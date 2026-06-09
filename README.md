@@ -2,7 +2,7 @@
 
 **Nexus** is a self-hosted team portal that brings your everyday tools into one place: bookmarked apps and links, a task board, network monitoring, and an optional AI assistant. It is designed for internal teams who want a single home screen for operations—not another SaaS subscription.
 
-Sign in once, and everyone sees the tools and status relevant to their role.
+Sign in once, and everyone sees the tools and status relevant to their role. The main sidebar can collapse to icons (with hover expand) to maximize workspace—matching the `/chat` layout.
 
 ---
 
@@ -56,7 +56,7 @@ A background worker runs checks continuously so the dashboard stays current.
 When an xAI API key is configured, users with permission can:
 
 - Chat with **Grok** from the home page search bar or AI drawer.
-- Use the full **AI Chat** workspace at `/chat` with projects, conversations, file knowledge bases, and AI skills.
+- Use the full **AI Chat** workspace at `/chat` with projects, conversations, file knowledge bases, per-conversation **Skills** toggles, and Grok-style tool results.
 - Get **AI-suggested metadata** when creating bookmarks (title, description, tags, icon).
 - **Analyse audit logs** in the admin panel (summaries, anomalies, follow-ups).
 

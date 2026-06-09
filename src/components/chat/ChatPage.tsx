@@ -1,12 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { Bot } from "lucide-react";
+import { Bot, FolderOpen, Sparkles, Wrench } from "lucide-react";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import { ChatComposer } from "@/components/chat/ChatComposer";
 import { ChatFileManager } from "@/components/chat/ChatFileManager";
 import { ChatMessageBubble } from "@/components/chat/ChatMessageBubble";
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
+import {
+  ChatActiveSkillChips,
+  ChatSkillsPanel,
+  resolveInitialEnabledSkills,
+} from "@/components/chat/ChatSkillsPanel";
 import { HistoryIndicatorBar, scrollToMessage } from "@/components/chat/HistoryIndicatorBar";
 import { useAiStream } from "@/components/chat/useAiStream";
 import type {
@@ -15,7 +21,9 @@ import type {
   AiMessageAttachment,
   AiProject,
   AiSkillEvent,
+  UserRole,
 } from "@/lib/db/schema";
+import type { UserPermissionOverrides } from "@/lib/permissions";
 import {
   appendAssistantMessage,
   appendUserMessage,
@@ -29,6 +37,7 @@ import {
   renameAiConversation,
   renameAiProject,
   setActiveAiSelection,
+  updateConversationEnabledSkills,
 } from "@/server/actions/ai-chat";
 import { updateBookmarkPreferences } from "@/server/actions/preferences";
 
@@ -59,6 +68,9 @@ export function ChatPage({
   initialProjectId,
   initialConversationId,
   initialSidebarCollapsed,
+  userRole,
+  userPermissions,
+  initialEnabledSkills,
 }: {
   initialProjects: AiProject[];
   initialConversations: AiConversation[];
@@ -66,6 +78,9 @@ export function ChatPage({
   initialProjectId: string | null;
   initialConversationId: string | null;
   initialSidebarCollapsed: boolean;
+  userRole: UserRole;
+  userPermissions: UserPermissionOverrides | null;
+  initialEnabledSkills: string[];
 }) {
   const { stream } = useAiStream();
   const [projects, setProjects] = useState(initialProjects);
@@ -83,6 +98,8 @@ export function ChatPage({
   const [streamingSkills, setStreamingSkills] = useState<AiSkillEvent[]>([]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(initialSidebarCollapsed);
   const [filesOpen, setFilesOpen] = useState(false);
+  const [skillsOpen, setSkillsOpen] = useState(false);
+  const [enabledSkillNames, setEnabledSkillNames] = useState(initialEnabledSkills);
   const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
@@ -90,6 +107,7 @@ export function ChatPage({
   const abortRef = useRef<AbortController | null>(null);
   const messagesRef = useRef(messages);
   const conversationIdRef = useRef(activeConversationId);
+  const enabledSkillNamesRef = useRef(enabledSkillNames);
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -98,6 +116,43 @@ export function ChatPage({
   useEffect(() => {
     conversationIdRef.current = activeConversationId;
   }, [activeConversationId]);
+
+  useEffect(() => {
+    enabledSkillNamesRef.current = enabledSkillNames;
+  }, [enabledSkillNames]);
+
+  const activeConversation = useMemo(
+    () => conversations.find((c) => c.id === activeConversationId) ?? null,
+    [conversations, activeConversationId]
+  );
+
+  const syncEnabledSkills = useCallback(
+    (conversation: AiConversation | null) => {
+      const resolved = resolveInitialEnabledSkills(
+        conversation?.enabledSkills,
+        userRole,
+        userPermissions
+      );
+      setEnabledSkillNames(resolved);
+    },
+    [userRole, userPermissions]
+  );
+
+  const handleEnabledSkillsChange = (names: string[]) => {
+    setEnabledSkillNames(names);
+    const conversationId = conversationIdRef.current;
+    if (!conversationId) return;
+    startTransition(async () => {
+      try {
+        const updated = await updateConversationEnabledSkills(conversationId, names);
+        setConversations((prev) =>
+          prev.map((c) => (c.id === updated.id ? { ...c, enabledSkills: updated.enabledSkills } : c))
+        );
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to update skills");
+      }
+    });
+  };
 
   const displayMessages = useMemo(() => {
     if (!isStreaming || (!streamingContent && streamingSkills.length === 0)) return messages;
@@ -126,13 +181,15 @@ export function ChatPage({
           const rows = await getConversationMessages(conversationId);
           setMessages(rows);
           setActiveConversationId(conversationId);
+          const conversation = conversations.find((c) => c.id === conversationId);
+          syncEnabledSkills(conversation ?? null);
           await setActiveAiSelection(activeProjectId, conversationId);
         } catch (error) {
           toast.error(error instanceof Error ? error.message : "Failed to load conversation");
         }
       });
     },
-    [activeProjectId]
+    [activeProjectId, conversations, syncEnabledSkills]
   );
 
   const selectProject = (projectId: string | null) => {
@@ -144,6 +201,7 @@ export function ChatPage({
     const conversation = conversations.find((c) => c.id === conversationId);
     if (conversation) {
       setActiveProjectId(conversation.projectId);
+      syncEnabledSkills(conversation);
     }
     loadConversation(conversationId);
   };
@@ -208,6 +266,7 @@ export function ChatPage({
         setConversations((prev) => [conversation, ...prev]);
         setActiveConversationId(conversation.id);
         setMessages([]);
+        syncEnabledSkills(conversation);
         await refreshWorkspace();
         toast.success("Conversation created");
       } catch (error) {
@@ -281,6 +340,7 @@ export function ChatPage({
           {
             projectId: projectIdRef.current,
             conversationId,
+            enabledSkillNames: enabledSkillNamesRef.current,
             onSkillsChange: setStreamingSkills,
           }
         );
@@ -412,12 +472,29 @@ export function ChatPage({
   }, [activeConversationId]);
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] min-h-[520px] flex-col">
-      <div className="border-b px-4 py-3">
-        <h1 className="text-xl font-semibold tracking-tight">AI Chat</h1>
-        <p className="text-sm text-muted-foreground">
-          Projects, conversations, and Grok — with full history navigation.
-        </p>
+    <div className="-m-4 flex h-[calc(100vh-3.5rem)] min-h-[520px] flex-col md:-m-6">
+      <div className="flex items-center justify-between border-b px-4 py-3 md:px-6">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary" />
+            <h1 className="truncate text-lg font-semibold tracking-tight">
+              {activeConversation?.title ?? "AI Chat"}
+            </h1>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Grok workspace · projects, files, skills, and history
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => setSkillsOpen(true)}>
+            <Wrench className="mr-1 h-4 w-4" />
+            Skills
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setFilesOpen(true)}>
+            <FolderOpen className="mr-1 h-4 w-4" />
+            Files
+          </Button>
+        </div>
       </div>
 
       <div className="flex min-h-0 flex-1">
@@ -455,9 +532,10 @@ export function ChatPage({
                       <Bot className="h-8 w-8 text-muted-foreground" />
                     </div>
                     <div className="max-w-md space-y-2">
-                      <h3 className="text-lg font-medium">How can I help?</h3>
+                      <h3 className="text-lg font-medium">Start a conversation</h3>
                       <p className="text-sm text-muted-foreground">
-                        Ask about bookmarks, tasks, monitoring, or day-to-day operations.
+                        Ask Grok about your operations, enable skills for tasks and monitoring, or
+                        upload project files for context.
                       </p>
                     </div>
                     <div className="flex flex-wrap justify-center gap-2">
@@ -493,6 +571,15 @@ export function ChatPage({
                 )}
               </div>
 
+              <div className="border-t bg-background/95 px-4 py-2 backdrop-blur">
+                <ChatActiveSkillChips
+                  userRole={userRole}
+                  userPermissions={userPermissions}
+                  enabledSkillNames={enabledSkillNames}
+                  onOpenSkills={() => setSkillsOpen(true)}
+                />
+              </div>
+
               <ChatComposer
                 value={input}
                 onChange={setInput}
@@ -524,6 +611,15 @@ export function ChatPage({
         onOpenChange={setFilesOpen}
         projectId={activeProjectId}
         conversationId={activeConversationId}
+      />
+
+      <ChatSkillsPanel
+        open={skillsOpen}
+        onOpenChange={setSkillsOpen}
+        userRole={userRole}
+        userPermissions={userPermissions}
+        enabledSkillNames={enabledSkillNames}
+        onEnabledChange={handleEnabledSkillsChange}
       />
     </div>
   );

@@ -50,6 +50,13 @@
       "when": 1780992773926,
       "tag": "0006_slow_lorna_dane",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1780993594988,
+      "tag": "0007_high_caretaker",
+      "breakpoints": true
     }
   ]
 }

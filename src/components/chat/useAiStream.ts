@@ -26,6 +26,7 @@ export function useAiStream() {
       options?: {
         projectId?: string | null;
         conversationId?: string | null;
+        enabledSkillNames?: string[];
         onSkill?: (event: AiSkillEvent) => void;
         onSkillsChange?: (skills: AiSkillEvent[]) => void;
       }
@@ -38,6 +39,7 @@ export function useAiStream() {
           projectId: options?.projectId ?? null,
           conversationId: options?.conversationId ?? null,
           enableTools: true,
+          enabledSkillNames: options?.enabledSkillNames,
         }),
         signal,
       });

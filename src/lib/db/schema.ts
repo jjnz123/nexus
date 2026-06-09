@@ -115,6 +115,7 @@ export const userPreferences = pgTable("user_preferences", {
   activeAiProjectId: uuid("active_ai_project_id"),
   activeAiConversationId: uuid("active_ai_conversation_id"),
   chatSidebarCollapsed: boolean("chat_sidebar_collapsed").notNull().default(false),
+  appSidebarCollapsed: boolean("app_sidebar_collapsed").notNull().default(false),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
@@ -259,6 +260,7 @@ export const aiConversations = pgTable(
     title: text("title").notNull().default("New conversation"),
     lastMessagePreview: text("last_message_preview"),
     lastMessageAt: timestamp("last_message_at"),
+    enabledSkills: jsonb("enabled_skills").$type<string[] | null>(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },

@@ -3,12 +3,12 @@
 import Image from "next/image";
 import { format } from "date-fns";
 import { motion } from "framer-motion";
-import { Check, Copy, FileText, Loader2, RotateCcw, Sparkles, Wrench } from "lucide-react";
+import { Check, Copy, FileText, RotateCcw, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { MarkdownMessage } from "@/components/ai/MarkdownMessage";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { SkillEvents } from "@/components/chat/SkillEvents";
 import type { AiMessage, AiMessageAttachment, AiSkillEvent } from "@/lib/db/schema";
 import { cn } from "@/lib/utils";
 
@@ -46,51 +46,6 @@ function AttachmentList({ attachments }: { attachments: AiMessageAttachment[] })
           </a>
         );
       })}
-    </div>
-  );
-}
-
-function SkillEvents({ skills }: { skills: AiSkillEvent[] }) {
-  if (!skills.length) return null;
-
-  return (
-    <div className="mb-3 space-y-1.5">
-      {skills.map((skill, index) => (
-        <div
-          key={`${skill.name}-${index}`}
-          className="flex items-start gap-2 rounded-lg border bg-muted/40 px-3 py-2 text-xs"
-        >
-          {skill.status === "running" ? (
-            <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin text-primary" />
-          ) : (
-            <Wrench className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
-          )}
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-medium">Using skill: {skill.label}</span>
-              <Badge
-                variant={
-                  skill.status === "success"
-                    ? "secondary"
-                    : skill.status === "error"
-                      ? "destructive"
-                      : "outline"
-                }
-                className="h-5 px-1.5 text-[10px]"
-              >
-                {skill.status}
-              </Badge>
-            </div>
-            {skill.error ? (
-              <p className="mt-1 text-destructive">{skill.error}</p>
-            ) : skill.result ? (
-              <pre className="mt-1 max-h-24 overflow-auto whitespace-pre-wrap break-words text-muted-foreground">
-                {JSON.stringify(skill.result, null, 2)}
-              </pre>
-            ) : null}
-          </div>
-        </div>
-      ))}
     </div>
   );
 }

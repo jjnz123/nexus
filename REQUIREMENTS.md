@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v1.4.0
+**Current release:** v1.5.0
 
 ## 1. Overview
 
@@ -70,6 +70,8 @@ Available on all authenticated app routes.
 - Sidebar: Home, **AI Chat**, Bookmarks, Tasks, Monitoring
 - Nav items hidden when the user lacks the required permission
 - Active route highlighting
+- **Collapsible sidebar** — icon-only mode with hover expand (same behaviour as `/chat` sidebar)
+- Manual collapse/expand toggle; state persisted in user preferences (`app_sidebar_collapsed`)
 - Mobile-responsive header with product branding
 - **Mobile navigation drawer** — hamburger menu exposes permission-filtered nav links on small screens
 
@@ -158,10 +160,10 @@ Requires `ai:use`. Also linked from the sidebar as **AI Chat**.
 
 ### Layout
 
-Three-panel workspace:
+Three-panel workspace (full-bleed within app shell):
 
 - **Left** — Collapsible projects and conversations sidebar (icon-only mode with hover expand)
-- **Center** — Main chat area with composer and file manager access
+- **Center** — Main chat area with header (conversation title, Skills and Files actions), active skill chips above composer, and file manager access
 - **Right** — Vertical history indicator bar (one marker per user/assistant message)
 
 ### Collapsible Sidebar
@@ -191,7 +193,7 @@ Three-panel workspace:
 
 - **Project knowledge base** — upload, rename, delete files shared across all conversations in a project
 - **Conversation files** — upload, rename, delete files scoped to the current conversation
-- File manager dialog with previews (images, document cards) and bulk upload
+- File manager dialog with search, image/document grouping, drag-and-drop upload, previews, and bulk upload
 - Text file content extracted for basic RAG-style context in AI responses
 - Message-level attachments remain supported in the composer
 
@@ -199,8 +201,11 @@ Three-panel workspace:
 
 - Grok can invoke Nexus **skills** during `/chat` conversations (permission-aware)
 - Built-in skills: **Create Task**, **Update Task**, **Check Monitoring**, **Search Bookmarks**
-- Skill usage shown inline in assistant messages (“Using skill: …”) with status and result
+- **Per-conversation skill toggles** — Skills panel to enable/disable each skill; stored in `enabled_skills` on the conversation (`null` = all permitted skills; `[]` = none)
+- Active skills shown as chips above the composer; header **Skills** button opens management dialog
+- Skill usage shown inline in assistant messages with Grok-style result cards (status, structured results)
 - Skill results persisted in message `metadata` jsonb
+- Only enabled skills are sent to the model as tools
 - Extensible skill registry in `src/lib/ai/skills/`
 
 ### Vertical History Indicator Bar
@@ -214,11 +219,11 @@ Three-panel workspace:
 ### Data Model
 
 - `ai_projects` — user-owned project folders
-- `ai_conversations` — title, project link, last message preview/at
+- `ai_conversations` — title, project link, last message preview/at, `enabled_skills` (jsonb)
 - `ai_messages` — role, content, attachments (jsonb), metadata (jsonb, skill events), timestamps
 - `ai_project_files` — project knowledge base files with text preview cache
 - `ai_conversation_files` — conversation-scoped files with text preview cache
-- User preferences: `active_ai_project_id`, `active_ai_conversation_id`, `chat_sidebar_collapsed`
+- User preferences: `active_ai_project_id`, `active_ai_conversation_id`, `chat_sidebar_collapsed`, `app_sidebar_collapsed`
 
 ## 5. Bookmarks (`/bookmarks`)
 
@@ -492,11 +497,12 @@ Requires `monitoring:configure` to enable; `monitoring:view` to display status.
 - Bookmarks sort mode
 - Home favourites order
 - Active AI project and conversation (`/chat`)
-- Chat sidebar collapsed state
+- Chat sidebar collapsed state (`/chat`)
+- App sidebar collapsed state (global nav)
 
 ### 13.2 AI Chat Persistence
 
-- Per-user projects, conversations, messages, project files, and conversation files (see §4.7)
+- Per-user projects, conversations, messages, project files, conversation files, and per-conversation enabled skills (see §4.7)
 - Attachments stored as jsonb on messages; knowledge-base files in dedicated tables
 - Skill execution metadata stored on assistant messages
 

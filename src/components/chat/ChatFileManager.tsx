@@ -1,9 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import { useRef, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { FileText, FolderOpen, MessageSquare, Pencil, Trash2, Upload } from "lucide-react";
+import { FileText, FolderOpen, ImageIcon, MessageSquare, Pencil, Search, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { AiConversationFile, AiProjectFile } from "@/lib/db/schema";
 import {
@@ -47,7 +48,7 @@ function FileRow({
   const src = `/uploads/${file.path}`;
 
   return (
-    <div className="flex gap-3 rounded-lg border p-3">
+    <div className="flex gap-3 rounded-lg border p-3 transition hover:bg-muted/40">
       <div className="shrink-0">
         {isImage ? (
           <Image
@@ -93,6 +94,112 @@ function FileRow({
   );
 }
 
+function filterFiles<T extends AiProjectFile | AiConversationFile>(files: T[], query: string) {
+  const q = query.trim().toLowerCase();
+  if (!q) return files;
+  return files.filter(
+    (file) =>
+      file.displayName.toLowerCase().includes(q) ||
+      file.mimeType.toLowerCase().includes(q) ||
+      (file.textPreview?.toLowerCase().includes(q) ?? false)
+  );
+}
+
+function groupFiles<T extends AiProjectFile | AiConversationFile>(files: T[]) {
+  const images = files.filter((f) => f.mimeType.startsWith("image/"));
+  const documents = files.filter((f) => !f.mimeType.startsWith("image/"));
+  return { images, documents };
+}
+
+function FileList<T extends AiProjectFile | AiConversationFile>({
+  files,
+  onRename,
+  onDelete,
+}: {
+  files: T[];
+  onRename: (file: T) => void;
+  onDelete: (file: T) => void;
+}) {
+  const { images, documents } = groupFiles(files);
+
+  if (files.length === 0) {
+    return (
+      <p className="py-8 text-center text-sm text-muted-foreground">
+        No files match your search
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {images.length > 0 ? (
+        <section className="space-y-2">
+          <h4 className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <ImageIcon className="h-3.5 w-3.5" />
+            Images ({images.length})
+          </h4>
+          {images.map((file) => (
+            <FileRow
+              key={file.id}
+              file={file}
+              onRename={() => onRename(file)}
+              onDelete={() => onDelete(file)}
+            />
+          ))}
+        </section>
+      ) : null}
+      {documents.length > 0 ? (
+        <section className="space-y-2">
+          <h4 className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <FileText className="h-3.5 w-3.5" />
+            Documents ({documents.length})
+          </h4>
+          {documents.map((file) => (
+            <FileRow
+              key={file.id}
+              file={file}
+              onRename={() => onRename(file)}
+              onDelete={() => onDelete(file)}
+            />
+          ))}
+        </section>
+      ) : null}
+    </div>
+  );
+}
+
+function DropZone({
+  disabled,
+  onFiles,
+  children,
+}: {
+  disabled?: boolean;
+  onFiles: (files: FileList) => void;
+  children: React.ReactNode;
+}) {
+  const [dragOver, setDragOver] = useState(false);
+
+  return (
+    <div
+      className={`rounded-xl border border-dashed p-1 transition ${
+        dragOver ? "border-primary bg-primary/5" : "border-muted-foreground/25"
+      } ${disabled ? "pointer-events-none opacity-50" : ""}`}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setDragOver(true);
+      }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDragOver(false);
+        if (e.dataTransfer.files?.length) onFiles(e.dataTransfer.files);
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
 export function ChatFileManager({
   open,
   onOpenChange,
@@ -106,9 +213,19 @@ export function ChatFileManager({
 }) {
   const [projectFiles, setProjectFiles] = useState<AiProjectFile[]>([]);
   const [conversationFiles, setConversationFiles] = useState<AiConversationFile[]>([]);
+  const [search, setSearch] = useState("");
   const [isPending, startTransition] = useTransition();
   const projectInputRef = useRef<HTMLInputElement>(null);
   const conversationInputRef = useRef<HTMLInputElement>(null);
+
+  const filteredProjectFiles = useMemo(
+    () => filterFiles(projectFiles, search),
+    [projectFiles, search]
+  );
+  const filteredConversationFiles = useMemo(
+    () => filterFiles(conversationFiles, search),
+    [conversationFiles, search]
+  );
 
   const refresh = () => {
     startTransition(async () => {
@@ -127,13 +244,13 @@ export function ChatFileManager({
 
   const handleOpenChange = (next: boolean) => {
     onOpenChange(next);
-    if (next) refresh();
+    if (next) {
+      setSearch("");
+      refresh();
+    }
   };
 
-  async function uploadMany(
-    files: FileList | null,
-    scope: "project" | "conversation"
-  ) {
+  async function uploadMany(files: FileList | null, scope: "project" | "conversation") {
     if (!files?.length) return;
     const list = Array.from(files).slice(0, 10);
 
@@ -172,9 +289,19 @@ export function ChatFileManager({
           <DialogTitle>File manager</DialogTitle>
           <DialogDescription>
             Project knowledge base files are shared across conversations. Conversation files apply to
-            this thread only.
+            this thread only. Uploaded text is indexed for AI context (RAG).
           </DialogDescription>
         </DialogHeader>
+
+        <div className="relative">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search files…"
+            className="pl-9"
+          />
+        </div>
 
         <Tabs defaultValue={projectId ? "project" : "conversation"}>
           <TabsList>
@@ -214,17 +341,16 @@ export function ChatFileManager({
                   onChange={(e) => void uploadMany(e.target.files, "project")}
                 />
               </div>
-              <div className="max-h-[50vh] space-y-2 overflow-y-auto pr-1">
-                {projectFiles.length === 0 ? (
-                  <p className="py-8 text-center text-sm text-muted-foreground">
-                    No project files yet
-                  </p>
-                ) : (
-                  projectFiles.map((file) => (
-                    <FileRow
-                      key={file.id}
-                      file={file}
-                      onRename={() => {
+              <DropZone disabled={isPending} onFiles={(files) => void uploadMany(files, "project")}>
+                <div className="max-h-[50vh] space-y-2 overflow-y-auto p-2">
+                  {projectFiles.length === 0 ? (
+                    <p className="py-8 text-center text-sm text-muted-foreground">
+                      Drop files here or click Upload · PDF, text, images, CSV, JSON
+                    </p>
+                  ) : (
+                    <FileList
+                      files={filteredProjectFiles}
+                      onRename={(file) => {
                         const name = window.prompt("Display name", file.displayName)?.trim();
                         if (!name || name === file.displayName) return;
                         startTransition(async () => {
@@ -232,7 +358,7 @@ export function ChatFileManager({
                           refresh();
                         });
                       }}
-                      onDelete={() => {
+                      onDelete={(file) => {
                         if (!window.confirm(`Delete "${file.displayName}"?`)) return;
                         startTransition(async () => {
                           await deleteAiProjectFile(file.id);
@@ -240,9 +366,9 @@ export function ChatFileManager({
                         });
                       }}
                     />
-                  ))
-                )}
-              </div>
+                  )}
+                </div>
+              </DropZone>
             </TabsContent>
           ) : null}
 
@@ -270,17 +396,19 @@ export function ChatFileManager({
                 onChange={(e) => void uploadMany(e.target.files, "conversation")}
               />
             </div>
-            <div className="max-h-[50vh] space-y-2 overflow-y-auto pr-1">
-              {conversationFiles.length === 0 ? (
-                <p className="py-8 text-center text-sm text-muted-foreground">
-                  No conversation files yet
-                </p>
-              ) : (
-                conversationFiles.map((file) => (
-                  <FileRow
-                    key={file.id}
-                    file={file}
-                    onRename={() => {
+            <DropZone
+              disabled={!conversationId || isPending}
+              onFiles={(files) => void uploadMany(files, "conversation")}
+            >
+              <div className="max-h-[50vh] space-y-2 overflow-y-auto p-2">
+                {conversationFiles.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-muted-foreground">
+                    Drop files here or click Upload · scoped to this conversation
+                  </p>
+                ) : (
+                  <FileList
+                    files={filteredConversationFiles}
+                    onRename={(file) => {
                       const name = window.prompt("Display name", file.displayName)?.trim();
                       if (!name || name === file.displayName) return;
                       startTransition(async () => {
@@ -288,7 +416,7 @@ export function ChatFileManager({
                         refresh();
                       });
                     }}
-                    onDelete={() => {
+                    onDelete={(file) => {
                       if (!window.confirm(`Delete "${file.displayName}"?`)) return;
                       startTransition(async () => {
                         await deleteAiConversationFile(file.id);
@@ -296,9 +424,9 @@ export function ChatFileManager({
                       });
                     }}
                   />
-                ))
-              )}
-            </div>
+                )}
+              </div>
+            </DropZone>
           </TabsContent>
         </Tabs>
       </DialogContent>

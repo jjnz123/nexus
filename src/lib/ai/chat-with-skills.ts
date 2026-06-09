@@ -7,7 +7,8 @@ import {
   aiProjects,
 } from "@/lib/db/schema";
 import { buildFileContextBlock } from "@/lib/ai/file-context";
-import { getSkillLabel, skillDefinitionsForApi } from "@/lib/ai/skills/definitions";
+import { getSkillLabel } from "@/lib/ai/skills/definitions";
+import { skillDefinitionsForApi } from "@/lib/ai/skills/index";
 import { executeSkill } from "@/lib/ai/skills/executor";
 import type { AiSkillEvent, UserRole } from "@/lib/db/schema";
 import type { UserPermissionOverrides } from "@/lib/permissions";
@@ -79,6 +80,7 @@ export async function runAiChatWithSkills({
   projectId,
   conversationId,
   enableTools = true,
+  enabledSkillNames,
   signal,
   onEvent,
 }: {
@@ -87,6 +89,7 @@ export async function runAiChatWithSkills({
   projectId?: string | null;
   conversationId?: string | null;
   enableTools?: boolean;
+  enabledSkillNames?: string[];
   signal?: AbortSignal;
   onEvent?: (event: StreamEvent) => void;
 }) {
@@ -121,7 +124,7 @@ export async function runAiChatWithSkills({
   ];
 
   const skillEvents: AiSkillEvent[] = [];
-  const tools = enableTools ? skillDefinitionsForApi() : undefined;
+  const tools = enableTools ? skillDefinitionsForApi(enabledSkillNames) : undefined;
   const maxRounds = 6;
 
   for (let round = 0; round < maxRounds; round += 1) {
@@ -240,6 +243,7 @@ export function createSkillChatSseStream(
     projectId?: string | null;
     conversationId?: string | null;
     enableTools?: boolean;
+    enabledSkillNames?: string[];
     signal?: AbortSignal;
   }
 ) {
@@ -254,6 +258,7 @@ export function createSkillChatSseStream(
           projectId: options.projectId,
           conversationId: options.conversationId,
           enableTools: options.enableTools,
+          enabledSkillNames: options.enabledSkillNames,
           signal: options.signal,
           onEvent: (event) => {
             controller.enqueue(encoder.encode(encodeSse(event)));

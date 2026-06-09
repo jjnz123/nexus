@@ -23,6 +23,7 @@ export async function POST(req: NextRequest) {
     projectId?: string | null;
     conversationId?: string | null;
     enableTools?: boolean;
+    enabledSkillNames?: string[];
     legacyStream?: boolean;
   };
 
@@ -83,6 +84,7 @@ export async function POST(req: NextRequest) {
       projectId: body.projectId ?? null,
       conversationId: body.conversationId ?? null,
       enableTools: true,
+      enabledSkillNames: body.enabledSkillNames,
     }
   );
 

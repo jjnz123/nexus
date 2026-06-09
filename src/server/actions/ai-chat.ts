@@ -171,6 +171,27 @@ export async function setActiveAiSelection(projectId: string | null, conversatio
   return { success: true };
 }
 
+export async function updateConversationEnabledSkills(
+  conversationId: string,
+  enabledSkills: string[] | null
+) {
+  const session = await requireAuth();
+  requireSessionPermission(session, "ai:use");
+  await assertConversationOwner(conversationId, session.user.id);
+
+  const [conversation] = await db
+    .update(aiConversations)
+    .set({
+      enabledSkills,
+      updatedAt: new Date(),
+    })
+    .where(eq(aiConversations.id, conversationId))
+    .returning();
+
+  revalidatePath("/chat");
+  return conversation;
+}
+
 export async function getConversationMessages(conversationId: string) {
   const session = await requireAuth();
   requireSessionPermission(session, "ai:use");

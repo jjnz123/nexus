@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/shell/AppShell";
 import { getSystemSettings } from "@/server/settings";
+import { getBookmarkPreferences } from "@/server/actions/preferences";
 
 export default async function AppLayout({
   children,
@@ -11,7 +12,7 @@ export default async function AppLayout({
   const session = await auth();
   if (!session?.user) redirect("/login");
 
-  const settings = await getSystemSettings();
+  const [settings, prefs] = await Promise.all([getSystemSettings(), getBookmarkPreferences()]);
 
   return (
     <AppShell
@@ -21,6 +22,7 @@ export default async function AppLayout({
       }}
       portalSubtitle={settings.portalSubtitle ?? "Internal Operations Portal"}
       portalSubtitleEnabled={settings.portalSubtitleEnabled}
+      initialAppSidebarCollapsed={prefs.appSidebarCollapsed ?? false}
     >
       {children}
     </AppShell>

@@ -20,6 +20,7 @@ const bookmarkPrefsSchema = z.object({
   activeAiProjectId: z.string().uuid().nullable().optional(),
   activeAiConversationId: z.string().uuid().nullable().optional(),
   chatSidebarCollapsed: z.boolean().optional(),
+  appSidebarCollapsed: z.boolean().optional(),
 });
 
 async function getOrCreatePrefs(userId: string) {
