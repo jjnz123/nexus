@@ -34,6 +34,8 @@ export function AdminPanel({
   auditActions,
   settings,
   aiProjects,
+  emailConfigured,
+  defaultTestEmail,
 }: {
   users: UserRow[];
   auditLogs: AuditLog[];
@@ -41,6 +43,8 @@ export function AdminPanel({
   auditActions: string[];
   settings: SystemSettings;
   aiProjects: AiProjectOption[];
+  emailConfigured: boolean;
+  defaultTestEmail: string;
 }) {
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab");
@@ -73,7 +77,11 @@ export function AdminPanel({
           <UserManagement users={users} />
         </TabsContent>
         <TabsContent value="settings" className="mt-4">
-          <SystemSettingsPanel settings={settings} />
+          <SystemSettingsPanel
+            settings={settings}
+            emailConfigured={emailConfigured}
+            defaultTestEmail={defaultTestEmail}
+          />
         </TabsContent>
         <TabsContent value="ai-history" className="mt-4">
           <AiHistoryPanel

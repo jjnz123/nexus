@@ -9,6 +9,7 @@ import { requireAuth } from "@/lib/auth";
 import { requireSessionPermission } from "@/lib/permissions";
 import { getSystemSettings } from "@/server/settings";
 import { logAudit } from "@/server/audit";
+import { isEmailConfigured, sendEmail } from "@/lib/email";
 
 const updateSettingsSchema = z.object({
   aiModel: z.string().min(1).max(100),
@@ -54,4 +55,47 @@ export async function updateSystemSettings(input: unknown) {
   });
 
   return settings;
+}
+
+export async function sendTestEmail(input: unknown) {
+  const session = await requireAuth();
+  requireSessionPermission(session, "admin:access");
+
+  const data = z
+    .object({ to: z.string().email().optional() })
+    .parse(input ?? {});
+
+  const to = data.to ?? session.user.email;
+
+  if (!isEmailConfigured()) {
+    throw new Error(
+      "SMTP2go is not configured. Set SMTP2GO_API_KEY and SMTP2GO_SENDER_EMAIL in the stack environment."
+    );
+  }
+
+  const result = await sendEmail({
+    to,
+    subject: "Nexus test email",
+    text: [
+      "This is a test email from Nexus.",
+      "",
+      `Sent by: ${session.user.name} (${session.user.email})`,
+      `Time: ${new Date().toISOString()}`,
+      "",
+      "If you received this message, SMTP2go is configured correctly.",
+    ].join("\n"),
+  });
+
+  if (result.skipped) {
+    throw new Error("Email send was skipped — check SMTP2go configuration.");
+  }
+
+  await logAudit({
+    action: "email.test",
+    resource: "email",
+    summary: `Sent test email to ${to}`,
+    details: { to },
+  });
+
+  return { ok: true, to };
 }

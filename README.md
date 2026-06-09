@@ -93,8 +93,8 @@ At `/meetings` (requires `ai:use`):
 ### Security & user lifecycle
 
 - **Account status:** `pending`, `member`, or `administrator` — new users start as **pending** with access limited to Profile Settings until elevated.
-- **Two-factor authentication (TOTP):** mandatory for all non-administrator accounts; setup in Profile Settings with QR enrollment and one-time backup codes.
-- **Administrators** are exempt from 2FA and seeded with `administrator` status.
+- **Two-factor authentication (TOTP):** mandatory for all non-administrator accounts; optional for administrators in Profile Settings (enforced at sign-in when enabled).
+- **Administrators** are not required to set up 2FA but may enable it voluntarily; seeded with `administrator` status.
 - **SMTP2go** integration for welcome/invite emails and admin alerts when pending users sign in for the first time (`SMTP2GO_*` env vars).
 
 ### Administration
@@ -102,7 +102,7 @@ At `/meetings` (requires `ai:use`):
 Admins manage the portal itself:
 
 - **Users** — create pending accounts, assign roles, elevate status (`pending` → `member` / `administrator`), send welcome emails, disable users, and override permissions per person.
-- **System settings** — AI model choice and the subtitle shown in the header.
+- **System settings** — AI model choice, header subtitle, and **send test email** to verify SMTP2go.
 - **Audit logs** — review who did what, filter, export, or ask AI to summarise activity.
 
 ---

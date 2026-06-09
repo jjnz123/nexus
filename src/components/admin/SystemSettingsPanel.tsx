@@ -2,9 +2,11 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Mail } from "lucide-react";
 import { toast } from "sonner";
 import type { SystemSettings } from "@/lib/db/schema";
-import { updateSystemSettings } from "@/server/actions/settings";
+import { sendTestEmail, updateSystemSettings } from "@/server/actions/settings";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -26,7 +28,15 @@ const MODEL_PRESETS = [
   "grok-beta",
 ];
 
-export function SystemSettingsPanel({ settings }: { settings: SystemSettings }) {
+export function SystemSettingsPanel({
+  settings,
+  emailConfigured,
+  defaultTestEmail,
+}: {
+  settings: SystemSettings;
+  emailConfigured: boolean;
+  defaultTestEmail: string;
+}) {
   const [aiModel, setAiModel] = useState(settings.aiModel);
   const [customModel, setCustomModel] = useState(
     MODEL_PRESETS.includes(settings.aiModel) ? "" : settings.aiModel
@@ -37,7 +47,9 @@ export function SystemSettingsPanel({ settings }: { settings: SystemSettings }) 
   const [portalSubtitleEnabled, setPortalSubtitleEnabled] = useState(
     settings.portalSubtitleEnabled
   );
+  const [testEmailTo, setTestEmailTo] = useState(defaultTestEmail);
   const [isPending, startTransition] = useTransition();
+  const [isEmailPending, startEmailTransition] = useTransition();
   const router = useRouter();
 
   const selectedPreset = MODEL_PRESETS.includes(aiModel) ? aiModel : "custom";
@@ -63,7 +75,19 @@ export function SystemSettingsPanel({ settings }: { settings: SystemSettings }) 
     });
   };
 
+  const onSendTestEmail = () => {
+    startEmailTransition(async () => {
+      try {
+        const result = await sendTestEmail({ to: testEmailTo.trim() || undefined });
+        toast.success(`Test email sent to ${result.to}`);
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to send test email");
+      }
+    });
+  };
+
   return (
+    <div className="space-y-6">
     <Card>
       <CardHeader>
         <CardTitle>System Settings</CardTitle>
@@ -136,5 +160,56 @@ export function SystemSettingsPanel({ settings }: { settings: SystemSettings }) 
         </Button>
       </CardContent>
     </Card>
+
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Mail className="h-5 w-5" />
+          Email (SMTP2go)
+        </CardTitle>
+        <CardDescription>
+          Send a test message to verify transactional email delivery.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Status:</span>
+          {emailConfigured ? (
+            <Badge>Configured</Badge>
+          ) : (
+            <Badge variant="destructive">Not configured</Badge>
+          )}
+        </div>
+        {!emailConfigured ? (
+          <p className="text-sm text-muted-foreground">
+            Set <code>SMTP2GO_API_KEY</code> and <code>SMTP2GO_SENDER_EMAIL</code> in the stack
+            environment to enable welcome emails, admin alerts, and test sends.
+          </p>
+        ) : (
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="test-email-to">Send test email to</Label>
+              <Input
+                id="test-email-to"
+                type="email"
+                value={testEmailTo}
+                onChange={(event) => setTestEmailTo(event.target.value)}
+                placeholder="you@example.com"
+              />
+            </div>
+            <Button
+              variant="outline"
+              className="gap-2"
+              disabled={isEmailPending || !testEmailTo.trim()}
+              onClick={onSendTestEmail}
+            >
+              <Mail className="h-4 w-4" />
+              {isEmailPending ? "Sending..." : "Send test email"}
+            </Button>
+          </>
+        )}
+      </CardContent>
+    </Card>
+    </div>
   );
 }

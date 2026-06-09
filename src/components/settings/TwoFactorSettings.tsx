@@ -89,8 +89,8 @@ export function TwoFactorSettings({
         </CardTitle>
         <CardDescription>
           {required
-            ? "Use an authenticator app (TOTP). Administrators are exempt from 2FA."
-            : "Optional for administrator accounts."}
+            ? "Use an authenticator app (TOTP). Required for all non-administrator accounts."
+            : "Optional for administrator accounts. When enabled, you'll need your authenticator code at sign-in."}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

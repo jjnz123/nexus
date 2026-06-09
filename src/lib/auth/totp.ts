@@ -89,6 +89,11 @@ export function isTwoFactorRequired(user: {
   return true;
 }
 
+/** True when the user must enter a TOTP/backup code at sign-in (any role). */
+export function requiresTotpAtLogin(user: { totpEnabled: boolean }): boolean {
+  return user.totpEnabled;
+}
+
 export function isTwoFactorSatisfied(user: {
   role: string;
   status: string;

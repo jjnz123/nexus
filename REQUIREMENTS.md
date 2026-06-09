@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v3.1.1
+**Current release:** v3.1.2
 
 ## 1. Overview
 
@@ -34,7 +34,7 @@ Internal operations portal for bookmarks, kanban tasks, network monitoring, and 
 |--------|--------|
 | `pending` | Profile Settings only until elevated |
 | `member` | Full access per role (after 2FA setup if required) |
-| `administrator` | Admin access; role forced to `admin`; 2FA exempt |
+| `administrator` | Admin access; role forced to `admin`; 2FA optional but enforced at login when enabled |
 
 - New users created by admins start as **`pending`**
 - Admins elevate `pending` → `member` or `administrator` in Admin Panel
@@ -42,7 +42,8 @@ Internal operations portal for bookmarks, kanban tasks, network monitoring, and 
 
 ### 2.1.2 Two-factor authentication (TOTP)
 
-- Mandatory for all users **except** administrators
+- Mandatory for all users **except** administrators (admins may optionally enable 2FA in Profile Settings)
+- When enabled on any account (including administrators), TOTP or a backup code is required at sign-in
 - Setup in Profile Settings: QR code enrollment, backup codes (hashed, one-time use)
 - TOTP secrets encrypted at rest using `AUTH_SECRET`-derived key
 - Optional email verification codes via SMTP2go (password-gated send from settings)
@@ -51,7 +52,7 @@ Internal operations portal for bookmarks, kanban tasks, network monitoring, and 
 
 - Provider: `https://api.smtp2go.com/v3/email/send` with `X-Smtp2go-Api-Key` header
 - Env: `SMTP2GO_API_KEY`, `SMTP2GO_SENDER_EMAIL`, `SMTP2GO_SENDER_NAME`
-- Sends: welcome/invite emails on user creation; admin alert on pending user first login
+- Sends: welcome/invite emails on user creation; admin alert on pending user first login; **test email** from Admin → Settings
 - Gracefully skips when not configured (logs warning)
 
 ### 2.2 Roles
@@ -572,6 +573,7 @@ Requires `admin:access`. Tab selection via query param: `?tab=users|settings|ai-
 
 - **AI model** — select preset Grok model or enter custom model ID
 - **Portal header subtitle** — text and enable/disable toggle
+- **Email test** — send a test message via SMTP2go to verify configuration (shows configured/not configured status)
 
 ### 10.3 Audit Logs
 

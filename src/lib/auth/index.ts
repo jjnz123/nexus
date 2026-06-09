@@ -7,7 +7,7 @@ import { users } from "@/lib/db/schema";
 import { loginSchema } from "@/lib/validators/auth";
 import {
   decryptTotpSecret,
-  isTwoFactorRequired,
+  requiresTotpAtLogin,
   verifyBackupCode,
   verifyTotpCode,
 } from "@/lib/auth/totp";
@@ -60,14 +60,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const valid = await bcrypt.compare(parsed.data.password, user.passwordHash);
         if (!valid) return null;
 
-        if (
-          isTwoFactorRequired({
-            role: user.role,
-            status: user.status,
-            totpEnabled: user.totpEnabled,
-          }) &&
-          user.totpEnabled
-        ) {
+        if (requiresTotpAtLogin(user)) {
           const totpCode = parsed.data.totpCode?.trim();
           const backupCode = parsed.data.backupCode?.trim();
           let verified = false;

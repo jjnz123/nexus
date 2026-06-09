@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
-import { isTwoFactorRequired } from "@/lib/auth/totp";
+import { isTwoFactorRequired, requiresTotpAtLogin } from "@/lib/auth/totp";
 import { isAdminUser } from "@/lib/auth/user-access";
 
 export async function checkLoginRequirements(email: string, password: string) {
@@ -23,12 +23,7 @@ export async function checkLoginRequirements(email: string, password: string) {
     return { ok: false as const, reason: "invalid" as const };
   }
 
-  const requiresTotp =
-    isTwoFactorRequired({
-      role: user.role,
-      status: user.status,
-      totpEnabled: user.totpEnabled,
-    }) && user.totpEnabled;
+  const requiresTotp = requiresTotpAtLogin(user);
 
   const requiresSetup =
     isTwoFactorRequired({
