@@ -60,7 +60,7 @@ Keep an eye on servers, services, and URLs:
 - **Overview** — see which targets are up, down, or unknown, with latency sparklines.
 - **Discover devices** — import unmonitored bookmark URLs or **scan a network range** (CIDR / IP range); network scan defaults to **ping** checks with plain IP targets (no URL/port).
 - **Check types** — ping, TCP, or HTTP, on a schedule you configure.
-- **Device detail pages** — back link to monitoring overview, latency charts (1h / 24h / 7d), and a history of recent checks.
+- **Device detail pages** — back link to monitoring overview, **Edit** button (configure permission), latency charts (1h / 24h / 7d), and a history of recent checks.
 - **Force a check** when you need an immediate result.
 
 A background worker runs checks continuously so the dashboard stays current.

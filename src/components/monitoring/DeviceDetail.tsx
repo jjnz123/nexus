@@ -20,6 +20,7 @@ import type { MonitorCheck, MonitorDevice } from "@/lib/db/schema";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { DeviceFormDialog } from "./DeviceFormDialog";
 
 const ranges = [
   { label: "1h", hours: 1 },
@@ -36,9 +37,11 @@ function statusVariant(status: MonitorCheck["status"] | MonitorDevice["lastStatu
 export function DeviceDetail({
   device,
   checksByRange,
+  canConfigureMonitoring = false,
 }: {
   device: MonitorDevice;
   checksByRange: Record<number, MonitorCheck[]>;
+  canConfigureMonitoring?: boolean;
 }) {
   const [selectedRange, setSelectedRange] = useState<number>(24);
   const [isPending, startTransition] = useTransition();
@@ -93,6 +96,17 @@ export function DeviceDetail({
           <Badge variant={statusVariant(lastCheck?.status ?? device.lastStatus)}>
             {(lastCheck?.status ?? device.lastStatus ?? "unknown").toUpperCase()}
           </Badge>
+          {canConfigureMonitoring ? (
+            <DeviceFormDialog
+              device={device}
+              onDeleted={() => router.push("/monitoring")}
+              trigger={
+                <Button variant="outline" size="sm">
+                  Edit
+                </Button>
+              }
+            />
+          ) : null}
           <Button onClick={onForceCheck} disabled={isPending} className="gap-2">
             <PlayCircle className="h-4 w-4" />
             {isPending ? "Running..." : "Force Check Now"}

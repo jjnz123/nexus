@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import { DeviceDetail } from "@/components/monitoring/DeviceDetail";
+import { auth } from "@/lib/auth";
+import { hasPermission } from "@/lib/permissions";
 import { getDeviceChecks, getMonitorDevice } from "@/server/actions/monitoring";
 
 export default async function MonitorDevicePage({
@@ -8,6 +10,11 @@ export default async function MonitorDevicePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const session = await auth();
+  const role = session?.user.role ?? "viewer";
+  const permissions = session?.user.permissions ?? null;
+  const canConfigureMonitoring = hasPermission(role, "monitoring:configure", permissions);
+
   const device = await getMonitorDevice(id);
   if (!device) notFound();
 
@@ -25,6 +32,7 @@ export default async function MonitorDevicePage({
         24: checks24h,
         168: checks7d,
       }}
+      canConfigureMonitoring={canConfigureMonitoring}
     />
   );
 }

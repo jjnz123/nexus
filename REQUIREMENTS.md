@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v2.0.2
+**Current release:** v2.0.3
 
 ## 1. Overview
 
@@ -508,6 +508,7 @@ Requires `monitoring:view`.
 
 - Device name, target, current status
 - **Back to monitoring** link at top of page
+- **Edit device** — same dialog as overview (requires `monitoring:configure`): name, target, check type, interval, timeout, enabled, delete
 - **Force check now** — queue immediate check and refresh page
 - **Latency trend chart** — selectable ranges: 1h, 24h, 7d
 - **Recent checks table** — timestamp, status, latency, error (up to 100 rows)

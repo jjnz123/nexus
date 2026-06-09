@@ -47,9 +47,11 @@ function initialValues(device?: MonitorDevice): DeviceInputState {
 export function DeviceFormDialog({
   device,
   trigger,
+  onDeleted,
 }: {
   device?: MonitorDevice;
   trigger: React.ReactNode;
+  onDeleted?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<DeviceInputState>(initialValues(device));
@@ -105,6 +107,7 @@ export function DeviceFormDialog({
         await deleteMonitorDevice(device.id);
         toast.success("Device deleted");
         setOpen(false);
+        onDeleted?.();
         router.refresh();
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Failed to delete device");
