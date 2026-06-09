@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v3.1.0
+**Current release:** v3.1.1
 
 ## 1. Overview
 
@@ -24,6 +24,9 @@ Internal operations portal for bookmarks, kanban tasks, network monitoring, and 
 - Redirect unauthenticated users to `/login`
 - Pending users and users without required 2FA are restricted to `/settings` only
 - Public routes: `/api/auth/*`, `/api/health`
+- Auth.js `trustHost: true` — trusts `X-Forwarded-Host` / `X-Forwarded-Proto` from Cloudflare Tunnel and reverse proxies
+- Middleware redirects resolve the public origin from forwarded headers (not the internal Docker/LAN address)
+- Absolute URLs in emails use `NEXT_PUBLIC_APP_URL` (preferred) or `AUTH_URL`
 
 ### 2.1.1 Account status
 
@@ -651,8 +654,22 @@ Requires `monitoring:configure` to enable; `monitoring:view` to display status.
 ### 14.1 Deployment
 
 - Docker Compose: app, PostgreSQL, monitor-worker
-- Default host port: 8374
-- Environment: `DATABASE_URL`, `AUTH_SECRET`, `AUTH_URL`, `XAI_API_KEY`, `OPENAI_API_KEY`, `SMTP2GO_*` (all optional except core auth/DB), seed admin vars
+- Default host port: 8374 (internal/LAN access only)
+- Environment: `DATABASE_URL`, `AUTH_SECRET`, `AUTH_URL`, `NEXT_PUBLIC_APP_URL`, `AUTH_TRUST_HOST`, `XAI_API_KEY`, `OPENAI_API_KEY`, `SMTP2GO_*` (all optional except core auth/DB), seed admin vars
+
+#### 14.1.1 Public access via Cloudflare Tunnel
+
+When users reach Nexus at a public domain (e.g. `https://ai.q1.co.nz`):
+
+| Variable | Value |
+|----------|-------|
+| `AUTH_URL` | `https://ai.q1.co.nz` |
+| `NEXT_PUBLIC_APP_URL` | `https://ai.q1.co.nz` |
+| `AUTH_TRUST_HOST` | `true` |
+
+- Do not set `AUTH_URL` to an internal IP or `:8374` address when the tunnel serves the public domain
+- Redirects and auth callbacks use forwarded headers (`X-Forwarded-Host`, `X-Forwarded-Proto`) via `src/lib/url.ts`
+- UI navigation uses relative paths wherever possible
 
 ### 14.2 Security
 

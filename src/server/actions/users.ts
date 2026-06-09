@@ -14,6 +14,7 @@ import {
 } from "@/lib/validators/auth";
 import { logAudit } from "@/server/audit";
 import { sendWelcomeEmail } from "@/lib/email";
+import { getAppUrlFromEnv } from "@/lib/url";
 
 export async function getUsers() {
   const session = await requireAuth();
@@ -56,7 +57,7 @@ export async function createUser(input: unknown) {
   });
 
   if (data.sendWelcomeEmail) {
-    const authUrl = process.env.AUTH_URL ?? "http://localhost:8374";
+    const authUrl = getAppUrlFromEnv();
     await sendWelcomeEmail({
       to: user.email,
       name: user.name,

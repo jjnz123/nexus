@@ -166,7 +166,9 @@ npm run dev
 |----------|-------------|
 | `DATABASE_URL` | PostgreSQL connection string |
 | `AUTH_SECRET` | Session signing secret (32+ chars) |
-| `AUTH_URL` | Public app URL (e.g. `http://localhost:8374`) |
+| `AUTH_URL` | Public app URL users open in the browser (e.g. `https://ai.q1.co.nz`) |
+| `NEXT_PUBLIC_APP_URL` | Same as `AUTH_URL` — used for absolute links in emails and server-side URL generation |
+| `AUTH_TRUST_HOST` | Set to `true` when behind Cloudflare Tunnel or a reverse proxy (Auth.js `trustHost`) |
 | `XAI_API_KEY` | xAI API key for Grok (optional) |
 | `OPENAI_API_KEY` | OpenAI API key for Whisper meeting transcription (optional) |
 | `SMTP2GO_API_KEY` | SMTP2go API key for transactional email (optional) |
@@ -198,7 +200,22 @@ location / {
 }
 ```
 
-Set `AUTH_URL` to your HTTPS URL.
+Set `AUTH_URL` and `NEXT_PUBLIC_APP_URL` to your HTTPS URL.
+
+### Cloudflare Tunnel (public access)
+
+When exposing Nexus via Cloudflare Tunnel (e.g. `https://ai.q1.co.nz` → internal `8374`):
+
+1. Set stack environment variables to the **public domain**, not the internal IP:
+   ```
+   AUTH_URL=https://ai.q1.co.nz
+   NEXT_PUBLIC_APP_URL=https://ai.q1.co.nz
+   AUTH_TRUST_HOST=true
+   ```
+2. Auth.js runs with `trustHost: true` and middleware redirects use `X-Forwarded-Host` / `X-Forwarded-Proto` from Cloudflare.
+3. Prefer relative URLs in the UI; absolute URLs in emails and admin alerts use `NEXT_PUBLIC_APP_URL` / `AUTH_URL`.
+
+Do **not** set `AUTH_URL` to `http://192.168.x.x:8374` when users access the app through the tunnel.
 
 ### Portainer stack
 
@@ -208,7 +225,9 @@ Deploy from the GitHub repo with build enabled. Set these stack environment vari
 |----------|----------|-------|
 | `AUTH_SECRET` | Yes | 32+ char random string |
 | `POSTGRES_PASSWORD` | Recommended | Change from default |
-| `AUTH_URL` | Recommended | Must match browser URL, e.g. `http://192.168.1.50:8374` |
+| `AUTH_URL` | Recommended | Public browser URL, e.g. `https://ai.q1.co.nz` (not internal IP) |
+| `NEXT_PUBLIC_APP_URL` | Recommended | Same as `AUTH_URL` |
+| `AUTH_TRUST_HOST` | Recommended | `true` when behind Cloudflare Tunnel or reverse proxy |
 | `SEED_ADMIN_EMAIL` | Recommended | First-run admin (only if DB empty) |
 | `SEED_ADMIN_PASSWORD` | Recommended | Change before first deploy |
 | `SEED_ADMIN_NAME` | Optional | Default: `Admin` |

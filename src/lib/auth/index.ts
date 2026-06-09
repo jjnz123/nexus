@@ -13,6 +13,7 @@ import {
 } from "@/lib/auth/totp";
 import { isRestrictedToSettings } from "@/lib/auth/user-access";
 import { sendPendingUserLoginAlert } from "@/lib/email";
+import { getAppUrlFromEnv } from "@/lib/url";
 import { authConfig } from "./auth.config";
 
 async function notifyAdminsOfPendingFirstLogin(user: {
@@ -24,7 +25,7 @@ async function notifyAdminsOfPendingFirstLogin(user: {
     .from(users)
     .where(eq(users.role, "admin"));
 
-  const authUrl = process.env.AUTH_URL ?? "http://localhost:8374";
+  const authUrl = getAppUrlFromEnv();
   await sendPendingUserLoginAlert({
     adminEmails: admins.map((a) => a.email),
     userName: user.name,

@@ -25,7 +25,11 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-nexus}:${POSTGRES_PASSWORD:-nexus}@postgres:5432/${POSTGRES_DB:-nexus}
       AUTH_SECRET: ${AUTH_SECRET}
+      # Public URL — set both to your browser-facing domain (e.g. https://ai.q1.co.nz).
+      # Do not use the internal Docker/LAN address when serving via Cloudflare Tunnel.
       AUTH_URL: ${AUTH_URL:-http://localhost:8374}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:8374}
+      AUTH_TRUST_HOST: "true"
       XAI_API_KEY: ${XAI_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       SMTP2GO_API_KEY: ${SMTP2GO_API_KEY:-}

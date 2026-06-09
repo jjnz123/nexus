@@ -2,6 +2,7 @@ import type { NextAuthConfig } from "next-auth";
 import type { UserRole, UserStatus } from "@/lib/db/schema";
 import type { UserPermissionOverrides } from "@/lib/permissions";
 import { canAccessRoute } from "@/lib/permissions";
+import { absoluteUrlFromRequest } from "@/lib/url";
 
 declare module "next-auth" {
   interface Session {
@@ -55,7 +56,8 @@ export const authConfig = {
         const dest = auth?.user?.status === "pending" || (!auth.user.totpEnabled && auth.user.role !== "admin" && auth.user.status !== "administrator")
           ? "/settings"
           : "/";
-        return Response.redirect(new URL(dest, request.nextUrl));
+        // Use forwarded host/proto (Cloudflare Tunnel) instead of internal request origin.
+        return Response.redirect(absoluteUrlFromRequest(dest, request));
       }
       if (
         isLoggedIn &&
@@ -65,7 +67,7 @@ export const authConfig = {
           totpEnabled: auth.user.totpEnabled,
         })
       ) {
-        return Response.redirect(new URL("/settings", request.nextUrl));
+        return Response.redirect(absoluteUrlFromRequest("/settings", request));
       }
       return true;
     },
