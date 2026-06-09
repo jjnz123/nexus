@@ -1,0 +1,241 @@
+import {
+  boolean,
+  integer,
+  jsonb,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+  index,
+} from "drizzle-orm/pg-core";
+
+export const userRoleEnum = pgEnum("user_role", [
+  "admin",
+  "editor",
+  "user",
+  "viewer",
+]);
+
+export const checkTypeEnum = pgEnum("check_type", ["ping", "tcp", "http"]);
+
+export const monitorStatusEnum = pgEnum("monitor_status", [
+  "up",
+  "down",
+  "unknown",
+]);
+
+export const taskPriorityEnum = pgEnum("task_priority", [
+  "low",
+  "medium",
+  "high",
+  "urgent",
+]);
+
+export const notificationTypeEnum = pgEnum("notification_type", [
+  "task",
+  "monitor",
+  "system",
+]);
+
+export const users = pgTable("users", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  email: text("email").notNull().unique(),
+  name: text("name").notNull(),
+  passwordHash: text("password_hash").notNull(),
+  avatarPath: text("avatar_path"),
+  role: userRoleEnum("role").notNull().default("user"),
+  disabled: boolean("disabled").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    type: notificationTypeEnum("type").notNull().default("system"),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    link: text("link"),
+    readAt: timestamp("read_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("notifications_user_idx").on(table.userId)]
+);
+
+export const bookmarkTabs = pgTable("bookmark_tabs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: text("name").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  layoutLocked: boolean("layout_locked").notNull().default(false),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const bookmarkGroups = pgTable("bookmark_groups", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tabId: uuid("tab_id")
+    .notNull()
+    .references(() => bookmarkTabs.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  collapsed: boolean("collapsed").notNull().default(false),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+export const bookmarkCards = pgTable("bookmark_cards", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  groupId: uuid("group_id")
+    .notNull()
+    .references(() => bookmarkGroups.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  description: text("description"),
+  url: text("url").notNull(),
+  icon: text("icon"),
+  enabled: boolean("enabled").notNull().default(true),
+  favourite: boolean("favourite").notNull().default(false),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+export const projects = pgTable("projects", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  key: text("key").notNull().unique(),
+  name: text("name").notNull(),
+  settings: jsonb("settings").$type<Record<string, unknown>>().default({}),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const taskColumns = pgTable("task_columns", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  color: text("color").notNull().default("#6366f1"),
+  wipLimit: integer("wip_limit"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  isBacklog: boolean("is_backlog").notNull().default(false),
+});
+
+export const tasks = pgTable(
+  "tasks",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    columnId: uuid("column_id")
+      .notNull()
+      .references(() => taskColumns.id, { onDelete: "restrict" }),
+    number: integer("number").notNull(),
+    title: text("title").notNull(),
+    description: text("description"),
+    priority: taskPriorityEnum("priority").notNull().default("medium"),
+    dueDate: timestamp("due_date"),
+    assigneeId: uuid("assignee_id").references(() => users.id),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("tasks_project_idx").on(table.projectId),
+    index("tasks_column_idx").on(table.columnId),
+  ]
+);
+
+export const taskLabels = pgTable("task_labels", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  color: text("color").notNull().default("#22c55e"),
+});
+
+export const taskLabelMap = pgTable("task_label_map", {
+  taskId: uuid("task_id")
+    .notNull()
+    .references(() => tasks.id, { onDelete: "cascade" }),
+  labelId: uuid("label_id")
+    .notNull()
+    .references(() => taskLabels.id, { onDelete: "cascade" }),
+});
+
+export const taskSubtasks = pgTable("task_subtasks", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  taskId: uuid("task_id")
+    .notNull()
+    .references(() => tasks.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  completed: boolean("completed").notNull().default(false),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+export const taskComments = pgTable("task_comments", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  taskId: uuid("task_id")
+    .notNull()
+    .references(() => tasks.id, { onDelete: "cascade" }),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const taskAttachments = pgTable("task_attachments", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  taskId: uuid("task_id")
+    .notNull()
+    .references(() => tasks.id, { onDelete: "cascade" }),
+  filename: text("filename").notNull(),
+  path: text("path").notNull(),
+  size: integer("size").notNull(),
+  uploadedBy: uuid("uploaded_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const monitorDevices = pgTable("monitor_devices", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: text("name").notNull(),
+  target: text("target").notNull(),
+  checkType: checkTypeEnum("check_type").notNull().default("ping"),
+  intervalSec: integer("interval_sec").notNull().default(60),
+  timeoutMs: integer("timeout_ms").notNull().default(5000),
+  enabled: boolean("enabled").notNull().default(true),
+  lastStatus: monitorStatusEnum("last_status").default("unknown"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const monitorChecks = pgTable(
+  "monitor_checks",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    deviceId: uuid("device_id")
+      .notNull()
+      .references(() => monitorDevices.id, { onDelete: "cascade" }),
+    status: monitorStatusEnum("status").notNull(),
+    latencyMs: integer("latency_ms"),
+    error: text("error"),
+    checkedAt: timestamp("checked_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("monitor_checks_device_idx").on(table.deviceId),
+    index("monitor_checks_checked_at_idx").on(table.checkedAt),
+  ]
+);
+
+export type User = typeof users.$inferSelect;
+export type UserRole = User["role"];
+export type BookmarkTab = typeof bookmarkTabs.$inferSelect;
+export type BookmarkGroup = typeof bookmarkGroups.$inferSelect;
+export type BookmarkCard = typeof bookmarkCards.$inferSelect;
+export type Project = typeof projects.$inferSelect;
+export type TaskColumn = typeof taskColumns.$inferSelect;
+export type Task = typeof tasks.$inferSelect;
+export type MonitorDevice = typeof monitorDevices.$inferSelect;
+export type MonitorCheck = typeof monitorChecks.$inferSelect;
+export type Notification = typeof notifications.$inferSelect;

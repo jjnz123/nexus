@@ -1,36 +1,81 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Nexus — Internal Operations Portal
 
-## Getting Started
+A self-hosted web hub for bookmarks, kanban tasks, network monitoring, and Grok AI assistance.
 
-First, run the development server:
+## Quick Start
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env
+# Edit .env — set AUTH_SECRET to a long random string
+
+docker compose up -d --build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open **http://localhost:3000** and sign in with the seeded admin credentials from `.env` (default: `admin@localhost` / `changeme123`).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Development
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+cp .env.example .env
+# Point DATABASE_URL at local Postgres or run: docker compose up postgres -d
 
-## Learn More
+npm install
+npm run db:push
+npm run db:seed
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Environment Variables
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Variable | Description |
+|----------|-------------|
+| `DATABASE_URL` | PostgreSQL connection string |
+| `AUTH_SECRET` | Session signing secret (32+ chars) |
+| `AUTH_URL` | Public app URL (e.g. `http://localhost:3000`) |
+| `XAI_API_KEY` | xAI API key for Grok (optional) |
+| `SEED_ADMIN_*` | First-run admin bootstrap |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Backup & Restore
 
-## Deploy on Vercel
+```bash
+# Backup
+docker compose exec postgres pg_dump -U nexus nexus > backup.sql
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+# Restore
+cat backup.sql | docker compose exec -T postgres psql -U nexus nexus
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Uploads (avatars, attachments) live in the `uploads` Docker volume.
+
+## HTTPS (Future)
+
+For production/LAN with TLS, place nginx or Caddy in front of the app container:
+
+```nginx
+location / {
+  proxy_pass http://127.0.0.1:3000;
+  proxy_set_header Host $host;
+  proxy_set_header X-Real-IP $remote_addr;
+}
+```
+
+Set `AUTH_URL` to your HTTPS URL.
+
+## Architecture
+
+- **app** — Next.js 15 (App Router, Server Actions, Auth.js v5)
+- **postgres** — PostgreSQL 16
+- **monitor-worker** — Background network health checks
+
+## Roles
+
+| Role | Capabilities |
+|------|-------------|
+| Admin | Full access + user management |
+| Editor | Edit bookmarks, tasks, monitoring config |
+| User | Edit bookmarks/tasks, view monitoring |
+| Viewer | Read-only |
+
+## License
+
+Private / internal use.
