@@ -31,6 +31,7 @@ export default async function ChatRoutePage() {
       initialMessages={initialMessages}
       initialProjectId={prefs.activeAiProjectId ?? null}
       initialConversationId={conversationId ?? null}
+      initialSidebarCollapsed={prefs.chatSidebarCollapsed ?? false}
     />
   );
 }

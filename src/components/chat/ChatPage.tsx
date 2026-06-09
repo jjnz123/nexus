@@ -4,11 +4,18 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { Bot } from "lucide-react";
 import { toast } from "sonner";
 import { ChatComposer } from "@/components/chat/ChatComposer";
+import { ChatFileManager } from "@/components/chat/ChatFileManager";
 import { ChatMessageBubble } from "@/components/chat/ChatMessageBubble";
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
 import { HistoryIndicatorBar, scrollToMessage } from "@/components/chat/HistoryIndicatorBar";
 import { useAiStream } from "@/components/chat/useAiStream";
-import type { AiConversation, AiMessage, AiMessageAttachment, AiProject } from "@/lib/db/schema";
+import type {
+  AiConversation,
+  AiMessage,
+  AiMessageAttachment,
+  AiProject,
+  AiSkillEvent,
+} from "@/lib/db/schema";
 import {
   appendAssistantMessage,
   appendUserMessage,
@@ -23,6 +30,7 @@ import {
   renameAiProject,
   setActiveAiSelection,
 } from "@/server/actions/ai-chat";
+import { updateBookmarkPreferences } from "@/server/actions/preferences";
 
 const STARTER_PROMPTS = [
   "Summarize what I should check on the home dashboard today",
@@ -50,12 +58,14 @@ export function ChatPage({
   initialMessages,
   initialProjectId,
   initialConversationId,
+  initialSidebarCollapsed,
 }: {
   initialProjects: AiProject[];
   initialConversations: AiConversation[];
   initialMessages: AiMessage[];
   initialProjectId: string | null;
   initialConversationId: string | null;
+  initialSidebarCollapsed: boolean;
 }) {
   const { stream } = useAiStream();
   const [projects, setProjects] = useState(initialProjects);
@@ -70,6 +80,9 @@ export function ChatPage({
   const [attachments, setAttachments] = useState<AiMessageAttachment[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
+  const [streamingSkills, setStreamingSkills] = useState<AiSkillEvent[]>([]);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(initialSidebarCollapsed);
+  const [filesOpen, setFilesOpen] = useState(false);
   const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
@@ -87,17 +100,18 @@ export function ChatPage({
   }, [activeConversationId]);
 
   const displayMessages = useMemo(() => {
-    if (!isStreaming || !streamingContent) return messages;
+    if (!isStreaming || (!streamingContent && streamingSkills.length === 0)) return messages;
     const streamingMessage: AiMessage = {
       id: "streaming",
       conversationId: activeConversationId ?? "",
       role: "assistant",
       content: streamingContent,
       attachments: [],
+      metadata: { skills: streamingSkills },
       createdAt: new Date(),
     };
     return [...messages, streamingMessage];
-  }, [messages, isStreaming, streamingContent, activeConversationId]);
+  }, [messages, isStreaming, streamingContent, streamingSkills, activeConversationId]);
 
   const refreshWorkspace = useCallback(async () => {
     const workspace = await getAiWorkspace();
@@ -233,6 +247,17 @@ export function ChatPage({
     });
   };
 
+  const projectIdRef = useRef(activeProjectId);
+
+  useEffect(() => {
+    projectIdRef.current = activeProjectId;
+  }, [activeProjectId]);
+
+  const handleSidebarCollapsedChange = (collapsed: boolean) => {
+    setSidebarCollapsed(collapsed);
+    void updateBookmarkPreferences({ chatSidebarCollapsed: collapsed });
+  };
+
   const runStream = useCallback(
     async (history: AiMessage[], conversationId: string) => {
       abortRef.current?.abort();
@@ -241,6 +266,7 @@ export function ChatPage({
 
       setIsStreaming(true);
       setStreamingContent("");
+      setStreamingSkills([]);
 
       try {
         const apiMessages = history.map((message) => ({
@@ -248,21 +274,30 @@ export function ChatPage({
           content: messageToApiContent(message),
         }));
 
-        const full = await stream(
+        const result = await stream(
           apiMessages,
           (content) => setStreamingContent(content),
-          controller.signal
+          controller.signal,
+          {
+            projectId: projectIdRef.current,
+            conversationId,
+            onSkillsChange: setStreamingSkills,
+          }
         );
 
         if (controller.signal.aborted) {
-          if (full.trim()) {
-            const saved = await appendAssistantMessage(conversationId, full);
+          if (result.content.trim()) {
+            const saved = await appendAssistantMessage(conversationId, result.content, {
+              skills: result.skills,
+            });
             setMessages((prev) => [...prev, saved]);
           }
           return;
         }
 
-        const saved = await appendAssistantMessage(conversationId, full);
+        const saved = await appendAssistantMessage(conversationId, result.content, {
+          skills: result.skills,
+        });
         setMessages((prev) => [...prev, saved]);
         await refreshWorkspace();
       } catch (error) {
@@ -271,6 +306,7 @@ export function ChatPage({
       } finally {
         setIsStreaming(false);
         setStreamingContent("");
+        setStreamingSkills([]);
         abortRef.current = null;
       }
     },
@@ -391,6 +427,8 @@ export function ChatPage({
           activeProjectId={activeProjectId}
           activeConversationId={activeConversationId}
           search={search}
+          collapsed={sidebarCollapsed}
+          onCollapsedChange={handleSidebarCollapsedChange}
           onSearchChange={setSearch}
           onSelectProject={selectProject}
           onSelectConversation={selectConversation}
@@ -400,6 +438,7 @@ export function ChatPage({
           onCreateConversation={handleCreateConversation}
           onRenameConversation={handleRenameConversation}
           onDeleteConversation={handleDeleteConversation}
+          onOpenFiles={() => setFilesOpen(true)}
         />
 
         <div className="flex min-w-0 flex-1 flex-col">
@@ -441,6 +480,7 @@ export function ChatPage({
                         key={message.id}
                         message={message}
                         isStreaming={message.id === "streaming"}
+                        streamingSkills={message.id === "streaming" ? streamingSkills : []}
                         showRegenerate={
                           message.role === "assistant" &&
                           message.id === lastAssistantId &&
@@ -478,6 +518,13 @@ export function ChatPage({
           />
         ) : null}
       </div>
+
+      <ChatFileManager
+        open={filesOpen}
+        onOpenChange={setFilesOpen}
+        projectId={activeProjectId}
+        conversationId={activeConversationId}
+      />
     </div>
   );
 }

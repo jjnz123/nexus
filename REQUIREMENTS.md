@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v1.3.1
+**Current release:** v1.4.0
 
 ## 1. Overview
 
@@ -160,9 +160,16 @@ Requires `ai:use`. Also linked from the sidebar as **AI Chat**.
 
 Three-panel workspace:
 
-- **Left** — Projects and conversations list
-- **Center** — Main chat area with composer
+- **Left** — Collapsible projects and conversations sidebar (icon-only mode with hover expand)
+- **Center** — Main chat area with composer and file manager access
 - **Right** — Vertical history indicator bar (one marker per user/assistant message)
+
+### Collapsible Sidebar
+
+- Manual collapse/expand toggle; state persisted in user preferences (`chat_sidebar_collapsed`)
+- Collapsed mode shows project/conversation icons only
+- Hover over collapsed sidebar smoothly expands full labels and lists
+- Quick access to file manager from sidebar header
 
 ### Projects & Conversations
 
@@ -180,6 +187,22 @@ Three-panel workspace:
 - Starter prompt chips on empty conversation
 - Stop streaming mid-generation (partial assistant reply saved when content exists)
 
+### File Management
+
+- **Project knowledge base** — upload, rename, delete files shared across all conversations in a project
+- **Conversation files** — upload, rename, delete files scoped to the current conversation
+- File manager dialog with previews (images, document cards) and bulk upload
+- Text file content extracted for basic RAG-style context in AI responses
+- Message-level attachments remain supported in the composer
+
+### AI Skills (Tool Use)
+
+- Grok can invoke Nexus **skills** during `/chat` conversations (permission-aware)
+- Built-in skills: **Create Task**, **Update Task**, **Check Monitoring**, **Search Bookmarks**
+- Skill usage shown inline in assistant messages (“Using skill: …”) with status and result
+- Skill results persisted in message `metadata` jsonb
+- Extensible skill registry in `src/lib/ai/skills/`
+
 ### Vertical History Indicator Bar
 
 - Scrollable timeline with a marker for **every** user and assistant message
@@ -192,8 +215,10 @@ Three-panel workspace:
 
 - `ai_projects` — user-owned project folders
 - `ai_conversations` — title, project link, last message preview/at
-- `ai_messages` — role, content, attachments (jsonb), timestamps
-- User preferences: `active_ai_project_id`, `active_ai_conversation_id`
+- `ai_messages` — role, content, attachments (jsonb), metadata (jsonb, skill events), timestamps
+- `ai_project_files` — project knowledge base files with text preview cache
+- `ai_conversation_files` — conversation-scoped files with text preview cache
+- User preferences: `active_ai_project_id`, `active_ai_conversation_id`, `chat_sidebar_collapsed`
 
 ## 5. Bookmarks (`/bookmarks`)
 
@@ -467,11 +492,13 @@ Requires `monitoring:configure` to enable; `monitoring:view` to display status.
 - Bookmarks sort mode
 - Home favourites order
 - Active AI project and conversation (`/chat`)
+- Chat sidebar collapsed state
 
 ### 13.2 AI Chat Persistence
 
-- Per-user projects, conversations, and messages (see §4.7)
-- Attachments stored as jsonb on messages; files in upload directory
+- Per-user projects, conversations, messages, project files, and conversation files (see §4.7)
+- Attachments stored as jsonb on messages; knowledge-base files in dedicated tables
+- Skill execution metadata stored on assistant messages
 
 ### 13.3 Audit Trail
 

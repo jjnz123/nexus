@@ -132,6 +132,7 @@ export function AiDrawer({
             role: message.role,
             content: message.content,
           })),
+          legacyStream: true,
         }),
         signal,
       });

@@ -9,6 +9,7 @@ import {
   aiProjects,
   users,
   type AiMessageAttachment,
+  type AiMessageMetadata,
 } from "@/lib/db/schema";
 import { requireAuth } from "@/lib/auth";
 import { requireSessionPermission } from "@/lib/permissions";
@@ -224,7 +225,11 @@ export async function appendUserMessage(input: unknown) {
   return message;
 }
 
-export async function appendAssistantMessage(conversationId: string, content: string) {
+export async function appendAssistantMessage(
+  conversationId: string,
+  content: string,
+  metadata?: AiMessageMetadata
+) {
   const session = await requireAuth();
   requireSessionPermission(session, "ai:use");
   await assertConversationOwner(conversationId, session.user.id);
@@ -236,6 +241,7 @@ export async function appendAssistantMessage(conversationId: string, content: st
       role: "assistant",
       content,
       attachments: [],
+      metadata: metadata ?? {},
     })
     .returning();
 

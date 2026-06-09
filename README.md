@@ -56,6 +56,7 @@ A background worker runs checks continuously so the dashboard stays current.
 When an xAI API key is configured, users with permission can:
 
 - Chat with **Grok** from the home page search bar or AI drawer.
+- Use the full **AI Chat** workspace at `/chat` with projects, conversations, file knowledge bases, and AI skills.
 - Get **AI-suggested metadata** when creating bookmarks (title, description, tags, icon).
 - **Analyse audit logs** in the admin panel (summaries, anomalies, follow-ups).
 
