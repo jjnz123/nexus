@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { ArrowRight, Inbox, Plus, X } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronUp, Inbox, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { createBacklogTask, moveTaskToBoard } from "@/server/actions/tasks";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +15,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  isTicketFieldVisible,
+  type ProjectTicketFieldSettings,
+} from "@/lib/tasks/ticket-fields";
 import type { BoardTask, TaskPriority, TaskType } from "./types";
 
 function makeTaskKey(projectKey: string, taskNumber: number) {
@@ -27,6 +32,9 @@ export function TasksBacklogPanel({
   projectId,
   projectKey,
   backlogTasks,
+  projectUsers,
+  parentCandidates,
+  fieldSettings,
   onRefresh,
   onOpenTask,
 }: {
@@ -35,15 +43,26 @@ export function TasksBacklogPanel({
   projectId: string;
   projectKey: string;
   backlogTasks: BoardTask[];
+  projectUsers: { id: string; name: string }[];
+  parentCandidates: { id: string; title: string; type: TaskType; number: number }[];
+  fieldSettings: ProjectTicketFieldSettings;
   onRefresh: () => Promise<void> | void;
   onOpenTask: (task: BoardTask) => void;
 }) {
   const [isPending, startTransition] = useTransition();
+  const [expanded, setExpanded] = useState(true);
   const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<TaskPriority>("medium");
   const [type, setType] = useState<TaskType>("task");
+  const [assigneeId, setAssigneeId] = useState("none");
+  const [parentId, setParentId] = useState("none");
+  const [storyPoints, setStoryPoints] = useState("");
 
   if (!open) return null;
+
+  const visible = (key: Parameters<typeof isTicketFieldVisible>[2]) =>
+    isTicketFieldVisible(fieldSettings, type, key);
 
   function moveToBoard(taskId: string) {
     startTransition(async () => {
@@ -64,10 +83,18 @@ export function TasksBacklogPanel({
         await createBacklogTask({
           projectId,
           title: title.trim(),
+          description: description.trim() || null,
           priority,
           type,
+          assigneeId: assigneeId === "none" ? null : assigneeId,
+          parentId: parentId === "none" ? null : parentId,
+          storyPoints: storyPoints.trim() ? Number(storyPoints) : null,
         });
         setTitle("");
+        setDescription("");
+        setAssigneeId("none");
+        setParentId("none");
+        setStoryPoints("");
         await onRefresh();
         toast.success("Backlog item created");
       } catch (error) {
@@ -92,7 +119,7 @@ export function TasksBacklogPanel({
               Backlog
             </h2>
             <p className="text-xs text-muted-foreground">
-              Move items to the board when ready (defaults to To Do).
+              Create tickets with full detail, then move to the board when ready.
             </p>
           </div>
           <Button size="icon" variant="ghost" onClick={() => onOpenChange(false)}>
@@ -101,46 +128,116 @@ export function TasksBacklogPanel({
         </div>
 
         <div className="space-y-3 border-b px-4 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="backlog-title">New backlog item</Label>
-            <Input
-              id="backlog-title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Describe the work…"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") createItem();
-              }}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <Select value={type} onValueChange={(v) => setType(v as TaskType)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="epic">Epic</SelectItem>
-                <SelectItem value="feature">Feature</SelectItem>
-                <SelectItem value="story">Story</SelectItem>
-                <SelectItem value="task">Task</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={priority} onValueChange={(v) => setPriority(v as TaskPriority)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="low">Low</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-                <SelectItem value="urgent">Urgent</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <Button className="w-full" onClick={createItem} disabled={!title.trim() || isPending}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add to backlog
-          </Button>
+          <button
+            type="button"
+            className="flex w-full items-center justify-between text-sm font-medium"
+            onClick={() => setExpanded((value) => !value)}
+          >
+            New backlog item
+            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </button>
+
+          {expanded ? (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="backlog-title">Title</Label>
+                <Input
+                  id="backlog-title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Describe the work…"
+                />
+              </div>
+
+              {visible("description") ? (
+                <div className="space-y-2">
+                  <Label htmlFor="backlog-description">Description</Label>
+                  <Textarea
+                    id="backlog-description"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    rows={3}
+                  />
+                </div>
+              ) : null}
+
+              <div className="grid grid-cols-2 gap-2">
+                {visible("type") ? (
+                  <Select value={type} onValueChange={(v) => setType(v as TaskType)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="epic">Epic</SelectItem>
+                      <SelectItem value="feature">Feature</SelectItem>
+                      <SelectItem value="story">Story</SelectItem>
+                      <SelectItem value="task">Task</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : null}
+                {visible("priority") ? (
+                  <Select value={priority} onValueChange={(v) => setPriority(v as TaskPriority)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="urgent">Urgent</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : null}
+              </div>
+
+              {visible("assignee") ? (
+                <Select value={assigneeId} onValueChange={setAssigneeId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Assignee" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Unassigned</SelectItem>
+                    {projectUsers.map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : null}
+
+              {visible("parent") ? (
+                <Select value={parentId} onValueChange={setParentId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Parent" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No parent</SelectItem>
+                    {parentCandidates.map((candidate) => (
+                      <SelectItem key={candidate.id} value={candidate.id}>
+                        {candidate.type} · {candidate.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : null}
+
+              {visible("storyPoints") ? (
+                <Input
+                  type="number"
+                  min={0}
+                  value={storyPoints}
+                  onChange={(e) => setStoryPoints(e.target.value)}
+                  placeholder="Story points"
+                />
+              ) : null}
+
+              <Button className="w-full" onClick={createItem} disabled={!title.trim() || isPending}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add to backlog
+              </Button>
+            </>
+          ) : null}
         </div>
 
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-4">
@@ -151,11 +248,7 @@ export function TasksBacklogPanel({
           ) : (
             backlogTasks.map((task) => (
               <div key={task.id} className="rounded-lg border p-3">
-                <button
-                  type="button"
-                  onClick={() => onOpenTask(task)}
-                  className="w-full text-left"
-                >
+                <button type="button" onClick={() => onOpenTask(task)} className="w-full text-left">
                   <p className="text-xs text-muted-foreground">
                     {makeTaskKey(projectKey, task.number)}
                   </p>
@@ -167,6 +260,11 @@ export function TasksBacklogPanel({
                     <Badge variant="outline" className="text-[10px] capitalize">
                       {task.priority}
                     </Badge>
+                    {task.storyPoints != null ? (
+                      <Badge variant="outline" className="text-[10px]">
+                        {task.storyPoints} pts
+                      </Badge>
+                    ) : null}
                   </div>
                 </button>
                 <Button

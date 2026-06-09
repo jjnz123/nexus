@@ -29,6 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { ProjectBoard } from "./types";
+import { TasksProjectFieldSettings } from "./TasksProjectFieldSettings";
 
 function SortableColumnRow({
   column,
@@ -288,6 +289,8 @@ export function TasksProjectSettings({
           </Button>
         </div>
       </section>
+
+      <TasksProjectFieldSettings board={board} onRefresh={onRefresh} />
     </div>
   );
 }

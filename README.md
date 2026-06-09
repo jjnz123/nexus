@@ -41,13 +41,13 @@ Editors can create and manage the library; viewers can browse and launch.
 
 ### Tasks
 
-A lightweight **kanban board** for team work with assignees, backlog panel, task hierarchy (Epic/Feature/Story), Issues and Roadmap views:
+A **Jira-inspired** task board with tickets, hierarchy, roadmap planning, and configurable fields:
 
-- Multiple **projects**, each with its own board and task keys (e.g. `OPS-001`).
-- **Kanban board** (horizontal columns) plus **backlog panel** for planning.
-- **Assignees**, task hierarchy (Epic/Feature/Story), Issues table, and Roadmap views.
-- **Task details** — priority, due date, labels, subtasks, comments, and shareable links.
-- **Project settings** — drag-to-reorder columns, WIP limits, and coloured labels.
+- Multiple **projects**, each with ticket keys (e.g. `OPS-001`).
+- **Kanban board** (horizontal columns) plus **backlog panel** with expanded create form.
+- **Roadmap** — inline bulk editing with draft/commit workflow; add any ticket type; hierarchy, assignee, dates, story points, status.
+- **Tickets** — title, description, details, acceptance criteria, definition of done, story points, attachments (preview), linked issues, threaded comments.
+- **Project settings** — columns, labels, and **per-type field configuration** (show/hide + drag reorder).
 
 ### Monitoring
 

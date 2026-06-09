@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq, asc, and, max } from "drizzle-orm";
+import { eq, asc, and, max, or, ilike, ne } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/lib/db";
 import {
@@ -13,6 +13,7 @@ import {
   taskSubtasks,
   taskComments,
   taskAttachments,
+  taskLinks,
   users,
 } from "@/lib/db/schema";
 import { requireAuth } from "@/lib/auth";
@@ -25,6 +26,10 @@ import {
   subtaskSchema,
   commentSchema,
   labelSchema,
+  taskLinkSchema,
+  taskAttachmentSchema,
+  updateProjectFieldSettingsSchema,
+  roadmapCommitSchema,
 } from "@/lib/validators/tasks";
 import { createNotification } from "./users";
 import { logAudit } from "@/server/audit";
@@ -155,10 +160,43 @@ export async function getTaskByKey(taskKey: string) {
     .where(eq(taskSubtasks.taskId, task.id))
     .orderBy(asc(taskSubtasks.sortOrder));
 
-  const attachments = await db
+  const attachmentRows = await db
     .select()
     .from(taskAttachments)
     .where(eq(taskAttachments.taskId, task.id));
+
+  const outgoingLinks = await db
+    .select({ link: taskLinks, linked: tasks, project: projects })
+    .from(taskLinks)
+    .innerJoin(tasks, eq(taskLinks.targetTaskId, tasks.id))
+    .innerJoin(projects, eq(tasks.projectId, projects.id))
+    .where(eq(taskLinks.sourceTaskId, task.id));
+
+  const incomingLinks = await db
+    .select({ link: taskLinks, linked: tasks, project: projects })
+    .from(taskLinks)
+    .innerJoin(tasks, eq(taskLinks.sourceTaskId, tasks.id))
+    .innerJoin(projects, eq(tasks.projectId, projects.id))
+    .where(eq(taskLinks.targetTaskId, task.id));
+
+  const links = [
+    ...outgoingLinks.map(({ link, linked, project }) => ({
+      id: link.id,
+      linkType: link.linkType,
+      linkedTaskId: linked.id,
+      linkedTaskKey: `${project.key}-${String(linked.number).padStart(3, "0")}`,
+      linkedTaskTitle: linked.title,
+      direction: "outgoing" as const,
+    })),
+    ...incomingLinks.map(({ link, linked, project }) => ({
+      id: link.id,
+      linkType: link.linkType,
+      linkedTaskId: linked.id,
+      linkedTaskKey: `${project.key}-${String(linked.number).padStart(3, "0")}`,
+      linkedTaskTitle: linked.title,
+      direction: "incoming" as const,
+    })),
+  ];
 
   const labelMaps = await db
     .select()
@@ -173,7 +211,14 @@ export async function getTaskByKey(taskKey: string) {
       userName: user.name,
     })),
     subtasks,
-    attachments,
+    attachments: attachmentRows.map((row) => ({
+      id: row.id,
+      filename: row.filename,
+      path: row.path,
+      mimeType: row.mimeType,
+      size: row.size,
+    })),
+    links,
     labelIds: labelMaps.map((m) => m.labelId),
   };
 }
@@ -200,7 +245,11 @@ export async function createTask(input: unknown) {
       columnId: data.columnId,
       number: (maxNum?.value ?? 0) + 1,
       title: data.title,
-      description: data.description,
+      description: data.description ?? null,
+      details: data.details ?? null,
+      acceptanceCriteria: data.acceptanceCriteria ?? null,
+      definitionOfDone: data.definitionOfDone ?? null,
+      storyPoints: data.storyPoints ?? null,
       priority: data.priority,
       dueDate: data.dueDate ? new Date(data.dueDate) : null,
       assigneeId: data.assigneeId,
@@ -251,7 +300,13 @@ export async function updateTask(input: unknown) {
     .update(tasks)
     .set({
       ...updates,
-      dueDate: updates.dueDate === null ? null : updates.dueDate ? new Date(updates.dueDate) : undefined,
+      dueDate:
+        updates.dueDate === null
+          ? null
+          : updates.dueDate
+            ? new Date(updates.dueDate)
+            : undefined,
+      storyPoints: updates.storyPoints === null ? null : updates.storyPoints,
       updatedAt: new Date(),
     })
     .where(eq(tasks.id, id))
@@ -411,7 +466,12 @@ export async function addComment(input: unknown) {
 
   const [comment] = await db
     .insert(taskComments)
-    .values({ taskId: data.taskId, userId: session.user.id, body: data.body })
+    .values({
+      taskId: data.taskId,
+      userId: session.user.id,
+      body: data.body,
+      parentId: data.parentId ?? null,
+    })
     .returning();
 
   const [task] = await db.select().from(tasks).where(eq(tasks.id, data.taskId)).limit(1);
@@ -499,11 +559,14 @@ export async function moveTaskToBoard(taskId: string) {
 export async function createBacklogTask(input: {
   projectId: string;
   title: string;
-  description?: string;
+  description?: string | null;
+  details?: string | null;
   priority?: "low" | "medium" | "high" | "urgent";
   type?: "epic" | "feature" | "story" | "task";
   assigneeId?: string | null;
   parentId?: string | null;
+  dueDate?: string | null;
+  storyPoints?: number | null;
 }) {
   const session = await requireAuth();
   requireSessionPermission(session, "tasks:edit");
@@ -521,10 +584,174 @@ export async function createBacklogTask(input: {
     projectId: input.projectId,
     columnId: column.id,
     title: input.title,
-    description: input.description,
+    description: input.description ?? undefined,
+    details: input.details ?? undefined,
     priority: input.priority,
     type: input.type,
     assigneeId: input.assigneeId,
     parentId: input.parentId,
+    dueDate: input.dueDate ?? undefined,
+    storyPoints: input.storyPoints ?? undefined,
   });
+}
+
+export async function searchProjectTasks(projectId: string, query: string, excludeTaskId?: string) {
+  const session = await requireAuth();
+  requireSessionPermission(session, "tasks:view");
+  const term = query.trim();
+  if (!term) return [];
+
+  const conditions = [
+    eq(tasks.projectId, projectId),
+    or(ilike(tasks.title, `%${term}%`), ilike(tasks.description, `%${term}%`)),
+  ];
+  if (excludeTaskId) conditions.push(ne(tasks.id, excludeTaskId));
+
+  const rows = await db
+    .select({ task: tasks, project: projects })
+    .from(tasks)
+    .innerJoin(projects, eq(tasks.projectId, projects.id))
+    .where(and(...conditions))
+    .orderBy(asc(tasks.number))
+    .limit(20);
+
+  return rows.map(({ task, project }) => ({
+    id: task.id,
+    key: `${project.key}-${String(task.number).padStart(3, "0")}`,
+    title: task.title,
+    type: task.type,
+  }));
+}
+
+export async function addTaskLink(input: unknown) {
+  const session = await requireAuth();
+  requireSessionPermission(session, "tasks:edit");
+  const data = taskLinkSchema.parse(input);
+  if (data.sourceTaskId === data.targetTaskId) throw new Error("Cannot link a task to itself");
+
+  const [link] = await db
+    .insert(taskLinks)
+    .values(data)
+    .onConflictDoNothing()
+    .returning();
+
+  revalidatePath("/tasks");
+  return link;
+}
+
+export async function removeTaskLink(linkId: string) {
+  const session = await requireAuth();
+  requireSessionPermission(session, "tasks:edit");
+  await db.delete(taskLinks).where(eq(taskLinks.id, linkId));
+  revalidatePath("/tasks");
+  return { success: true };
+}
+
+export async function addTaskAttachment(input: unknown) {
+  const session = await requireAuth();
+  requireSessionPermission(session, "tasks:edit");
+  const data = taskAttachmentSchema.parse(input);
+  const [attachment] = await db
+    .insert(taskAttachments)
+    .values({
+      taskId: data.taskId,
+      filename: data.filename,
+      path: data.path,
+      mimeType: data.mimeType ?? "application/octet-stream",
+      size: data.size,
+      uploadedBy: session.user.id,
+    })
+    .returning();
+  revalidatePath("/tasks");
+  return attachment;
+}
+
+export async function deleteTaskAttachment(attachmentId: string) {
+  const session = await requireAuth();
+  requireSessionPermission(session, "tasks:edit");
+  await db.delete(taskAttachments).where(eq(taskAttachments.id, attachmentId));
+  revalidatePath("/tasks");
+  return { success: true };
+}
+
+export async function updateProjectFieldSettings(input: unknown) {
+  const session = await requireAuth();
+  requireSessionPermission(session, "tasks:edit");
+  const data = updateProjectFieldSettingsSchema.parse(input);
+
+  const [project] = await db
+    .select()
+    .from(projects)
+    .where(eq(projects.id, data.projectId))
+    .limit(1);
+  if (!project) throw new Error("Project not found");
+
+  const nextSettings = {
+    ...(project.settings ?? {}),
+    ticketFields: data.ticketFields,
+  };
+
+  const [updated] = await db
+    .update(projects)
+    .set({ settings: nextSettings })
+    .where(eq(projects.id, data.projectId))
+    .returning();
+
+  revalidatePath("/tasks");
+  return updated;
+}
+
+export async function commitRoadmapChanges(input: unknown) {
+  const session = await requireAuth();
+  requireSessionPermission(session, "tasks:edit");
+  const data = roadmapCommitSchema.parse(input);
+
+  for (const taskId of data.deletes) {
+    await db.delete(tasks).where(and(eq(tasks.id, taskId), eq(tasks.projectId, data.projectId)));
+  }
+
+  for (const update of data.updates) {
+    const { id, ...rest } = update;
+    const payload = Object.fromEntries(
+      Object.entries(rest).filter(([, value]) => value !== undefined)
+    );
+    if (Object.keys(payload).length === 0) continue;
+    await updateTask({ id, ...payload });
+  }
+
+  const createdMap: Record<string, string> = {};
+  const typeOrder = { epic: 0, feature: 1, story: 2, task: 3 };
+  const sortedCreates = [...data.creates].sort(
+    (a, b) => typeOrder[a.type] - typeOrder[b.type]
+  );
+
+  for (const item of sortedCreates) {
+    let parentId = item.parentId ?? null;
+    if (parentId && createdMap[parentId]) {
+      parentId = createdMap[parentId];
+    }
+
+    const created = await createTask({
+      projectId: data.projectId,
+      columnId: item.columnId,
+      title: item.title,
+      description: item.description ?? undefined,
+      priority: item.priority,
+      type: item.type,
+      assigneeId: item.assigneeId,
+      parentId,
+      dueDate: item.dueDate ?? undefined,
+      storyPoints: item.storyPoints ?? undefined,
+    });
+    createdMap[item.draftId] = created.id;
+  }
+
+  revalidatePath("/tasks");
+  await logAudit({
+    action: "tasks.roadmap.commit",
+    resource: "project",
+    resourceId: data.projectId,
+    summary: `Committed roadmap: ${data.creates.length} created, ${data.updates.length} updated, ${data.deletes.length} deleted`,
+  });
+  return { success: true, createdMap };
 }

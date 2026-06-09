@@ -35,6 +35,7 @@ export const taskPriorityEnum = pgEnum("task_priority", [
 ]);
 
 export const taskTypeEnum = pgEnum("task_type", ["epic", "feature", "story", "task"]);
+export const taskLinkTypeEnum = pgEnum("task_link_type", ["relates_to", "blocks", "duplicates"]);
 
 export const bookmarkVisibilityEnum = pgEnum("bookmark_visibility", ["everyone", "restricted"]);
 
@@ -448,6 +449,10 @@ export const tasks = pgTable(
     number: integer("number").notNull(),
     title: text("title").notNull(),
     description: text("description"),
+    details: text("details"),
+    acceptanceCriteria: text("acceptance_criteria"),
+    definitionOfDone: text("definition_of_done"),
+    storyPoints: integer("story_points"),
     priority: taskPriorityEnum("priority").notNull().default("medium"),
     dueDate: timestamp("due_date"),
     assigneeId: uuid("assignee_id").references(() => users.id),
@@ -501,6 +506,9 @@ export const taskComments = pgTable("task_comments", {
   userId: uuid("user_id")
     .notNull()
     .references(() => users.id),
+  parentId: uuid("parent_id").references((): AnyPgColumn => taskComments.id, {
+    onDelete: "cascade",
+  }),
   body: text("body").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -512,10 +520,30 @@ export const taskAttachments = pgTable("task_attachments", {
     .references(() => tasks.id, { onDelete: "cascade" }),
   filename: text("filename").notNull(),
   path: text("path").notNull(),
+  mimeType: text("mime_type").notNull().default("application/octet-stream"),
   size: integer("size").notNull(),
   uploadedBy: uuid("uploaded_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+export const taskLinks = pgTable(
+  "task_links",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    sourceTaskId: uuid("source_task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    targetTaskId: uuid("target_task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    linkType: taskLinkTypeEnum("link_type").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("task_links_source_idx").on(table.sourceTaskId),
+    index("task_links_target_idx").on(table.targetTaskId),
+  ]
+);
 
 export const monitorDevices = pgTable("monitor_devices", {
   id: uuid("id").defaultRandom().primaryKey(),

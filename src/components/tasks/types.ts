@@ -1,5 +1,6 @@
 export type TaskPriority = "low" | "medium" | "high" | "urgent";
 export type TaskType = "epic" | "feature" | "story" | "task";
+export type TaskLinkType = "relates_to" | "blocks" | "duplicates";
 
 export type ProjectSummary = {
   id: string;
@@ -41,6 +42,10 @@ export type BoardTask = {
   number: number;
   title: string;
   description: string | null;
+  details: string | null;
+  acceptanceCriteria: string | null;
+  definitionOfDone: string | null;
+  storyPoints: number | null;
   priority: TaskPriority;
   dueDate: string | Date | null;
   assigneeId: string | null;
@@ -59,9 +64,27 @@ export type TaskComment = {
   id: string;
   taskId: string;
   userId: string;
+  parentId: string | null;
   body: string;
   createdAt: string | Date;
   userName: string;
+};
+
+export type TaskAttachment = {
+  id: string;
+  filename: string;
+  path: string;
+  mimeType: string;
+  size: number;
+};
+
+export type TaskLink = {
+  id: string;
+  linkType: TaskLinkType;
+  linkedTaskId: string;
+  linkedTaskKey: string;
+  linkedTaskTitle: string;
+  direction: "outgoing" | "incoming";
 };
 
 export type TaskDetails = {
@@ -69,7 +92,8 @@ export type TaskDetails = {
   task: Omit<BoardTask, "assigneeName" | "labelIds" | "subtasks" | "parentTitle">;
   comments: TaskComment[];
   subtasks: TaskSubtask[];
-  attachments: { id: string; filename: string; path: string; size: number }[];
+  attachments: TaskAttachment[];
+  links: TaskLink[];
   labelIds: string[];
 };
 
@@ -78,4 +102,33 @@ export type ProjectBoard = {
   columns: TaskColumn[];
   tasks: BoardTask[];
   labels: TaskLabel[];
+};
+
+export type RoadmapDraftCreate = {
+  draftId: string;
+  title: string;
+  type: TaskType;
+  parentId: string | null;
+  assigneeId: string | null;
+  priority: TaskPriority;
+  dueDate: string | null;
+  storyPoints: number | null;
+  columnId: string;
+  description?: string | null;
+};
+
+export type RoadmapDraftUpdate = {
+  id: string;
+  title?: string;
+  type?: TaskType;
+  parentId?: string | null;
+  assigneeId?: string | null;
+  priority?: TaskPriority;
+  dueDate?: string | null;
+  storyPoints?: number | null;
+  columnId?: string;
+  description?: string | null;
+  details?: string | null;
+  acceptanceCriteria?: string | null;
+  definitionOfDone?: string | null;
 };

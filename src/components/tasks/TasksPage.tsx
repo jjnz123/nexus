@@ -50,6 +50,9 @@ import { TasksIssuesView } from "./TasksIssuesView";
 import { TasksRoadmapView } from "./TasksRoadmapView";
 import { TasksProjectSettings } from "./TasksProjectSettings";
 import type { BoardTask, ProjectBoard, ProjectSummary, TaskDetails, TaskPriority } from "./types";
+import {
+  parseProjectTicketFieldSettings,
+} from "@/lib/tasks/ticket-fields";
 
 function makeTaskKey(projectKey: string, taskNumber: number) {
   return `${projectKey}-${String(taskNumber).padStart(3, "0")}`;
@@ -194,6 +197,11 @@ export function TasksPage({
       .filter((task) => task.columnId === backlogColumn.id)
       .sort((a, b) => a.sortOrder - b.sortOrder);
   }, [board, backlogColumn]);
+
+  const ticketFieldSettings = useMemo(
+    () => parseProjectTicketFieldSettings(board?.project.settings),
+    [board?.project.settings]
+  );
 
   const parentCandidates = useMemo(
     () =>
@@ -609,7 +617,12 @@ export function TasksPage({
           ) : null}
 
           {sidebarView === "roadmap" ? (
-            <TasksRoadmapView board={board} onOpenTask={openTaskModal} />
+            <TasksRoadmapView
+              board={board}
+              projectUsers={projectUsers}
+              onOpenTask={openTaskModal}
+              onRefresh={refreshBoard}
+            />
           ) : null}
 
           {sidebarView === "settings" ? (
@@ -624,6 +637,9 @@ export function TasksPage({
         projectId={board.project.id}
         projectKey={board.project.key}
         backlogTasks={backlogTasks}
+        projectUsers={projectUsers}
+        parentCandidates={parentCandidates}
+        fieldSettings={ticketFieldSettings}
         onRefresh={refreshBoard}
         onOpenTask={openTaskModal}
       />
@@ -684,6 +700,22 @@ export function TasksPage({
         labels={board.labels}
         projectUsers={projectUsers}
         parentCandidates={parentCandidates}
+        fieldSettings={ticketFieldSettings}
+        onOpenLinkedTask={(key) => {
+          const match = board.tasks.find(
+            (task) => makeTaskKey(board.project.key, task.number) === key
+          );
+          if (match) openTaskModal(match);
+          else {
+            setModalTaskKey(key);
+            setModalOpen(true);
+            router.replace(`/tasks/${key}`);
+            startTransition(async () => {
+              const details = await getTaskByKey(key);
+              setModalTaskDetails(details);
+            });
+          }
+        }}
         onTaskSaved={async () => {
           await refreshBoard();
           if (modalTaskKey) {

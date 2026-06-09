@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v1.9.0
+**Current release:** v2.0.0
 
 ## 1. Overview
 
@@ -385,11 +385,16 @@ Requires `tasks:view`. Edit operations require `tasks:edit`.
 - **Backlog panel** — slide-out panel (top-right button); create/manage backlog items; move to board (To Do)
 - WIP limit display per column with visual warning when exceeded
 
-### 6.3 Task Hierarchy
+### 6.3 Task Hierarchy & Ticket Fields
 
-- Task types: **Epic**, **Feature**, **Story**, **Task**
+- Ticket types: **Epic**, **Feature**, **Story**, **Task**
 - Optional **parent** link for hierarchy (Epic → Feature → Story/Task)
-- Type and parent editable in task modal and backlog create form
+- Extended ticket fields stored on `tasks`:
+  - Title, description, **details**, **acceptance criteria**, **definition of done**, **story points**
+  - Priority, due date, assignee, column/status, type, parent, labels
+- **Linked issues** — `task_links` table (relates to, blocks, duplicates); search-and-link UI in ticket modal
+- **Attachments** — upload via `/api/uploads`, stored in `task_attachments` with mime type; image/PDF preview in modal
+- **Comments** — threaded replies via `parent_id` on `task_comments`
 
 ### 6.4 Filtering
 
@@ -404,8 +409,11 @@ Requires `tasks:view`. Edit operations require `tasks:edit`.
 
 ### 6.6 Roadmap View
 
-- Epic cards with linked child counts
-- Timeline grouped by due date month
+- **Draft/commit workflow** — inline edits stay local until **Commit changes**; **Discard** resets draft
+- **Add item** dropdown — create Epic, Feature, Story, or Task directly on the roadmap
+- Editable table: key, title, type, parent, assignee, priority, due date, story points, status/column
+- Hierarchy visible via indent + collapse/expand on parent rows
+- Bulk create, update, and delete committed via `commitRoadmapChanges` server action
 
 ### 6.7 Project Settings
 
@@ -414,15 +422,16 @@ Requires `tasks:edit`.
 - **Columns:** drag-to-reorder, create, edit (name, color, WIP limit), delete (non-backlog columns)
 - Backlog column managed here but hidden from kanban
 - **Labels:** create with name and color
+- **Ticket fields by type:** per Epic/Feature/Story/Task — drag-to-reorder fields, show/hide toggles; stored in `projects.settings.ticketFields`; controls ticket modal, backlog create form visibility
 
-### 6.8 Create Task
+### 6.8 Create Ticket
 
 Requires `tasks:edit`.
 
 - **New task** toolbar button opens create-task dialog (board columns only)
 - Per-column **+** button pre-selects target column
-- Fields: title, description, priority, column, type, assignee, parent
-- Backlog items created via backlog panel
+- **Backlog panel** — expanded create form: title, description, type, priority, assignee, parent, story points (respects field settings)
+- Backlog items created via backlog panel; move to board defaults to To Do
 
 ### 6.9 Task Cards
 
@@ -430,16 +439,18 @@ Requires `tasks:edit`.
 - Draggable on kanban board
 - Click to open task detail modal
 
-### 6.10 Task Detail Modal
+### 6.10 Ticket Detail Modal
 
 - Deep-linkable via `/tasks/[KEY]` (e.g. `/tasks/OPS-001`)
-- Edit: title, description, priority, due date, column, type, assignee, parent
-- Assign/remove labels
+- Field visibility/order driven by project ticket field settings for the ticket type
+- Edit all ticket fields (see §6.3)
+- **Linked issues** — search, link, unlink, open linked ticket
+- **Attachments** — upload, preview (images, PDFs), delete
 - **Subtasks:** add, toggle complete, progress indicator
-- **Comments:** add, view with author and timestamp
-- Copy shareable task URL
+- **Comments:** threaded replies with author and timestamp
+- Copy shareable ticket URL
 - Save changes
-- **Delete task** with confirmation
+- **Delete ticket** with confirmation
 
 ### 6.11 Server Actions (No UI Yet)
 
@@ -622,7 +633,6 @@ Requires `monitoring:configure` to enable; `monitoring:view` to display status.
 
 ## 15. Out of Scope / Known Gaps
 
-- Task attachment upload/view UI (schema exists)
 - Project export UI (server action exists, no front-end)
 - Bookmark share UI for individual groups/cards (server supports tab/group/card resource types)
 - Message list virtualization for very long `/chat` conversations (may be added later)
