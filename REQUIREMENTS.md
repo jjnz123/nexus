@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v3.0.0
+**Current release:** v3.1.0
 
 ## 1. Overview
 
@@ -83,6 +83,7 @@ Admin-only permissions (not overridable via custom flags):
 |--------------|---------------------|
 | `/chat` | `ai:use` |
 | `/meetings` | `ai:use` |
+| `/meetings/archived` | `ai:use` |
 | `/admin` | `admin:access` |
 | `/bookmarks` | `bookmarks:view` |
 | `/tasks` | `tasks:view` |
@@ -676,16 +677,19 @@ Requires `ai:use`. Transcription requires `OPENAI_API_KEY`; summarization requir
 
 ### 15.1 Core workflow
 
-- Create meeting with title and optional project link
+- Create meeting with **title**, **date/time** (defaults to now), and optional **project** link
+- **Create a new Tasks project** inline from the meeting form when the user has `tasks:edit`
 - **Record** in browser (MediaRecorder) or **upload** audio file
 - States: `recording` → `processing` → `ready` (or `failed`)
 - Background processing: Whisper transcription → Grok summary + action item extraction
 
 ### 15.2 Meeting detail
 
+- Edit title, date/time, and project from the detail view
 - Tabs: Summary (markdown), Transcript, Action items, Ask AI
 - Audio playback from uploaded recording
 - Scoped Q&A chat persisted in `meeting_messages`
+- **Archive** active meetings (soft delete via `archived_at`)
 
 ### 15.3 Action items → Tasks
 
@@ -695,9 +699,15 @@ Requires `ai:use`. Transcription requires `OPENAI_API_KEY`; summarization requir
 
 ### 15.4 List & search
 
-- Meetings sorted by date descending
+- Active meetings sorted by `meeting_at` descending (archived meetings excluded)
 - Search title, transcript, summary; filter by project
 - Labels stored as jsonb array on meeting record
+
+### 15.5 Archive & delete
+
+- Route `/meetings/archived` lists archived meetings with search and project filter
+- **Permanent delete** only from archived list or archived meeting detail (with confirmation)
+- Hard delete removes meeting record and related action items/messages
 
 ## 16. Out of Scope / Known Gaps
 

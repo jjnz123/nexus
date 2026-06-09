@@ -78,6 +78,13 @@
       "when": 1780998000000,
       "tag": "0011_auth_2fa_meetings",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1780998800000,
+      "tag": "0012_meetings_enhancements",
+      "breakpoints": true
     }
   ]
 }

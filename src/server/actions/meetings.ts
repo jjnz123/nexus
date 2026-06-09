@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   meetingActionItems,
@@ -30,7 +30,10 @@ export async function getMeetings(input?: unknown) {
   requireSessionPermission(session, "ai:use");
   const filters = meetingSearchSchema.parse(input ?? {});
 
-  const conditions = [eq(meetings.userId, session.user.id)];
+  const conditions = [
+    eq(meetings.userId, session.user.id),
+    filters.archived ? isNotNull(meetings.archivedAt) : isNull(meetings.archivedAt),
+  ];
   if (filters.projectId) conditions.push(eq(meetings.projectId, filters.projectId));
   if (filters.query?.trim()) {
     const q = `%${filters.query.trim()}%`;
@@ -51,9 +54,13 @@ export async function getMeetings(input?: unknown) {
     .from(meetings)
     .leftJoin(projects, eq(meetings.projectId, projects.id))
     .where(and(...conditions))
-    .orderBy(desc(meetings.createdAt));
+    .orderBy(desc(meetings.meetingAt));
 
   return rows;
+}
+
+export async function getArchivedMeetings(input?: unknown) {
+  return getMeetings({ ...(meetingSearchSchema.parse(input ?? {})), archived: true });
 }
 
 export async function getMeeting(id: string) {
@@ -99,6 +106,7 @@ export async function createMeeting(input: unknown) {
       userId: session.user.id,
       title: data.title,
       projectId: data.projectId ?? null,
+      meetingAt: data.meetingAt ? new Date(data.meetingAt) : new Date(),
       labels: data.labels ?? [],
       status: "recording",
     })
@@ -118,6 +126,7 @@ export async function updateMeeting(input: unknown) {
     .set({
       ...(data.title ? { title: data.title } : {}),
       ...(data.projectId !== undefined ? { projectId: data.projectId } : {}),
+      ...(data.meetingAt ? { meetingAt: new Date(data.meetingAt) } : {}),
       ...(data.labels ? { labels: data.labels } : {}),
       updatedAt: new Date(),
     })
@@ -333,14 +342,45 @@ export async function convertActionItemToTask(input: unknown) {
   return task;
 }
 
+export async function archiveMeeting(id: string) {
+  const session = await requireActiveMember();
+  requireSessionPermission(session, "ai:use");
+
+  const [meeting] = await db
+    .update(meetings)
+    .set({ archivedAt: new Date(), updatedAt: new Date() })
+    .where(
+      and(eq(meetings.id, id), eq(meetings.userId, session.user.id), isNull(meetings.archivedAt))
+    )
+    .returning();
+
+  if (!meeting) throw new Error("Meeting not found");
+  revalidatePath("/meetings");
+  revalidatePath("/meetings/archived");
+  revalidatePath(`/meetings/${id}`);
+  return meeting;
+}
+
 export async function deleteMeeting(id: string) {
   const session = await requireActiveMember();
   requireSessionPermission(session, "ai:use");
 
-  await db
-    .delete(meetings)
-    .where(and(eq(meetings.id, id), eq(meetings.userId, session.user.id)));
+  const [meeting] = await db
+    .select({ id: meetings.id })
+    .from(meetings)
+    .where(
+      and(
+        eq(meetings.id, id),
+        eq(meetings.userId, session.user.id),
+        isNotNull(meetings.archivedAt)
+      )
+    )
+    .limit(1);
 
-  revalidatePath("/meetings");
+  if (!meeting) throw new Error("Only archived meetings can be deleted");
+
+  await db.delete(meetings).where(eq(meetings.id, id));
+
+  revalidatePath("/meetings/archived");
   return { ok: true };
 }

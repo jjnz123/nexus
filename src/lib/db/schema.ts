@@ -602,6 +602,8 @@ export const meetings = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
     title: text("title").notNull(),
+    meetingAt: timestamp("meeting_at").defaultNow().notNull(),
+    archivedAt: timestamp("archived_at"),
     labels: jsonb("labels").$type<string[]>().default([]),
     status: meetingStatusEnum("status").notNull().default("recording"),
     audioPath: text("audio_path"),
@@ -618,6 +620,8 @@ export const meetings = pgTable(
     index("meetings_user_idx").on(table.userId),
     index("meetings_project_idx").on(table.projectId),
     index("meetings_created_at_idx").on(table.createdAt),
+    index("meetings_meeting_at_idx").on(table.meetingAt),
+    index("meetings_archived_at_idx").on(table.archivedAt),
   ]
 );
 

@@ -80,12 +80,15 @@ Leave the API key unset to run Nexus without AI features.
 
 At `/meetings` (requires `ai:use`):
 
+- **Create** meetings with title, **date/time** (defaults to now), and optional **project** — or **create a new project** inline (`tasks:edit`).
 - **Record** audio in the browser or **upload** an audio file.
 - **Transcribe** with OpenAI Whisper (`OPENAI_API_KEY`).
 - **Summarize** and extract **action items** with Grok.
 - **Ask questions** about the meeting in a scoped chat interface.
+- **Edit** title, date/time, and project from the meeting detail view.
+- **Archive** meetings (soft delete); view them at `/meetings/archived` and **delete permanently** with confirmation.
 - Link meetings to **Tasks projects**; convert action items into backlog/tickets.
-- Search and filter past meetings by title, transcript, project, and labels.
+- Search and filter active/archived meetings by title, transcript, project, and labels.
 
 ### Security & user lifecycle
 

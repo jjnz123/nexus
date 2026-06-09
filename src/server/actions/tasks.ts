@@ -64,6 +64,7 @@ export async function createProject(input: unknown) {
   }
 
   revalidatePath("/tasks");
+  revalidatePath("/meetings");
   await logAudit({
     action: "tasks.project.create",
     resource: "project",

@@ -3,6 +3,7 @@ import { z } from "zod";
 export const createMeetingSchema = z.object({
   title: z.string().min(1).max(200),
   projectId: z.string().uuid().nullable().optional(),
+  meetingAt: z.string().datetime().optional(),
   labels: z.array(z.string().min(1).max(40)).max(20).optional(),
 });
 
@@ -10,6 +11,7 @@ export const updateMeetingSchema = z.object({
   id: z.string().uuid(),
   title: z.string().min(1).max(200).optional(),
   projectId: z.string().uuid().nullable().optional(),
+  meetingAt: z.string().datetime().optional(),
   labels: z.array(z.string().min(1).max(40)).max(20).optional(),
 });
 
@@ -36,4 +38,5 @@ export const meetingSearchSchema = z.object({
   query: z.string().optional(),
   projectId: z.string().uuid().optional(),
   label: z.string().optional(),
+  archived: z.boolean().optional(),
 });

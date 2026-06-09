@@ -4,20 +4,29 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { format } from "date-fns";
-import { ArrowLeft, Mic, Play, Square, Upload } from "lucide-react";
+import { Archive, ArrowLeft, Mic, Pencil, Play, Square, Trash2, Upload } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
 import type { Meeting, MeetingActionItem, MeetingMessage, Project, Task } from "@/lib/db/schema";
 import {
+  datetimeLocalToIso,
+  toDatetimeLocalValue,
+} from "@/lib/meetings/datetime";
+import {
+  archiveMeeting,
   askMeetingQuestion,
   attachMeetingAudio,
   convertActionItemToTask,
+  deleteMeeting,
   reprocessMeeting,
+  updateMeeting,
 } from "@/server/actions/meetings";
+import { MeetingProjectSelect } from "@/components/meetings/MeetingProjectSelect";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -34,6 +43,7 @@ type MeetingDetailProps = {
   actionItems: MeetingActionItem[];
   messages: MeetingMessage[];
   projects: Project[];
+  canCreateProject?: boolean;
 };
 
 export function MeetingDetailView({
@@ -42,21 +52,30 @@ export function MeetingDetailView({
   projectKey,
   actionItems: initialActionItems,
   messages: initialMessages,
-  projects,
+  projects: initialProjects,
+  canCreateProject = false,
 }: MeetingDetailProps) {
   const [meeting, setMeeting] = useState(initialMeeting);
+  const [projects, setProjects] = useState(initialProjects);
   const [actionItems, setActionItems] = useState(initialActionItems);
   const [messages, setMessages] = useState(initialMessages);
   const [question, setQuestion] = useState("");
   const [recording, setRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState(meeting.title);
+  const [editMeetingAt, setEditMeetingAt] = useState(toDatetimeLocalValue(new Date(meeting.meetingAt)));
+  const [editProjectId, setEditProjectId] = useState(meeting.projectId ?? "none");
   const chunksRef = useRef<BlobPart[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
 
+  const isArchived = !!meeting.archivedAt;
+
   useEffect(() => {
+    if (isArchived) return;
     const mode = searchParams.get("mode");
     if (mode === "upload") fileInputRef.current?.click();
     if (mode === "record" && meeting.status === "recording") startRecording();
@@ -88,27 +107,30 @@ export function MeetingDetailView({
   }
 
   function startRecording() {
-    void navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
-      const recorder = new MediaRecorder(stream);
-      chunksRef.current = [];
-      recorder.ondataavailable = (e) => {
-        if (e.data.size) chunksRef.current.push(e.data);
-      };
-      recorder.onstop = () => {
-        stream.getTracks().forEach((t) => t.stop());
-        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
-        startTransition(async () => {
-          try {
-            await uploadBlob(blob, `meeting-${Date.now()}.webm`);
-          } catch (error) {
-            toast.error(error instanceof Error ? error.message : "Upload failed");
-          }
-        });
-      };
-      recorder.start();
-      setMediaRecorder(recorder);
-      setRecording(true);
-    }).catch(() => toast.error("Microphone access denied"));
+    void navigator.mediaDevices
+      .getUserMedia({ audio: true })
+      .then((stream) => {
+        const recorder = new MediaRecorder(stream);
+        chunksRef.current = [];
+        recorder.ondataavailable = (e) => {
+          if (e.data.size) chunksRef.current.push(e.data);
+        };
+        recorder.onstop = () => {
+          stream.getTracks().forEach((t) => t.stop());
+          const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
+          startTransition(async () => {
+            try {
+              await uploadBlob(blob, `meeting-${Date.now()}.webm`);
+            } catch (error) {
+              toast.error(error instanceof Error ? error.message : "Upload failed");
+            }
+          });
+        };
+        recorder.start();
+        setMediaRecorder(recorder);
+        setRecording(true);
+      })
+      .catch(() => toast.error("Microphone access denied"));
   }
 
   function stopRecording() {
@@ -169,27 +191,167 @@ export function MeetingDetailView({
     });
   }
 
+  function saveEdits() {
+    if (!editTitle.trim()) {
+      toast.error("Title is required");
+      return;
+    }
+    startTransition(async () => {
+      try {
+        const updated = await updateMeeting({
+          id: meeting.id,
+          title: editTitle.trim(),
+          projectId: editProjectId === "none" ? null : editProjectId,
+          meetingAt: datetimeLocalToIso(editMeetingAt),
+        });
+        setMeeting(updated);
+        setEditing(false);
+        toast.success("Meeting updated");
+        router.refresh();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Unable to update meeting");
+      }
+    });
+  }
+
+  function archive() {
+    startTransition(async () => {
+      try {
+        await archiveMeeting(meeting.id);
+        toast.success("Meeting archived");
+        router.push("/meetings");
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Unable to archive meeting");
+      }
+    });
+  }
+
+  function permanentlyDelete() {
+    if (
+      !window.confirm(
+        `Permanently delete "${meeting.title}"? This cannot be undone and removes all transcripts, summaries, and action items.`
+      )
+    ) {
+      return;
+    }
+    startTransition(async () => {
+      try {
+        await deleteMeeting(meeting.id);
+        toast.success("Meeting deleted");
+        router.push("/meetings/archived");
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Unable to delete meeting");
+      }
+    });
+  }
+
+  const backHref = isArchived ? "/meetings/archived" : "/meetings";
+  const backLabel = isArchived ? "Back to archived meetings" : "Back to meetings";
+
   return (
     <div className="space-y-6">
       <Button variant="ghost" size="sm" className="-ml-2 gap-1.5" asChild>
-        <Link href="/meetings">
+        <Link href={backHref}>
           <ArrowLeft className="h-4 w-4" />
-          Back to meetings
+          {backLabel}
         </Link>
       </Button>
 
+      {isArchived ? (
+        <Card className="border-muted-foreground/30 bg-muted/30">
+          <CardContent className="py-3 text-sm text-muted-foreground">
+            This meeting is archived. Content is read-only. Delete it from here or the archived list
+            to remove permanently.
+          </CardContent>
+        </Card>
+      ) : null}
+
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{meeting.title}</h1>
-          <p className="text-sm text-muted-foreground">
-            {format(new Date(meeting.createdAt), "MMM d, yyyy HH:mm")}
-            {projectKey ? ` · ${projectName} (${projectKey})` : ""}
-          </p>
+        {editing && !isArchived ? (
+          <div className="grid w-full max-w-2xl gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-title">Title</Label>
+              <Input
+                id="edit-title"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="edit-meeting-at">Date & time</Label>
+                <Input
+                  id="edit-meeting-at"
+                  type="datetime-local"
+                  value={editMeetingAt}
+                  onChange={(e) => setEditMeetingAt(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Project</Label>
+                <MeetingProjectSelect
+                  projects={projects}
+                  value={editProjectId}
+                  onChange={setEditProjectId}
+                  onProjectsChange={setProjects}
+                  canCreateProject={canCreateProject}
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button disabled={isPending} onClick={saveEdits}>
+                Save
+              </Button>
+              <Button variant="ghost" onClick={() => setEditing(false)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">{meeting.title}</h1>
+            <p className="text-sm text-muted-foreground">
+              {format(new Date(meeting.meetingAt), "MMM d, yyyy HH:mm")}
+              {projectKey ? ` · ${projectName} (${projectKey})` : ""}
+            </p>
+          </div>
+        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge>{meeting.status}</Badge>
+          {!editing && !isArchived ? (
+            <>
+              <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setEditing(true)}>
+                <Pencil className="h-4 w-4" />
+                Edit
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                disabled={isPending}
+                onClick={archive}
+              >
+                <Archive className="h-4 w-4" />
+                Archive
+              </Button>
+            </>
+          ) : null}
+          {isArchived ? (
+            <Button
+              variant="destructive"
+              size="sm"
+              className="gap-1.5"
+              disabled={isPending}
+              onClick={permanentlyDelete}
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete permanently
+            </Button>
+          ) : null}
         </div>
-        <Badge>{meeting.status}</Badge>
       </div>
 
-      {meeting.status === "recording" ? (
+      {!isArchived && meeting.status === "recording" ? (
         <Card>
           <CardHeader>
             <CardTitle>Capture audio</CardTitle>
@@ -222,7 +384,7 @@ export function MeetingDetailView({
         </Card>
       ) : null}
 
-      {meeting.status === "processing" ? (
+      {!isArchived && meeting.status === "processing" ? (
         <Card>
           <CardContent className="py-8 text-center text-sm text-muted-foreground">
             Processing… transcribing with Whisper and summarizing with Grok.
@@ -230,7 +392,7 @@ export function MeetingDetailView({
         </Card>
       ) : null}
 
-      {meeting.status === "failed" ? (
+      {!isArchived && meeting.status === "failed" ? (
         <Card>
           <CardContent className="space-y-3 py-6">
             <p className="text-sm text-destructive">{meeting.errorMessage ?? "Processing failed"}</p>
@@ -256,7 +418,7 @@ export function MeetingDetailView({
             <TabsTrigger value="summary">Summary</TabsTrigger>
             <TabsTrigger value="transcript">Transcript</TabsTrigger>
             <TabsTrigger value="actions">Action items</TabsTrigger>
-            <TabsTrigger value="chat">Ask AI</TabsTrigger>
+            {!isArchived ? <TabsTrigger value="chat">Ask AI</TabsTrigger> : null}
           </TabsList>
 
           <TabsContent value="summary" className="mt-4">
@@ -285,11 +447,15 @@ export function MeetingDetailView({
                       <p className="mt-1 text-sm text-muted-foreground">{item.description}</p>
                     ) : null}
                     {item.assigneeHint ? (
-                      <p className="mt-1 text-xs text-muted-foreground">Assignee: {item.assigneeHint}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Assignee: {item.assigneeHint}
+                      </p>
                     ) : null}
                   </div>
                   {item.convertedTaskId ? (
                     <Badge>Converted</Badge>
+                  ) : isArchived ? (
+                    <Badge variant="outline">Not converted</Badge>
                   ) : (
                     <Select onValueChange={(projectId) => convertItem(item, projectId)}>
                       <SelectTrigger className="w-[180px]">
@@ -312,35 +478,37 @@ export function MeetingDetailView({
             ) : null}
           </TabsContent>
 
-          <TabsContent value="chat" className="mt-4 space-y-4">
-            <div className="max-h-80 space-y-3 overflow-y-auto rounded-lg border p-4">
-              {messages.map((m) => (
-                <div key={m.id} className={m.role === "user" ? "text-right" : ""}>
-                  <div
-                    className={`inline-block max-w-[85%] rounded-lg px-3 py-2 text-sm ${
-                      m.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"
-                    }`}
-                  >
-                    {m.content}
+          {!isArchived ? (
+            <TabsContent value="chat" className="mt-4 space-y-4">
+              <div className="max-h-80 space-y-3 overflow-y-auto rounded-lg border p-4">
+                {messages.map((m) => (
+                  <div key={m.id} className={m.role === "user" ? "text-right" : ""}>
+                    <div
+                      className={`inline-block max-w-[85%] rounded-lg px-3 py-2 text-sm ${
+                        m.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"
+                      }`}
+                    >
+                      {m.content}
+                    </div>
                   </div>
-                </div>
-              ))}
-              {messages.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Ask anything about this meeting.</p>
-              ) : null}
-            </div>
-            <div className="flex gap-2">
-              <Input
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                placeholder="What decisions were made about…?"
-                onKeyDown={(e) => e.key === "Enter" && sendQuestion()}
-              />
-              <Button disabled={isPending} onClick={sendQuestion}>
-                Ask
-              </Button>
-            </div>
-          </TabsContent>
+                ))}
+                {messages.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Ask anything about this meeting.</p>
+                ) : null}
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  value={question}
+                  onChange={(e) => setQuestion(e.target.value)}
+                  placeholder="What decisions were made about…?"
+                  onKeyDown={(e) => e.key === "Enter" && sendQuestion()}
+                />
+                <Button disabled={isPending} onClick={sendQuestion}>
+                  Ask
+                </Button>
+              </div>
+            </TabsContent>
+          ) : null}
         </Tabs>
       ) : null}
 
