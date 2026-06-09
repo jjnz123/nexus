@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v1.3.0
+**Current release:** v1.3.1
 
 ## 1. Overview
 
