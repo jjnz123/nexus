@@ -248,17 +248,30 @@ Static analysis runs automatically via **GitHub Actions** on every push to `main
 **One-time setup**
 
 1. Create a SonarQube project with key **`nexus`** (matches `sonar-project.properties`).
-2. In GitHub → **Settings → Secrets and variables → Actions**, add:
+2. Generate a **Project Analysis Token** (`sqp_…`) in SonarQube: **Project → Project Settings → Analysis Method → GitHub Actions** (or regenerate under your user tokens if you prefer a `squ_…` token with *Execute Analysis* on this project).
+3. In GitHub → **Settings → Secrets and variables → Actions**, add:
 
 | Secret | Description |
 |--------|-------------|
-| `SONAR_TOKEN` | User token from SonarQube (My Account → Security) |
-| `SONAR_HOST_URL` | SonarQube server URL, e.g. `https://sonar.example.com` |
+| `SONAR_TOKEN` | Project analysis token (`sqp_…`) or user token with analysis permission — **no quotes, no trailing spaces** |
+| `SONAR_HOST_URL` | `https://sonarqube.q1.co.nz` (no trailing slash) |
 
 **Configuration**
 
 - Project settings: `sonar-project.properties` at the repo root
 - Sources: repository root (excludes tests, `node_modules`, `.next`, `dist`, `coverage`, Drizzle meta)
+
+**Troubleshooting**
+
+| Symptom | Likely cause |
+|---------|----------------|
+| `HTTP 403` / “check sonar.token or SONAR_TOKEN” | Wrong, expired, or missing GitHub secret — **not** a network failure. The runner reached SonarQube but the token was rejected. |
+| Works locally, fails in Actions | GitHub `SONAR_TOKEN` differs from your local token, or the secret has a trailing newline. Re-paste the token in GitHub secrets. |
+| `sonar.login` in local tests | Deprecated on SonarQube 10+; use `SONAR_TOKEN` env or `-Dsonar.token=` (not `-Dsonar.login=`). |
+
+The workflow includes a **Verify SonarQube secrets and connectivity** step that checks `/api/system/status` (reachability) and `/api/authentication/validate` (token) before scanning. Use **Actions → SonarQube Analysis → Run workflow** to test after updating secrets.
+
+**Never commit tokens** to the repository. If a token was pasted into a file, revoke it in SonarQube and create a new one.
 
 After secrets are set, pushes and PRs trigger the **SonarQube Analysis** workflow. Results appear in SonarQube and (for PRs) as GitHub checks when the server is linked.
 

@@ -16,6 +16,45 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Verify SonarQube secrets and connectivity
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${SONAR_TOKEN:-}" ]; then
+            echo "::error::SONAR_TOKEN is not set. Add it under Settings → Secrets → Actions."
+            exit 1
+          fi
+          if [ -z "${SONAR_HOST_URL:-}" ]; then
+            echo "::error::SONAR_HOST_URL is not set. Example: https://sonarqube.q1.co.nz"
+            exit 1
+          fi
+
+          URL="${SONAR_HOST_URL%/}"
+          echo "SONAR_HOST_URL length: ${#SONAR_HOST_URL}"
+          echo "SONAR_TOKEN length: ${#SONAR_TOKEN}"
+
+          echo "Checking server reachability (no auth)..."
+          STATUS_CODE=$(curl -sS -o /tmp/sonar-status.json -w "%{http_code}" "${URL}/api/system/status")
+          echo "GET /api/system/status -> HTTP ${STATUS_CODE}"
+          cat /tmp/sonar-status.json
+          echo ""
+
+          echo "Validating token..."
+          AUTH_CODE=$(curl -sS -o /tmp/sonar-auth.json -w "%{http_code}" \
+            -u "${SONAR_TOKEN}:" \
+            "${URL}/api/authentication/validate")
+          echo "GET /api/authentication/validate -> HTTP ${AUTH_CODE}"
+          cat /tmp/sonar-auth.json
+          echo ""
+
+          if [ "$AUTH_CODE" != "200" ]; then
+            echo "::error::Token rejected (HTTP ${AUTH_CODE}). See README SonarQube troubleshooting."
+            exit 1
+          fi
+
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v5.0.0
         env:
