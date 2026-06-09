@@ -21,6 +21,7 @@ import type {
   AiMessageAttachment,
   AiProject,
   AiSkillEvent,
+  RagCitation,
   UserRole,
 } from "@/lib/db/schema";
 import type { UserPermissionOverrides } from "@/lib/permissions";
@@ -96,6 +97,7 @@ export function ChatPage({
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
   const [streamingSkills, setStreamingSkills] = useState<AiSkillEvent[]>([]);
+  const [streamingCitations, setStreamingCitations] = useState<RagCitation[]>([]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(initialSidebarCollapsed);
   const [filesOpen, setFilesOpen] = useState(false);
   const [skillsOpen, setSkillsOpen] = useState(false);
@@ -162,11 +164,11 @@ export function ChatPage({
       role: "assistant",
       content: streamingContent,
       attachments: [],
-      metadata: { skills: streamingSkills },
+      metadata: { skills: streamingSkills, citations: streamingCitations },
       createdAt: new Date(),
     };
     return [...messages, streamingMessage];
-  }, [messages, isStreaming, streamingContent, streamingSkills, activeConversationId]);
+  }, [messages, isStreaming, streamingContent, streamingSkills, streamingCitations, activeConversationId]);
 
   const refreshWorkspace = useCallback(async () => {
     const workspace = await getAiWorkspace();
@@ -326,6 +328,7 @@ export function ChatPage({
       setIsStreaming(true);
       setStreamingContent("");
       setStreamingSkills([]);
+      setStreamingCitations([]);
 
       try {
         const apiMessages = history.map((message) => ({
@@ -342,6 +345,7 @@ export function ChatPage({
             conversationId,
             enabledSkillNames: enabledSkillNamesRef.current,
             onSkillsChange: setStreamingSkills,
+            onCitationsChange: setStreamingCitations,
           }
         );
 
@@ -349,6 +353,7 @@ export function ChatPage({
           if (result.content.trim()) {
             const saved = await appendAssistantMessage(conversationId, result.content, {
               skills: result.skills,
+              citations: result.citations,
             });
             setMessages((prev) => [...prev, saved]);
           }
@@ -357,6 +362,7 @@ export function ChatPage({
 
         const saved = await appendAssistantMessage(conversationId, result.content, {
           skills: result.skills,
+          citations: result.citations,
         });
         setMessages((prev) => [...prev, saved]);
         await refreshWorkspace();
@@ -559,6 +565,7 @@ export function ChatPage({
                         message={message}
                         isStreaming={message.id === "streaming"}
                         streamingSkills={message.id === "streaming" ? streamingSkills : []}
+                        streamingCitations={message.id === "streaming" ? streamingCitations : []}
                         showRegenerate={
                           message.role === "assistant" &&
                           message.id === lastAssistantId &&

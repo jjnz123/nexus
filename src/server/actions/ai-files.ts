@@ -12,6 +12,9 @@ import {
 import { requireAuth } from "@/lib/auth";
 import { requireSessionPermission } from "@/lib/permissions";
 import { extractTextPreview } from "@/lib/ai/file-context";
+import { indexAiConversationFile, indexAiProjectFile } from "@/lib/rag/indexer";
+import { deleteRagSource as deleteRagSourceFromStore } from "@/lib/rag/store";
+import { RAG_SOURCE_TYPES } from "@/lib/rag/types";
 import {
   aiConversationFileInputSchema,
   aiProjectFileInputSchema,
@@ -86,6 +89,9 @@ export async function addAiProjectFile(input: unknown) {
     .returning();
 
   revalidatePath("/chat");
+
+  void indexAiProjectFile(file).catch(() => undefined);
+
   return file;
 }
 
@@ -113,6 +119,9 @@ export async function addAiConversationFile(input: unknown) {
     .returning();
 
   revalidatePath("/chat");
+
+  void indexAiConversationFile(file).catch(() => undefined);
+
   return file;
 }
 
@@ -158,6 +167,8 @@ export async function deleteAiProjectFile(id: string) {
     .delete(aiProjectFiles)
     .where(and(eq(aiProjectFiles.id, id), eq(aiProjectFiles.userId, session.user.id)));
 
+  await deleteRagSourceFromStore(RAG_SOURCE_TYPES.AI_PROJECT_FILE, id);
+
   revalidatePath("/chat");
   return { success: true };
 }
@@ -171,6 +182,8 @@ export async function deleteAiConversationFile(id: string) {
     .where(
       and(eq(aiConversationFiles.id, id), eq(aiConversationFiles.userId, session.user.id))
     );
+
+  await deleteRagSourceFromStore(RAG_SOURCE_TYPES.AI_CONVERSATION_FILE, id);
 
   revalidatePath("/chat");
   return { success: true };

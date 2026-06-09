@@ -9,7 +9,8 @@ import { toast } from "sonner";
 import { MarkdownMessage } from "@/components/ai/MarkdownMessage";
 import { Button } from "@/components/ui/button";
 import { SkillEvents } from "@/components/chat/SkillEvents";
-import type { AiMessage, AiMessageAttachment, AiSkillEvent } from "@/lib/db/schema";
+import type { AiMessage, AiMessageAttachment, AiSkillEvent, RagCitation } from "@/lib/db/schema";
+import { RagCitations } from "@/components/chat/RagCitations";
 import { cn } from "@/lib/utils";
 
 function AttachmentList({ attachments }: { attachments: AiMessageAttachment[] }) {
@@ -54,6 +55,7 @@ export function ChatMessageBubble({
   message,
   isStreaming = false,
   streamingSkills = [],
+  streamingCitations = [],
   showRegenerate = false,
   onRegenerate,
   registerRef,
@@ -61,6 +63,7 @@ export function ChatMessageBubble({
   message: AiMessage;
   isStreaming?: boolean;
   streamingSkills?: AiSkillEvent[];
+  streamingCitations?: RagCitation[];
   showRegenerate?: boolean;
   onRegenerate?: () => void;
   registerRef?: (el: HTMLDivElement | null) => void;
@@ -68,6 +71,7 @@ export function ChatMessageBubble({
   const [copied, setCopied] = useState(false);
   const isUser = message.role === "user";
   const skills = isStreaming ? streamingSkills : (message.metadata?.skills ?? []);
+  const citations = isStreaming ? streamingCitations : (message.metadata?.citations ?? []);
 
   async function copyContent() {
     await navigator.clipboard.writeText(message.content);
@@ -118,6 +122,7 @@ export function ChatMessageBubble({
         ) : message.content || isStreaming ? (
           <>
             {message.content ? <MarkdownMessage content={message.content} /> : null}
+            <RagCitations citations={citations} />
             {isStreaming && !message.content ? (
               <span className="text-muted-foreground animate-pulse">Thinking…</span>
             ) : null}

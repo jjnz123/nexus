@@ -70,7 +70,7 @@ A background worker runs checks continuously so the dashboard stays current.
 When an xAI API key is configured, users with permission can:
 
 - Chat with **Grok** from the home page search bar or AI drawer.
-- Use the full **AI Chat** workspace at `/chat` with projects, conversations, project- and conversation-level file knowledge bases, per-conversation **Skills** toggles (including **Web Search** and **X Search**), and Grok-style tool results that **collapse automatically** once the final answer appears (expand to inspect details).
+- Use the full **AI Chat** workspace at `/chat` with projects, conversations, project- and conversation-level file knowledge bases (**semantic RAG** when `OPENAI_API_KEY` is set), per-conversation **Skills** toggles (including **Web Search** and **X Search**), source **citations** on grounded answers, and Grok-style tool results that **collapse automatically** once the final answer appears (expand to inspect details).
 - Get **AI-suggested metadata** when creating bookmarks (title, description, tags, icon).
 - **Analyse audit logs** in the admin panel (summaries, anomalies, follow-ups).
 
@@ -169,7 +169,7 @@ npm run dev
 | `NEXT_PUBLIC_APP_URL` | Same as `AUTH_URL` — used for absolute links in emails and server-side URL generation |
 | `AUTH_TRUST_HOST` | Set to `true` when behind Cloudflare Tunnel or a reverse proxy (Auth.js `trustHost`) |
 | `XAI_API_KEY` | xAI API key for Grok (optional) |
-| `OPENAI_API_KEY` | OpenAI API key for Whisper meeting transcription (optional) |
+| `OPENAI_API_KEY` | OpenAI API key for Whisper transcription and RAG embeddings (optional) |
 | `SMTP2GO_API_KEY` | SMTP2go API key for transactional email (optional) |
 | `SMTP2GO_SENDER_EMAIL` | From address for SMTP2go emails |
 | `SMTP2GO_SENDER_NAME` | From name for SMTP2go emails (default: Nexus) |
@@ -231,7 +231,7 @@ Deploy from the GitHub repo with build enabled. Set these stack environment vari
 | `SEED_ADMIN_PASSWORD` | Recommended | Change before first deploy |
 | `SEED_ADMIN_NAME` | Optional | Default: `Admin` |
 | `XAI_API_KEY` | Optional | Grok AI; leave blank to disable |
-| `OPENAI_API_KEY` | Optional | Whisper transcription for Meeting Assistant |
+| `OPENAI_API_KEY` | Optional | Whisper transcription; RAG embeddings for AI Chat knowledge bases |
 | `SMTP2GO_API_KEY` | Optional | Transactional email via SMTP2go REST API |
 | `SMTP2GO_SENDER_EMAIL` | Optional | Verified sender email in SMTP2go |
 | `SMTP2GO_SENDER_NAME` | Optional | Email sender display name |
@@ -260,7 +260,7 @@ After merging changes to `main`:
 ### Architecture
 
 - **app** — Next.js 15 (App Router, Server Actions, Auth.js v5)
-- **postgres** — PostgreSQL 16
+- **postgres** — PostgreSQL 16 with pgvector extension
 - **monitor-worker** — Background network health checks
 
 For a full feature breakdown, see [REQUIREMENTS.md](./REQUIREMENTS.md).

@@ -29,4 +29,15 @@ export const db = new Proxy({} as Db, {
   },
 });
 
+export function getSqlClient() {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error("DATABASE_URL is not set");
+  }
+  if (!globalForDb.client) {
+    globalForDb.client = postgres(connectionString, { max: 10 });
+  }
+  return globalForDb.client;
+}
+
 export { schema };

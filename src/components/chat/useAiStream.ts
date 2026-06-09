@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback } from "react";
-import type { AiSkillEvent } from "@/lib/db/schema";
+import type { AiSkillEvent, RagCitation } from "@/lib/db/schema";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
 export type AiStreamResult = {
   content: string;
   skills: AiSkillEvent[];
+  citations: RagCitation[];
 };
 
 async function readAiError(response: Response): Promise<string> {
@@ -29,6 +30,7 @@ export function useAiStream() {
         enabledSkillNames?: string[];
         onSkill?: (event: AiSkillEvent) => void;
         onSkillsChange?: (skills: AiSkillEvent[]) => void;
+        onCitationsChange?: (citations: RagCitation[]) => void;
       }
     ): Promise<AiStreamResult> => {
       const response = await fetch("/api/ai/chat", {
@@ -53,6 +55,7 @@ export function useAiStream() {
       let buffer = "";
       let full = "";
       const skills: AiSkillEvent[] = [];
+      const citations: RagCitation[] = [];
 
       while (true) {
         const { done, value } = await reader.read();
@@ -75,7 +78,7 @@ export function useAiStream() {
           try {
             const parsed = JSON.parse(data) as
               | { type: "content"; delta: string }
-              | { type: "done"; content: string; skills?: AiSkillEvent[] }
+              | { type: "done"; content: string; skills?: AiSkillEvent[]; citations?: RagCitation[] }
               | { type: "skill"; event: AiSkillEvent }
               | { type: "error"; message: string }
               | {
@@ -107,6 +110,10 @@ export function useAiStream() {
                   skills.splice(0, skills.length, ...parsed.skills);
                   options?.onSkillsChange?.([...skills]);
                 }
+                if (parsed.citations?.length) {
+                  citations.splice(0, citations.length, ...parsed.citations);
+                  options?.onCitationsChange?.([...citations]);
+                }
                 continue;
               }
             }
@@ -126,7 +133,7 @@ export function useAiStream() {
         }
       }
 
-      return { content: full, skills };
+      return { content: full, skills, citations };
     },
     []
   );

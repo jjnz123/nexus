@@ -330,7 +330,21 @@ export type AiSkillEvent = {
 
 export type AiMessageMetadata = {
   skills?: AiSkillEvent[];
+  citations?: RagCitation[];
 };
+
+export type RagCitation = {
+  chunkId: string;
+  sourceType: RagSourceType;
+  sourceId: string;
+  title: string;
+  excerpt: string;
+  href: string;
+};
+
+export type RagSourceType = "ai_project_file" | "ai_conversation_file";
+
+export type RagChunkMetadata = Record<string, unknown>;
 
 export const aiProjects = pgTable(
   "ai_projects",
@@ -436,6 +450,57 @@ export const aiConversationFiles = pgTable(
   (table) => [
     index("ai_conversation_files_conversation_idx").on(table.conversationId),
     index("ai_conversation_files_user_idx").on(table.userId),
+  ]
+);
+
+export const ragChunks = pgTable(
+  "rag_chunks",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    sourceType: text("source_type").$type<RagSourceType>().notNull(),
+    sourceId: uuid("source_id").notNull(),
+    chunkIndex: integer("chunk_index").notNull(),
+    content: text("content").notNull(),
+    contentHash: text("content_hash"),
+    title: text("title").notNull(),
+    mimeType: text("mime_type"),
+    aiProjectId: uuid("ai_project_id").references(() => aiProjects.id, {
+      onDelete: "cascade",
+    }),
+    aiConversationId: uuid("ai_conversation_id").references(() => aiConversations.id, {
+      onDelete: "cascade",
+    }),
+    metadata: jsonb("metadata").$type<RagChunkMetadata>().default({}).notNull(),
+    tokenEstimate: integer("token_estimate"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("rag_chunks_user_id_idx").on(table.userId),
+    index("rag_chunks_source_idx").on(table.sourceType, table.sourceId),
+    index("rag_chunks_project_idx").on(table.aiProjectId),
+    index("rag_chunks_conversation_idx").on(table.aiConversationId),
+  ]
+);
+
+export const ragIndexState = pgTable(
+  "rag_index_state",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    sourceType: text("source_type").$type<RagSourceType>().notNull(),
+    sourceId: uuid("source_id").notNull(),
+    contentHash: text("content_hash").notNull(),
+    chunkCount: integer("chunk_count").notNull().default(0),
+    status: text("status").$type<"indexed" | "failed" | "pending">().notNull().default("indexed"),
+    errorMessage: text("error_message"),
+    indexedAt: timestamp("indexed_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("rag_index_state_source_idx").on(table.sourceType, table.sourceId),
   ]
 );
 
@@ -692,3 +757,5 @@ export type AiConversation = typeof aiConversations.$inferSelect;
 export type AiMessage = typeof aiMessages.$inferSelect;
 export type AiProjectFile = typeof aiProjectFiles.$inferSelect;
 export type AiConversationFile = typeof aiConversationFiles.$inferSelect;
+export type RagChunk = typeof ragChunks.$inferSelect;
+export type RagIndexState = typeof ragIndexState.$inferSelect;

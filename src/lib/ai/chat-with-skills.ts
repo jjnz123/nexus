@@ -6,7 +6,8 @@ import {
   aiProjectFiles,
   aiProjects,
 } from "@/lib/db/schema";
-import { buildFileContextBlock } from "@/lib/ai/file-context";
+import { retrieveChatKnowledge } from "@/lib/rag/retriever";
+import type { RagCitation } from "@/lib/db/schema";
 import { getSkillLabel } from "@/lib/ai/skills/definitions";
 import { skillDefinitionsForApi } from "@/lib/ai/skills/index";
 import { executeSkill } from "@/lib/ai/skills/executor";
@@ -35,10 +36,15 @@ type ChatUser = {
 type StreamEvent =
   | { type: "skill"; event: AiSkillEvent }
   | { type: "content"; delta: string }
-  | { type: "done"; content: string; skills: AiSkillEvent[] }
+  | { type: "done"; content: string; skills: AiSkillEvent[]; citations?: RagCitation[] }
   | { type: "error"; message: string };
 
-async function loadFileContext(userId: string, projectId: string | null, conversationId: string | null) {
+async function loadKnowledgeContext(
+  userId: string,
+  projectId: string | null,
+  conversationId: string | null,
+  query: string
+) {
   const projectFiles = projectId
     ? await db
         .select({ file: aiProjectFiles, project: aiProjects })
@@ -59,7 +65,14 @@ async function loadFileContext(userId: string, projectId: string | null, convers
         )
     : [];
 
-  return buildFileContextBlock(projectFiles, conversationFiles);
+  return retrieveChatKnowledge({
+    userId,
+    query,
+    projectId,
+    conversationId,
+    projectFiles,
+    conversationFiles,
+  });
 }
 
 function encodeSse(event: StreamEvent) {
@@ -97,7 +110,14 @@ export async function runAiChatWithSkills({
   if (!apiKey) throw new Error("AI not configured");
 
   const model = await getAiModel();
-  const fileContext = await loadFileContext(user.id, projectId ?? null, conversationId ?? null);
+  const latestUserMessage =
+    [...messages].reverse().find((message) => message.role === "user")?.content ?? "";
+  const knowledge = await loadKnowledgeContext(
+    user.id,
+    projectId ?? null,
+    conversationId ?? null,
+    latestUserMessage
+  );
 
   const systemParts = [
     "You are Grok, a helpful AI assistant embedded in Nexus, an internal operations portal.",
@@ -106,10 +126,13 @@ export async function runAiChatWithSkills({
     "When you use a skill/tool, explain what you did briefly after receiving the result.",
   ];
 
-  if (fileContext) {
-    systemParts.push(
-      "The user has uploaded reference files. Use them as context when answering:\n\n" + fileContext
-    );
+  if (knowledge.contextBlock) {
+    systemParts.push(knowledge.contextBlock);
+    if (knowledge.usedRag) {
+      systemParts.push(
+        "When you use retrieved knowledge, cite sources inline using [1], [2], etc. matching the numbered excerpts above."
+      );
+    }
   }
 
   if (enableTools) {
@@ -229,8 +252,8 @@ export async function runAiChatWithSkills({
       await new Promise((r) => setTimeout(r, 8));
     }
 
-    onEvent?.({ type: "done", content, skills: skillEvents });
-    return { content, skills: skillEvents };
+    onEvent?.({ type: "done", content, skills: skillEvents, citations: knowledge.citations });
+    return { content, skills: skillEvents, citations: knowledge.citations };
   }
 
   throw new Error("Too many skill rounds");

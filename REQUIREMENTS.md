@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v3.2.2
+**Current release:** v3.3.0
 
 ## 1. Overview
 
@@ -10,7 +10,8 @@ Internal operations portal for bookmarks, kanban tasks, network monitoring, and 
 |------|--------|
 | Product name | Nexus |
 | Stack | Next.js 15 (App Router), Server Actions, Auth.js v5, PostgreSQL, Drizzle ORM |
-| AI provider | xAI Grok (optional; `XAI_API_KEY`); OpenAI Whisper (optional; `OPENAI_API_KEY`) |
+| AI provider | xAI Grok (optional; `XAI_API_KEY`); OpenAI Whisper + RAG embeddings (optional; `OPENAI_API_KEY`) |
+| Vector search | pgvector (PostgreSQL extension; `pgvector/pgvector:pg16` image) |
 | Email | SMTP2go REST API (optional; `SMTP2GO_*`) |
 | Background services | `monitor-worker` for scheduled network health checks |
 
@@ -234,7 +235,8 @@ Three-panel workspace (full-bleed within app shell):
 - **Conversation-level files** — upload, rename, delete files scoped to the current conversation only
 - File manager dialog labels scope clearly (**Project-wide** vs **This conversation** badges)
 - File manager dialog with search, image/document grouping, drag-and-drop upload, previews, and bulk upload
-- Text file content extracted for basic RAG-style context in AI responses
+- Text file content indexed for **semantic RAG retrieval** in AI responses (see §16)
+- Falls back to 8KB text previews when `OPENAI_API_KEY` is not set
 - Message-level attachments remain supported in the composer
 
 ### AI Skills (Tool Use)
@@ -732,7 +734,47 @@ Requires `ai:use`. Transcription requires `OPENAI_API_KEY`; summarization requir
 - **Permanent delete** only from archived list or archived meeting detail (with confirmation)
 - Hard delete removes meeting record and related action items/messages
 
-## 16. Out of Scope / Known Gaps
+## 16. RAG — Retrieval-Augmented Generation
+
+**Phase 1 (current):** AI Chat file knowledge bases.
+
+### Architecture
+
+- **Vector store:** PostgreSQL + pgvector (`rag_chunks` table, HNSW cosine index)
+- **Embeddings:** OpenAI `text-embedding-3-small` (1536 dimensions) via `OPENAI_API_KEY`
+- **Abstraction:** `src/lib/rag/` — chunking, embeddings, store, indexer, retriever (swappable vector backend)
+- **Permission model:** Chunks scoped by `user_id`; retrieval limited to the current user's project/conversation files
+
+### Ingestion & indexing
+
+- **Sources (Phase 1):** `ai_project_files`, `ai_conversation_files`
+- **Chunking:** Semantic-aware — markdown split by headings; prose split by paragraphs with overlap
+- **Metadata:** source type/id, project/conversation IDs, title, mime type, file path, content hash
+- **Incremental updates:** Content hash in `rag_index_state`; skip re-embed when unchanged; re-index on upload
+- **Delete:** Removing a file deletes associated chunks and index state
+
+### Retrieval (AI Chat)
+
+- Query-time embedding of the latest user message
+- Top-k cosine similarity search scoped to active project + conversation files
+- Context budget ~12KB; fallback to legacy 8KB text previews when RAG unavailable
+- **Citations:** Assistant messages show linked sources with excerpts; inline `[1]`, `[2]` citation prompts
+
+### Planned phases
+
+| Phase | Scope |
+|-------|--------|
+| **2** | Meetings (transcripts, summaries, action items), Notes, Tasks |
+| **3** | Hybrid search (BM25), re-ranking, query rewriting |
+| **4** | Admin knowledge UI, scoped search modes, analytics |
+
+### Infrastructure
+
+- Docker Postgres image: `pgvector/pgvector:pg16`
+- Migration `0015_rag_pgvector.sql` enables extension and creates tables
+- Existing stacks: update compose image and run `npm run db:migrate`
+
+## 17. Out of Scope / Known Gaps
 
 - Project export UI (server action exists, no front-end)
 - Bookmark share UI for individual groups/cards (server supports tab/group/card resource types)
