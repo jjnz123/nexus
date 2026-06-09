@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v3.4.0
+**Current release:** v3.5.0
 
 ## 1. Overview
 
@@ -586,11 +586,13 @@ Requires `admin:access`. Tab selection via query param: `?tab=users|settings|kno
 
 Tab: **Knowledge** (`?tab=knowledge`).
 
-- Overview stats: indexed/failed sources, total chunks
-- Source breakdown by type
-- Top retrieved sources (30-day analytics from `rag_retrieval_logs`)
-- **Test search** — admin-scoped hybrid search across all indexed content
-- **Reindex** individual sources; **Backfill all** for existing notes, meetings, tasks, and files
+- Overview stats: indexed/failed sources, total chunks, retrieval success rate (30 days)
+- **Tabs:** Analytics, Chunks, Test search, Sources
+- Source breakdown by type; top retrieved sources (7 and 30 days)
+- Retrieval pipeline stats (runs, avg duration, avg chunks used); low-relevance query log
+- **Chunk browser** — search indexed chunks by content/title/type; view metadata and last indexed time; delete individual chunks
+- **Test search** — admin hybrid search with timing breakdown, vector/keyword/fused scores, fusion rank, and which chunks entered context
+- **Sources** — failed source list with errors; recent index status; per-source reindex; **Backfill all** with per-stage progress (notes, meetings, tasks, files)
 
 ### 10.4 Audit Logs
 
@@ -778,20 +780,21 @@ Full RAG pipeline across AI Chat files, Notes, Meetings, and Tasks (Phases 1–4
 ### Retrieval
 
 - **Hybrid search:** vector similarity + PostgreSQL full-text search, fused with reciprocal rank fusion (RRF)
-- **Query rewriting:** Grok expands user queries before embedding (when `XAI_API_KEY` set)
+- **Query rewriting:** Grok expands user queries before embedding (improved entity-preserving prompt when `XAI_API_KEY` set)
 - **Re-ranking:** fused score ordering before context budget trim
-- **Scoped search in `/chat`:** toggle Files, Notes, Meetings, Tasks above composer
+- **Scoped search in `/chat`:** persistent Files / Notes / Meetings / Tasks toggles above composer (saved in browser localStorage)
+- **Metadata filters in `/chat`:** kanban project, meeting date range, meeting label, note language — applied at retrieval without query syntax
 - **Meeting Q&A:** uses RAG retrieval for long meetings instead of full transcript injection
-- Context budget ~12KB; citations with deep links; retrieval logged to `rag_retrieval_logs`
+- Context budget ~12KB; citations with deep links and hover excerpts; retrieval logged to `rag_retrieval_logs` and `rag_retrieval_runs` (timings, scores, used-in-context flag)
 
 ### Admin
 
-- Tab `/admin?tab=knowledge` — index health, analytics, test search, reindex, backfill
+- Tab `/admin?tab=knowledge` — chunk browser, index health, 7/30-day analytics, pipeline debug test search, reindex, staged backfill
 
 ### Infrastructure
 
 - Docker Postgres image: `pgvector/pgvector:pg16`
-- Migrations: `0015_rag_pgvector.sql`, `0016_rag_phases_2_4.sql`
+- Migrations: `0015_rag_pgvector.sql`, `0016_rag_phases_2_4.sql`, `0017_rag_observability.sql`
 
 ## 17. Out of Scope / Known Gaps
 

@@ -8,7 +8,7 @@ import {
   type RagSourceType,
 } from "@/lib/db/schema";
 import { embeddingToVectorLiteral } from "@/lib/rag/embeddings";
-import type { RagSearchInput, RetrievedRagChunk } from "@/lib/rag/types";
+import type { RagSearchInput, RagChunkAdminRow, RetrievedRagChunk, RagSearchFilters } from "@/lib/rag/types";
 import {
   RAG_DEFAULT_TOP_K,
   RAG_HYBRID_CANDIDATE_LIMIT,
@@ -198,6 +198,64 @@ function mapChunkRow(row: {
   };
 }
 
+function buildMetadataFilter(input: RagSearchInput, sql: ReturnType<typeof getSqlClient>) {
+  const filters = input.filters;
+  if (!filters) return sql``;
+
+  let clause = sql``;
+
+  if (filters.kanbanProjectId) {
+    clause = sql`${clause} AND (
+      kanban_project_id = ${filters.kanbanProjectId}
+      OR metadata->>'projectId' = ${filters.kanbanProjectId}
+    )`;
+  }
+
+  if (filters.meetingDateFrom) {
+    clause = sql`${clause} AND (
+      source_type NOT IN ${sql([
+        RAG_SOURCE_TYPES.MEETING_TRANSCRIPT,
+        RAG_SOURCE_TYPES.MEETING_SUMMARY,
+        RAG_SOURCE_TYPES.MEETING_ACTION_ITEM,
+      ])}
+      OR (metadata->>'meetingAt')::timestamptz >= ${filters.meetingDateFrom}::timestamptz
+    )`;
+  }
+
+  if (filters.meetingDateTo) {
+    clause = sql`${clause} AND (
+      source_type NOT IN ${sql([
+        RAG_SOURCE_TYPES.MEETING_TRANSCRIPT,
+        RAG_SOURCE_TYPES.MEETING_SUMMARY,
+        RAG_SOURCE_TYPES.MEETING_ACTION_ITEM,
+      ])}
+      OR (metadata->>'meetingAt')::timestamptz <= ${filters.meetingDateTo}::timestamptz
+    )`;
+  }
+
+  if (filters.meetingLabels?.length) {
+    for (const label of filters.meetingLabels) {
+      clause = sql`${clause} AND (
+        source_type NOT IN ${sql([
+          RAG_SOURCE_TYPES.MEETING_TRANSCRIPT,
+          RAG_SOURCE_TYPES.MEETING_SUMMARY,
+          RAG_SOURCE_TYPES.MEETING_ACTION_ITEM,
+        ])}
+        OR metadata->'labels' ? ${label}
+      )`;
+    }
+  }
+
+  if (filters.noteLanguage) {
+    clause = sql`${clause} AND (
+      source_type <> ${RAG_SOURCE_TYPES.USER_NOTE}
+      OR metadata->>'language' = ${filters.noteLanguage}
+    )`;
+  }
+
+  return clause;
+}
+
 function buildAccessFilter(input: RagSearchInput, sql: ReturnType<typeof getSqlClient>) {
   const sourceTypes = scopesToSourceTypes(input.scopes);
   if (!sourceTypes.length) return sql`AND FALSE`;
@@ -226,6 +284,7 @@ function buildAccessFilter(input: RagSearchInput, sql: ReturnType<typeof getSqlC
     return sql`
       AND source_type IN ${sql(sourceTypes)}
       AND (${filesScope} OR ${notesScope} OR ${meetingsScope} OR ${tasksScope})
+      ${buildMetadataFilter(input, sql)}
     `;
   }
 
@@ -268,6 +327,7 @@ function buildAccessFilter(input: RagSearchInput, sql: ReturnType<typeof getSqlC
   return sql`
     AND source_type IN ${sql(sourceTypes)}
     AND (${fileScope} OR ${notesScope} OR ${meetingsScope} OR ${tasksScope})
+    ${buildMetadataFilter(input, sql)}
   `;
 }
 
@@ -391,6 +451,88 @@ export async function getIndexState(sourceType: RagSourceType, sourceId: string)
   return row ?? null;
 }
 
+export async function logRetrievalRun(input: {
+  userId: string;
+  query: string;
+  rewrittenQuery?: string;
+  context: string;
+  scopes: string[];
+  filters?: RagSearchFilters;
+  vectorCount: number;
+  keywordCount: number;
+  fusedCount: number;
+  usedCount: number;
+  durationMs: number;
+  success: boolean;
+  vectorResults: RetrievedRagChunk[];
+  keywordResults: RetrievedRagChunk[];
+  fusedResults: RetrievedRagChunk[];
+  usedChunks: RetrievedRagChunk[];
+}) {
+  const sql = getSqlClient();
+  const [run] = await sql<Array<{ id: string }>>`
+    INSERT INTO rag_retrieval_runs (
+      user_id,
+      query,
+      rewritten_query,
+      context,
+      scopes,
+      filters,
+      vector_count,
+      keyword_count,
+      fused_count,
+      used_count,
+      duration_ms,
+      success
+    ) VALUES (
+      ${input.userId},
+      ${input.query.slice(0, 2000)},
+      ${input.rewrittenQuery?.slice(0, 2000) ?? null},
+      ${input.context},
+      ${JSON.stringify(input.scopes)}::jsonb,
+      ${JSON.stringify(input.filters ?? {})}::jsonb,
+      ${input.vectorCount},
+      ${input.keywordCount},
+      ${input.fusedCount},
+      ${input.usedCount},
+      ${input.durationMs},
+      ${input.success}
+    )
+    RETURNING id
+  `;
+
+  const runId = run?.id;
+  if (!runId) return null;
+
+  const vectorById = new Map(input.vectorResults.map((chunk) => [chunk.id, chunk]));
+  const keywordById = new Map(input.keywordResults.map((chunk) => [chunk.id, chunk]));
+  const usedIds = new Set(input.usedChunks.map((chunk) => chunk.id));
+
+  const logRows = input.fusedResults.map((chunk) => {
+    const vector = vectorById.get(chunk.id);
+    const keyword = keywordById.get(chunk.id);
+    return {
+      userId: input.userId,
+      runId,
+      query: input.query.slice(0, 2000),
+      sourceType: chunk.sourceType,
+      sourceId: chunk.sourceId,
+      chunkId: chunk.id,
+      similarity: vector?.similarity ?? vector?.vectorScore ?? null,
+      keywordScore: keyword?.keywordScore ?? keyword?.similarity ?? chunk.keywordScore ?? null,
+      fusedScore: chunk.fusedScore ?? chunk.similarity,
+      usedInContext: usedIds.has(chunk.id),
+      context: input.context,
+    };
+  });
+
+  if (logRows.length) {
+    await db.insert(ragRetrievalLogs).values(logRows);
+  }
+
+  return runId;
+}
+
 export async function logRetrievalHits(input: {
   userId: string;
   query: string;
@@ -406,7 +548,10 @@ export async function logRetrievalHits(input: {
       sourceType: chunk.sourceType,
       sourceId: chunk.sourceId,
       chunkId: chunk.id,
-      similarity: chunk.similarity,
+      similarity: chunk.vectorScore ?? chunk.similarity,
+      keywordScore: chunk.keywordScore ?? null,
+      fusedScore: chunk.fusedScore ?? chunk.similarity,
+      usedInContext: true,
       context: input.context,
     }))
   );
@@ -437,13 +582,59 @@ export async function getRagAnalyticsSummary() {
     ORDER BY count DESC
   `;
 
+  const topSources7Days = await sql<
+    Array<{ source_type: string; source_id: string; hits: number; last_hit: string }>
+  >`
+    SELECT source_type, source_id, count(*)::int AS hits, max(created_at)::text AS last_hit
+    FROM rag_retrieval_logs
+    WHERE created_at >= NOW() - INTERVAL '7 days'
+      AND used_in_context = true
+    GROUP BY source_type, source_id
+    ORDER BY hits DESC
+    LIMIT 10
+  `;
+
   const topSources = await sql<
     Array<{ source_type: string; source_id: string; hits: number; last_hit: string }>
   >`
     SELECT source_type, source_id, count(*)::int AS hits, max(created_at)::text AS last_hit
     FROM rag_retrieval_logs
     WHERE created_at >= NOW() - INTERVAL '30 days'
+      AND used_in_context = true
     GROUP BY source_type, source_id
+    ORDER BY hits DESC
+    LIMIT 10
+  `;
+
+  const [retrievalStats] = await sql<
+    Array<{
+      total_runs: number;
+      successful_runs: number;
+      avg_duration_ms: number | null;
+      avg_used_count: number | null;
+    }>
+  >`
+    SELECT
+      count(*)::int AS total_runs,
+      count(*) FILTER (WHERE success = true)::int AS successful_runs,
+      avg(duration_ms)::float AS avg_duration_ms,
+      avg(used_count)::float AS avg_used_count
+    FROM rag_retrieval_runs
+    WHERE created_at >= NOW() - INTERVAL '30 days'
+  `;
+
+  const lowRelevanceQueries = await sql<
+    Array<{ query: string; hits: number; avg_fused: number | null }>
+  >`
+    SELECT
+      query,
+      count(*)::int AS hits,
+      avg(fused_score)::float AS avg_fused
+    FROM rag_retrieval_logs
+    WHERE created_at >= NOW() - INTERVAL '30 days'
+      AND fused_score IS NOT NULL
+      AND fused_score < 0.015
+    GROUP BY query
     ORDER BY hits DESC
     LIMIT 10
   `;
@@ -456,7 +647,15 @@ export async function getRagAnalyticsSummary() {
       total_chunks: 0,
     },
     sourceBreakdown,
+    topSources7Days,
     topSources,
+    retrievalStats: retrievalStats ?? {
+      total_runs: 0,
+      successful_runs: 0,
+      avg_duration_ms: null,
+      avg_used_count: null,
+    },
+    lowRelevanceQueries,
   };
 }
 
@@ -473,4 +672,88 @@ export async function countRagIndexStates() {
     .select({ count: drizzleSql<number>`count(*)::int` })
     .from(ragIndexState);
   return row?.count ?? 0;
+}
+
+export async function listFailedRagIndexStates(limit = 50) {
+  return db
+    .select()
+    .from(ragIndexState)
+    .where(eq(ragIndexState.status, "failed"))
+    .orderBy(desc(ragIndexState.updatedAt))
+    .limit(limit);
+}
+
+export async function searchRagChunksAdmin(input: {
+  query?: string;
+  sourceType?: RagSourceType;
+  sourceId?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{ chunks: RagChunkAdminRow[]; total: number }> {
+  const sql = getSqlClient();
+  const limit = input.limit ?? 25;
+  const offset = input.offset ?? 0;
+  const search = input.query?.trim() ?? "";
+
+  const rows = await sql<
+    Array<{
+      id: string;
+      source_type: RagSourceType;
+      source_id: string;
+      chunk_index: number;
+      title: string;
+      content: string;
+      metadata: Record<string, unknown> | null;
+      updated_at: string;
+      total_count: number;
+    }>
+  >`
+    SELECT
+      id,
+      source_type,
+      source_id,
+      chunk_index,
+      title,
+      content,
+      metadata,
+      updated_at::text,
+      count(*) OVER()::int AS total_count
+    FROM rag_chunks
+    WHERE 1 = 1
+      ${input.sourceType ? sql`AND source_type = ${input.sourceType}` : sql``}
+      ${input.sourceId ? sql`AND source_id = ${input.sourceId}` : sql``}
+      ${
+        search
+          ? sql`AND (
+              title ILIKE ${`%${search}%`}
+              OR content ILIKE ${`%${search}%`}
+              OR search_vector @@ websearch_to_tsquery('english', ${search})
+            )`
+          : sql``
+      }
+    ORDER BY updated_at DESC
+    LIMIT ${limit}
+    OFFSET ${offset}
+  `;
+
+  const total = rows[0]?.total_count ?? 0;
+
+  return {
+    total,
+    chunks: rows.map((row) => ({
+      id: row.id,
+      sourceType: row.source_type,
+      sourceId: row.source_id,
+      chunkIndex: row.chunk_index,
+      title: row.title,
+      contentPreview:
+        row.content.length > 320 ? `${row.content.slice(0, 320).trim()}…` : row.content,
+      metadata: row.metadata ?? {},
+      indexedAt: row.updated_at,
+    })),
+  };
+}
+
+export async function deleteRagChunkById(chunkId: string) {
+  await db.delete(ragChunks).where(eq(ragChunks.id, chunkId));
 }

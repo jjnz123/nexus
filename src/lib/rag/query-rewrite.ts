@@ -22,7 +22,9 @@ export async function rewriteRetrievalQuery(query: string): Promise<string> {
           {
             role: "system",
             content:
-              "Rewrite the user's question into a concise search query for retrieving relevant internal documents. Return only the rewritten query, no explanation.",
+              "You rewrite user questions into concise search queries for an internal company knowledge base (notes, meeting transcripts, tasks, uploaded files). " +
+              "Preserve key entities (people, projects, dates, product names). Expand abbreviations. Remove conversational filler. " +
+              "Return only the rewritten query on one line — no quotes or explanation.",
           },
           { role: "user", content: trimmed },
         ],

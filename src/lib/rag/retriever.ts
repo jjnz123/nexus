@@ -5,7 +5,7 @@ import { reciprocalRankFusion, rerankByScore } from "@/lib/rag/hybrid";
 import { ensureAiFilesIndexed } from "@/lib/rag/indexer";
 import { rewriteRetrievalQuery } from "@/lib/rag/query-rewrite";
 import {
-  logRetrievalHits,
+  logRetrievalRun,
   searchKeywordChunks,
   searchVectorChunks,
 } from "@/lib/rag/store";
@@ -17,6 +17,8 @@ import {
   isRagEnabled,
   normalizeSearchScopes,
   type RagContextResult,
+  type RagRetrievalDebug,
+  type RagSearchFilters,
   type RetrievedRagChunk,
 } from "@/lib/rag/types";
 
@@ -64,7 +66,8 @@ export function buildRagContextBlock(chunks: RetrievedRagChunk[]): {
       href: buildCitationHref(chunk.sourceType, chunk.metadata),
     });
 
-    return `[${citationNumber}] **${chunk.title}** (${chunk.sourceType}, score ${chunk.similarity.toFixed(2)})\n${chunk.content}`;
+    const scoreLabel = chunk.fusedScore ?? chunk.similarity;
+    return `[${citationNumber}] **${chunk.title}** (${chunk.sourceType}, score ${scoreLabel.toFixed(3)})\n${chunk.content}`;
   });
 
   const contextBlock = [
@@ -77,6 +80,50 @@ export function buildRagContextBlock(chunks: RetrievedRagChunk[]): {
   return { contextBlock, citations };
 }
 
+function buildRetrievalDebug(input: {
+  originalQuery: string;
+  retrievalQuery: string;
+  timingsMs: RagRetrievalDebug["timingsMs"];
+  vectorResults: RetrievedRagChunk[];
+  keywordResults: RetrievedRagChunk[];
+  fused: RetrievedRagChunk[];
+  trimmed: RetrievedRagChunk[];
+}): RagRetrievalDebug {
+  const usedIds = new Set(input.trimmed.map((chunk) => chunk.id));
+  const vectorById = new Map(input.vectorResults.map((chunk) => [chunk.id, chunk]));
+  const keywordById = new Map(input.keywordResults.map((chunk) => [chunk.id, chunk]));
+
+  return {
+    originalQuery: input.originalQuery,
+    retrievalQuery: input.retrievalQuery,
+    timingsMs: input.timingsMs,
+    counts: {
+      vector: input.vectorResults.length,
+      keyword: input.keywordResults.length,
+      fused: input.fused.length,
+      used: input.trimmed.length,
+    },
+    chunks: input.fused.map((chunk, index) => {
+      const vector = vectorById.get(chunk.id);
+      const keyword = keywordById.get(chunk.id);
+      return {
+        chunkId: chunk.id,
+        sourceType: chunk.sourceType,
+        sourceId: chunk.sourceId,
+        chunkIndex: chunk.chunkIndex,
+        title: chunk.title,
+        contentPreview:
+          chunk.content.length > 200 ? `${chunk.content.slice(0, 200).trim()}…` : chunk.content,
+        vectorScore: vector?.vectorScore ?? vector?.similarity ?? null,
+        keywordScore: keyword?.keywordScore ?? keyword?.similarity ?? chunk.keywordScore ?? null,
+        fusedScore: chunk.fusedScore ?? chunk.similarity ?? null,
+        rankAfterFusion: index + 1,
+        usedInContext: usedIds.has(chunk.id),
+      };
+    }),
+  };
+}
+
 export async function retrievePortalKnowledge(input: {
   userId: string;
   query: string;
@@ -85,13 +132,16 @@ export async function retrievePortalKnowledge(input: {
   projectId?: string | null;
   conversationId?: string | null;
   meetingId?: string | null;
+  filters?: RagSearchFilters;
   projectFiles?: AiProjectFile[];
   conversationFiles?: AiConversationFile[];
   limit?: number;
   context?: string;
   rewriteQuery?: boolean;
   adminMode?: boolean;
+  includeDebug?: boolean;
 }): Promise<RagContextResult> {
+  const startedAt = Date.now();
   const scopes = normalizeSearchScopes(input.scopes);
   const fallbackBlock =
     input.projectFiles || input.conversationFiles
@@ -106,13 +156,27 @@ export async function retrievePortalKnowledge(input: {
     await ensureAiFilesIndexed(input.projectFiles ?? [], input.conversationFiles ?? []);
   }
 
+  const timings = {
+    rewrite: 0,
+    embed: 0,
+    vectorSearch: 0,
+    keywordSearch: 0,
+    fusion: 0,
+    total: 0,
+  };
+
+  const rewriteStarted = Date.now();
   const retrievalQuery = input.rewriteQuery
     ? await rewriteRetrievalQuery(input.query)
     : input.query;
+  timings.rewrite = Date.now() - rewriteStarted;
 
+  const embedStarted = Date.now();
   const queryEmbedding = await embedQuery(retrievalQuery);
+  timings.embed = Date.now() - embedStarted;
+
   if (!queryEmbedding.length) {
-    return { contextBlock: fallbackBlock, citations: [], usedRag: false };
+    return { contextBlock: fallbackBlock, citations: [], usedRag: false, retrievalQuery };
   }
 
   const searchInput = {
@@ -125,35 +189,90 @@ export async function retrievePortalKnowledge(input: {
     aiProjectId: input.projectId ?? null,
     aiConversationId: input.conversationId ?? null,
     meetingId: input.meetingId ?? null,
+    filters: input.filters,
     limit: input.limit ?? RAG_HYBRID_CANDIDATE_LIMIT,
   };
 
-  const [vectorResults, keywordResults] = await Promise.all([
-    searchVectorChunks(searchInput),
-    searchKeywordChunks(searchInput),
-  ]);
+  const vectorStarted = Date.now();
+  const vectorPromise = searchVectorChunks(searchInput).then((results) => {
+    timings.vectorSearch = Date.now() - vectorStarted;
+    return results;
+  });
 
+  const keywordStarted = Date.now();
+  const keywordPromise = searchKeywordChunks(searchInput).then((results) => {
+    timings.keywordSearch = Date.now() - keywordStarted;
+    return results;
+  });
+
+  const [vectorResults, keywordResults] = await Promise.all([vectorPromise, keywordPromise]);
+
+  const fusionStarted = Date.now();
   const fused = rerankByScore(
     dedupeChunks(reciprocalRankFusion(vectorResults, keywordResults))
   ).slice(0, input.limit ?? RAG_DEFAULT_TOP_K);
+  timings.fusion = Date.now() - fusionStarted;
+  timings.total = Date.now() - startedAt;
 
   if (!fused.length) {
+    await logRetrievalRun({
+      userId: input.userId,
+      query: input.query,
+      rewrittenQuery: retrievalQuery,
+      context: input.context ?? "chat",
+      scopes,
+      filters: input.filters,
+      vectorCount: vectorResults.length,
+      keywordCount: keywordResults.length,
+      fusedCount: 0,
+      usedCount: 0,
+      durationMs: timings.total,
+      success: false,
+      vectorResults,
+      keywordResults,
+      fusedResults: [],
+      usedChunks: [],
+    }).catch(() => undefined);
+
     return {
       contextBlock: fallbackBlock,
       citations: [],
       usedRag: false,
       retrievalQuery,
+      debug: input.includeDebug
+        ? buildRetrievalDebug({
+            originalQuery: input.query,
+            retrievalQuery,
+            timingsMs: timings,
+            vectorResults,
+            keywordResults,
+            fused: [],
+            trimmed: [],
+          })
+        : undefined,
     };
   }
 
   const trimmed = trimChunksToBudget(fused, RAG_MAX_CONTEXT_CHARS);
   const { contextBlock, citations } = buildRagContextBlock(trimmed);
 
-  await logRetrievalHits({
+  await logRetrievalRun({
     userId: input.userId,
-    query: retrievalQuery,
+    query: input.query,
+    rewrittenQuery: retrievalQuery,
     context: input.context ?? "chat",
-    chunks: trimmed,
+    scopes,
+    filters: input.filters,
+    vectorCount: vectorResults.length,
+    keywordCount: keywordResults.length,
+    fusedCount: fused.length,
+    usedCount: trimmed.length,
+    durationMs: timings.total,
+    success: true,
+    vectorResults,
+    keywordResults,
+    fusedResults: fused,
+    usedChunks: trimmed,
   }).catch(() => undefined);
 
   return {
@@ -161,6 +280,17 @@ export async function retrievePortalKnowledge(input: {
     citations,
     usedRag: true,
     retrievalQuery,
+    debug: input.includeDebug
+      ? buildRetrievalDebug({
+          originalQuery: input.query,
+          retrievalQuery,
+          timingsMs: timings,
+          vectorResults,
+          keywordResults,
+          fused,
+          trimmed,
+        })
+      : undefined,
   };
 }
 
@@ -173,6 +303,7 @@ export async function retrieveChatKnowledge(input: {
   conversationFiles: AiConversationFile[];
   scopes?: RagSearchScope[];
   includeOrgTasks?: boolean;
+  filters?: RagSearchFilters;
   limit?: number;
 }): Promise<RagContextResult> {
   return retrievePortalKnowledge({
@@ -180,6 +311,7 @@ export async function retrieveChatKnowledge(input: {
     query: input.query,
     scopes: input.scopes,
     includeOrgTasks: input.includeOrgTasks,
+    filters: input.filters,
     projectId: input.projectId,
     conversationId: input.conversationId,
     projectFiles: input.projectFiles,

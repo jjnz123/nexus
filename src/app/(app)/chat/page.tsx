@@ -5,6 +5,7 @@ import { hasPermission } from "@/lib/permissions";
 import { ChatPage } from "@/components/chat/ChatPage";
 import { getAiWorkspace, getConversationMessages } from "@/server/actions/ai-chat";
 import { getBookmarkPreferences } from "@/server/actions/preferences";
+import { getProjects } from "@/server/actions/tasks";
 
 export default async function ChatRoutePage() {
   const session = await auth();
@@ -12,7 +13,13 @@ export default async function ChatRoutePage() {
     redirect("/");
   }
 
-  const [workspace, prefs] = await Promise.all([getAiWorkspace(), getBookmarkPreferences()]);
+  const canViewTasks = hasPermission(session.user.role, "tasks:view", session.user.permissions);
+
+  const [workspace, prefs, kanbanProjects] = await Promise.all([
+    getAiWorkspace(),
+    getBookmarkPreferences(),
+    canViewTasks ? getProjects().catch(() => []) : Promise.resolve([]),
+  ]);
 
   let initialMessages: Awaited<ReturnType<typeof getConversationMessages>> = [];
   const conversationId = prefs.activeAiConversationId;
@@ -45,6 +52,10 @@ export default async function ChatRoutePage() {
       userRole={session.user.role}
       userPermissions={session.user.permissions ?? null}
       initialEnabledSkills={initialEnabledSkills}
+      kanbanProjects={kanbanProjects.map((project) => ({
+        id: project.id,
+        name: project.name,
+      }))}
     />
   );
 }

@@ -25,6 +25,13 @@ export async function POST(req: NextRequest) {
     enableTools?: boolean;
     enabledSkillNames?: string[];
     searchScopes?: ("files" | "notes" | "meetings" | "tasks")[];
+    searchFilters?: {
+      kanbanProjectId?: string | null;
+      meetingDateFrom?: string | null;
+      meetingDateTo?: string | null;
+      meetingLabels?: string[];
+      noteLanguage?: string | null;
+    };
     legacyStream?: boolean;
   };
 
@@ -87,6 +94,7 @@ export async function POST(req: NextRequest) {
       enableTools: true,
       enabledSkillNames: body.enabledSkillNames,
       searchScopes: body.searchScopes,
+      searchFilters: body.searchFilters,
     }
   );
 

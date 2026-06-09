@@ -13,7 +13,11 @@ export function reciprocalRankFusion(
     const existing = scores.get(key);
     const score = 1 / (RRF_K + index + 1);
     scores.set(key, {
-      chunk: { ...chunk, keywordScore: existing?.chunk.keywordScore },
+      chunk: {
+        ...chunk,
+        vectorScore: chunk.similarity,
+        keywordScore: existing?.chunk.keywordScore,
+      },
       score: (existing?.score ?? 0) + score,
     });
   });
@@ -22,10 +26,12 @@ export function reciprocalRankFusion(
     const key = chunkKey(chunk);
     const existing = scores.get(key);
     const score = 1 / (RRF_K + index + 1);
+    const keywordScore = chunk.keywordScore ?? chunk.similarity;
     scores.set(key, {
       chunk: {
         ...(existing?.chunk ?? chunk),
-        keywordScore: chunk.keywordScore ?? chunk.similarity,
+        keywordScore: keywordScore,
+        vectorScore: existing?.chunk.vectorScore ?? chunk.vectorScore,
       },
       score: (existing?.score ?? 0) + score,
     });
@@ -33,7 +39,11 @@ export function reciprocalRankFusion(
 
   return [...scores.values()]
     .sort((a, b) => b.score - a.score)
-    .map(({ chunk, score }) => ({ ...chunk, similarity: score }));
+    .map(({ chunk, score }) => ({
+      ...chunk,
+      fusedScore: score,
+      similarity: score,
+    }));
 }
 
 function chunkKey(chunk: RetrievedRagChunk) {

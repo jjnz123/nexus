@@ -240,6 +240,9 @@ export async function indexMeetingContent(
   const baseMetadata = {
     meetingId: meeting.id,
     meetingTitle: meeting.title,
+    meetingAt: meeting.meetingAt.toISOString(),
+    projectId: meeting.projectId ?? undefined,
+    labels: meeting.labels ?? [],
     archived: archived ? "true" : "false",
   };
 

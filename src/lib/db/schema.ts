@@ -512,6 +512,32 @@ export const ragChunks = pgTable(
   ]
 );
 
+export const ragRetrievalRuns = pgTable(
+  "rag_retrieval_runs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    query: text("query").notNull(),
+    rewrittenQuery: text("rewritten_query"),
+    context: text("context").notNull().default("chat"),
+    scopes: jsonb("scopes").$type<RagSearchScope[]>().default([]).notNull(),
+    filters: jsonb("filters").$type<Record<string, unknown>>().default({}).notNull(),
+    vectorCount: integer("vector_count").notNull().default(0),
+    keywordCount: integer("keyword_count").notNull().default(0),
+    fusedCount: integer("fused_count").notNull().default(0),
+    usedCount: integer("used_count").notNull().default(0),
+    durationMs: integer("duration_ms"),
+    success: boolean("success").notNull().default(false),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("rag_retrieval_runs_created_at_idx").on(table.createdAt),
+    index("rag_retrieval_runs_user_idx").on(table.userId),
+  ]
+);
+
 export const ragRetrievalLogs = pgTable(
   "rag_retrieval_logs",
   {
@@ -519,11 +545,15 @@ export const ragRetrievalLogs = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    runId: uuid("run_id").references(() => ragRetrievalRuns.id, { onDelete: "set null" }),
     query: text("query").notNull(),
     sourceType: text("source_type").$type<RagSourceType>().notNull(),
     sourceId: uuid("source_id").notNull(),
     chunkId: uuid("chunk_id").references(() => ragChunks.id, { onDelete: "set null" }),
     similarity: real("similarity"),
+    keywordScore: real("keyword_score"),
+    fusedScore: real("fused_score"),
+    usedInContext: boolean("used_in_context").notNull().default(true),
     context: text("context").notNull().default("chat"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
@@ -531,6 +561,7 @@ export const ragRetrievalLogs = pgTable(
     index("rag_retrieval_logs_created_at_idx").on(table.createdAt),
     index("rag_retrieval_logs_source_idx").on(table.sourceType, table.sourceId),
     index("rag_retrieval_logs_user_idx").on(table.userId),
+    index("rag_retrieval_logs_run_idx").on(table.runId),
   ]
 );
 

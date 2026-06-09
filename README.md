@@ -70,7 +70,7 @@ A background worker runs checks continuously so the dashboard stays current.
 When an xAI API key is configured, users with permission can:
 
 - Chat with **Grok** from the home page search bar or AI drawer.
-- Use the full **AI Chat** workspace at `/chat` with projects, conversations, project- and conversation-level file knowledge bases (**semantic RAG** across files, notes, meetings, and tasks when `OPENAI_API_KEY` is set), **scoped search toggles**, per-conversation **Skills**, source **citations**, and Grok-style tool results that collapse once the final answer appears.
+- Use the full **AI Chat** workspace at `/chat` with projects, conversations, project- and conversation-level file knowledge bases (**semantic RAG** across files, notes, meetings, and tasks when `OPENAI_API_KEY` is set), **persistent scoped search toggles** (Files / Notes / Meetings / Tasks), **metadata filters** (kanban project, meeting date range, note language, meeting labels), per-conversation **Skills**, clickable source **citations** with excerpts, and Grok-style tool results that collapse once the final answer appears.
 - Get **AI-suggested metadata** when creating bookmarks (title, description, tags, icon).
 - **Analyse audit logs** in the admin panel (summaries, anomalies, follow-ups).
 
@@ -102,7 +102,7 @@ Admins manage the portal itself:
 
 - **Users** — create pending accounts, assign roles, elevate status (`pending` → `member` / `administrator`), send welcome emails, disable users, and override permissions per person.
 - **System settings** — AI model choice, header subtitle, meeting recording format/bitrate, and **send test email** to verify SMTP2go.
-- **Knowledge base** — RAG index health, retrieval analytics, test search, reindex, and backfill (`?tab=knowledge`).
+- **Knowledge base** — RAG chunk browser, index health, 7/30-day retrieval analytics, pipeline debug test search (vector/keyword/fused scores), reindex, and staged backfill progress (`?tab=knowledge`).
 - **Audit logs** — review who did what, filter, export, or ask AI to summarise activity.
 
 ---

@@ -43,6 +43,50 @@ export type RetrievedRagChunk = {
   metadata: Record<string, unknown>;
   similarity: number;
   keywordScore?: number;
+  vectorScore?: number;
+  fusedScore?: number;
+};
+
+export type RagSearchFilters = {
+  kanbanProjectId?: string | null;
+  meetingDateFrom?: string | null;
+  meetingDateTo?: string | null;
+  meetingLabels?: string[];
+  noteLanguage?: string | null;
+};
+
+export type RagRetrievalDebugChunk = {
+  chunkId: string;
+  sourceType: RagSourceType;
+  sourceId: string;
+  chunkIndex: number;
+  title: string;
+  contentPreview: string;
+  vectorScore: number | null;
+  keywordScore: number | null;
+  fusedScore: number | null;
+  rankAfterFusion: number;
+  usedInContext: boolean;
+};
+
+export type RagRetrievalDebug = {
+  originalQuery: string;
+  retrievalQuery: string;
+  timingsMs: {
+    rewrite: number;
+    embed: number;
+    vectorSearch: number;
+    keywordSearch: number;
+    fusion: number;
+    total: number;
+  };
+  counts: {
+    vector: number;
+    keyword: number;
+    fused: number;
+    used: number;
+  };
+  chunks: RagRetrievalDebugChunk[];
 };
 
 export type RagContextResult = {
@@ -50,6 +94,7 @@ export type RagContextResult = {
   citations: RagCitation[];
   usedRag: boolean;
   retrievalQuery?: string;
+  debug?: RagRetrievalDebug;
 };
 
 export type RagIndexInput = {
@@ -92,8 +137,20 @@ export type RagSearchInput = {
   aiProjectId?: string | null;
   aiConversationId?: string | null;
   meetingId?: string | null;
+  filters?: RagSearchFilters;
   limit?: number;
   minSimilarity?: number;
+};
+
+export type RagChunkAdminRow = {
+  id: string;
+  sourceType: RagSourceType;
+  sourceId: string;
+  chunkIndex: number;
+  title: string;
+  contentPreview: string;
+  metadata: Record<string, unknown>;
+  indexedAt: string;
 };
 
 export function isRagEnabled() {

@@ -8,6 +8,7 @@ import {
 } from "@/lib/db/schema";
 import { retrieveChatKnowledge } from "@/lib/rag/retriever";
 import type { RagCitation, RagSearchScope } from "@/lib/db/schema";
+import type { RagSearchFilters } from "@/lib/rag/types";
 import { hasPermission } from "@/lib/permissions";
 import { getSkillLabel } from "@/lib/ai/skills/definitions";
 import { skillDefinitionsForApi } from "@/lib/ai/skills/index";
@@ -45,7 +46,8 @@ async function loadKnowledgeContext(
   projectId: string | null,
   conversationId: string | null,
   query: string,
-  searchScopes?: RagSearchScope[]
+  searchScopes?: RagSearchScope[],
+  searchFilters?: RagSearchFilters
 ) {
   const projectFiles = projectId
     ? await db
@@ -75,6 +77,7 @@ async function loadKnowledgeContext(
     projectFiles,
     conversationFiles,
     scopes: searchScopes,
+    filters: searchFilters,
     includeOrgTasks: hasPermission(user.role, "tasks:view", user.permissions),
   });
 }
@@ -99,6 +102,7 @@ export async function runAiChatWithSkills({
   enableTools = true,
   enabledSkillNames,
   searchScopes,
+  searchFilters,
   signal,
   onEvent,
 }: {
@@ -109,6 +113,7 @@ export async function runAiChatWithSkills({
   enableTools?: boolean;
   enabledSkillNames?: string[];
   searchScopes?: RagSearchScope[];
+  searchFilters?: RagSearchFilters;
   signal?: AbortSignal;
   onEvent?: (event: StreamEvent) => void;
 }) {
@@ -123,7 +128,8 @@ export async function runAiChatWithSkills({
     projectId ?? null,
     conversationId ?? null,
     latestUserMessage,
-    searchScopes
+    searchScopes,
+    searchFilters
   );
 
   const systemParts = [
@@ -275,6 +281,7 @@ export function createSkillChatSseStream(
     enableTools?: boolean;
     enabledSkillNames?: string[];
     searchScopes?: RagSearchScope[];
+    searchFilters?: RagSearchFilters;
     signal?: AbortSignal;
   }
 ) {
@@ -291,6 +298,7 @@ export function createSkillChatSseStream(
           enableTools: options.enableTools,
           enabledSkillNames: options.enabledSkillNames,
           searchScopes: options.searchScopes,
+          searchFilters: options.searchFilters,
           signal: options.signal,
           onEvent: (event) => {
             controller.enqueue(encoder.encode(encodeSse(event)));
