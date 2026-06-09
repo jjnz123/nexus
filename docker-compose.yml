@@ -18,14 +18,14 @@ services:
     build: .
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "8374:3000"
     depends_on:
       postgres:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-nexus}:${POSTGRES_PASSWORD:-nexus}@postgres:5432/${POSTGRES_DB:-nexus}
       AUTH_SECRET: ${AUTH_SECRET}
-      AUTH_URL: ${AUTH_URL:-http://localhost:3000}
+      AUTH_URL: ${AUTH_URL:-http://localhost:8374}
       XAI_API_KEY: ${XAI_API_KEY:-}
       SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@localhost}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-changeme123}
