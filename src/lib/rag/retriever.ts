@@ -1,14 +1,21 @@
-import type { AiConversationFile, AiProjectFile, RagCitation } from "@/lib/db/schema";
+import type { AiConversationFile, AiProjectFile, RagCitation, RagSearchScope } from "@/lib/db/schema";
 import { buildFileContextBlock } from "@/lib/ai/file-context";
-import { ensureAiFilesIndexed } from "@/lib/rag/indexer";
 import { embedQuery } from "@/lib/rag/embeddings";
-import { searchSimilarChunks } from "@/lib/rag/store";
+import { reciprocalRankFusion, rerankByScore } from "@/lib/rag/hybrid";
+import { ensureAiFilesIndexed } from "@/lib/rag/indexer";
+import { rewriteRetrievalQuery } from "@/lib/rag/query-rewrite";
+import {
+  logRetrievalHits,
+  searchKeywordChunks,
+  searchVectorChunks,
+} from "@/lib/rag/store";
 import {
   RAG_DEFAULT_TOP_K,
+  RAG_HYBRID_CANDIDATE_LIMIT,
   RAG_MAX_CONTEXT_CHARS,
-  RAG_SOURCE_TYPES,
   buildCitationHref,
   isRagEnabled,
+  normalizeSearchScopes,
   type RagContextResult,
   type RetrievedRagChunk,
 } from "@/lib/rag/types";
@@ -45,8 +52,6 @@ export function buildRagContextBlock(chunks: RetrievedRagChunk[]): {
 
   const sections = chunks.map((chunk, index) => {
     const citationNumber = index + 1;
-    const filePath =
-      typeof chunk.metadata.filePath === "string" ? chunk.metadata.filePath : undefined;
     const excerpt =
       chunk.content.length > 240 ? `${chunk.content.slice(0, 240).trim()}…` : chunk.content;
 
@@ -56,7 +61,7 @@ export function buildRagContextBlock(chunks: RetrievedRagChunk[]): {
       sourceId: chunk.sourceId,
       title: chunk.title,
       excerpt,
-      href: buildCitationHref(chunk.sourceType, filePath),
+      href: buildCitationHref(chunk.sourceType, chunk.metadata),
     });
 
     return `[${citationNumber}] **${chunk.title}** (${chunk.sourceType}, score ${chunk.similarity.toFixed(2)})\n${chunk.content}`;
@@ -64,12 +69,99 @@ export function buildRagContextBlock(chunks: RetrievedRagChunk[]): {
 
   const contextBlock = [
     "## Retrieved knowledge (cite sources as [1], [2], …)",
-    "Use only the excerpts below when answering questions about uploaded files. If the answer is not in these excerpts, say so.",
+    "Use the excerpts below when answering. If the answer is not supported by these sources, say so.",
     "",
     sections.join("\n\n---\n\n"),
   ].join("\n");
 
   return { contextBlock, citations };
+}
+
+export async function retrievePortalKnowledge(input: {
+  userId: string;
+  query: string;
+  scopes?: RagSearchScope[];
+  includeOrgTasks?: boolean;
+  projectId?: string | null;
+  conversationId?: string | null;
+  meetingId?: string | null;
+  projectFiles?: AiProjectFile[];
+  conversationFiles?: AiConversationFile[];
+  limit?: number;
+  context?: string;
+  rewriteQuery?: boolean;
+  adminMode?: boolean;
+}): Promise<RagContextResult> {
+  const scopes = normalizeSearchScopes(input.scopes);
+  const fallbackBlock =
+    input.projectFiles || input.conversationFiles
+      ? buildFileContextBlock(input.projectFiles ?? [], input.conversationFiles ?? [])
+      : "";
+
+  if (!isRagEnabled()) {
+    return { contextBlock: fallbackBlock, citations: [], usedRag: false };
+  }
+
+  if (input.projectFiles?.length || input.conversationFiles?.length) {
+    await ensureAiFilesIndexed(input.projectFiles ?? [], input.conversationFiles ?? []);
+  }
+
+  const retrievalQuery = input.rewriteQuery
+    ? await rewriteRetrievalQuery(input.query)
+    : input.query;
+
+  const queryEmbedding = await embedQuery(retrievalQuery);
+  if (!queryEmbedding.length) {
+    return { contextBlock: fallbackBlock, citations: [], usedRag: false };
+  }
+
+  const searchInput = {
+    userId: input.userId,
+    query: retrievalQuery,
+    queryEmbedding,
+    scopes,
+    includeOrgTasks: input.includeOrgTasks ?? scopes.includes("tasks"),
+    adminMode: input.adminMode ?? false,
+    aiProjectId: input.projectId ?? null,
+    aiConversationId: input.conversationId ?? null,
+    meetingId: input.meetingId ?? null,
+    limit: input.limit ?? RAG_HYBRID_CANDIDATE_LIMIT,
+  };
+
+  const [vectorResults, keywordResults] = await Promise.all([
+    searchVectorChunks(searchInput),
+    searchKeywordChunks(searchInput),
+  ]);
+
+  const fused = rerankByScore(
+    dedupeChunks(reciprocalRankFusion(vectorResults, keywordResults))
+  ).slice(0, input.limit ?? RAG_DEFAULT_TOP_K);
+
+  if (!fused.length) {
+    return {
+      contextBlock: fallbackBlock,
+      citations: [],
+      usedRag: false,
+      retrievalQuery,
+    };
+  }
+
+  const trimmed = trimChunksToBudget(fused, RAG_MAX_CONTEXT_CHARS);
+  const { contextBlock, citations } = buildRagContextBlock(trimmed);
+
+  await logRetrievalHits({
+    userId: input.userId,
+    query: retrievalQuery,
+    context: input.context ?? "chat",
+    chunks: trimmed,
+  }).catch(() => undefined);
+
+  return {
+    contextBlock,
+    citations,
+    usedRag: true,
+    retrievalQuery,
+  };
 }
 
 export async function retrieveChatKnowledge(input: {
@@ -79,72 +171,36 @@ export async function retrieveChatKnowledge(input: {
   conversationId: string | null;
   projectFiles: AiProjectFile[];
   conversationFiles: AiConversationFile[];
+  scopes?: RagSearchScope[];
+  includeOrgTasks?: boolean;
   limit?: number;
 }): Promise<RagContextResult> {
-  const fallbackBlock = buildFileContextBlock(input.projectFiles, input.conversationFiles);
+  return retrievePortalKnowledge({
+    userId: input.userId,
+    query: input.query,
+    scopes: input.scopes,
+    includeOrgTasks: input.includeOrgTasks,
+    projectId: input.projectId,
+    conversationId: input.conversationId,
+    projectFiles: input.projectFiles,
+    conversationFiles: input.conversationFiles,
+    limit: input.limit,
+    context: "chat",
+    rewriteQuery: true,
+  });
+}
 
-  if (!isRagEnabled()) {
-    return {
-      contextBlock: fallbackBlock,
-      citations: [],
-      usedRag: false,
-    };
-  }
-
-  const hasFiles = input.projectFiles.length > 0 || input.conversationFiles.length > 0;
-  if (!hasFiles) {
-    return { contextBlock: "", citations: [], usedRag: false };
-  }
-
-  await ensureAiFilesIndexed(input.projectFiles, input.conversationFiles);
-
-  const queryEmbedding = await embedQuery(input.query);
-  if (!queryEmbedding.length) {
-    return {
-      contextBlock: fallbackBlock,
-      citations: [],
-      usedRag: false,
-    };
-  }
-
-  const projectResults = input.projectId
-    ? await searchSimilarChunks({
-        userId: input.userId,
-        queryEmbedding,
-        aiProjectId: input.projectId,
-        sourceTypes: [RAG_SOURCE_TYPES.AI_PROJECT_FILE],
-        limit: input.limit ?? RAG_DEFAULT_TOP_K,
-      })
-    : [];
-
-  const conversationResults = input.conversationId
-    ? await searchSimilarChunks({
-        userId: input.userId,
-        queryEmbedding,
-        aiConversationId: input.conversationId,
-        sourceTypes: [RAG_SOURCE_TYPES.AI_CONVERSATION_FILE],
-        limit: input.limit ?? RAG_DEFAULT_TOP_K,
-      })
-    : [];
-
-  const merged = dedupeChunks(
-    [...projectResults, ...conversationResults].sort((a, b) => b.similarity - a.similarity)
-  );
-
-  if (!merged.length) {
-    return {
-      contextBlock: fallbackBlock,
-      citations: [],
-      usedRag: false,
-    };
-  }
-
-  const trimmed = trimChunksToBudget(merged, RAG_MAX_CONTEXT_CHARS);
-  const { contextBlock, citations } = buildRagContextBlock(trimmed);
-
-  return {
-    contextBlock,
-    citations,
-    usedRag: true,
-  };
+export async function retrieveMeetingKnowledge(input: {
+  userId: string;
+  meetingId: string;
+  query: string;
+}): Promise<RagContextResult> {
+  return retrievePortalKnowledge({
+    userId: input.userId,
+    query: input.query,
+    scopes: ["meetings"],
+    meetingId: input.meetingId,
+    context: "meeting",
+    rewriteQuery: true,
+  });
 }

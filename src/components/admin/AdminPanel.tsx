@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AiHistoryPanel } from "./AiHistoryPanel";
 import { UserManagement } from "./UserManagement";
 import { AuditLogViewer } from "./AuditLogViewer";
+import { RagKnowledgePanel } from "./RagKnowledgePanel";
 import { SystemSettingsPanel } from "./SystemSettingsPanel";
 
 type UserRow = {
@@ -36,6 +37,7 @@ export function AdminPanel({
   aiProjects,
   emailConfigured,
   defaultTestEmail,
+  ragOverview,
 }: {
   users: UserRow[];
   auditLogs: AuditLog[];
@@ -45,11 +47,14 @@ export function AdminPanel({
   aiProjects: AiProjectOption[];
   emailConfigured: boolean;
   defaultTestEmail: string;
+  ragOverview: Awaited<ReturnType<typeof import("@/server/actions/rag-admin").getRagAdminOverview>>;
 }) {
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab");
   const defaultTab =
-    tabParam === "ai-history"
+    tabParam === "knowledge"
+      ? "knowledge"
+      : tabParam === "ai-history"
       ? "ai-history"
       : tabParam === "audit"
         ? "audit"
@@ -62,7 +67,7 @@ export function AdminPanel({
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Administration</h1>
         <p className="text-sm text-muted-foreground">
-          Manage users, system settings, AI history, and review audit activity.
+          Manage users, system settings, knowledge base, AI history, and review audit activity.
         </p>
       </div>
 
@@ -70,6 +75,7 @@ export function AdminPanel({
         <TabsList>
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
+          <TabsTrigger value="knowledge">Knowledge</TabsTrigger>
           <TabsTrigger value="ai-history">AI History</TabsTrigger>
           <TabsTrigger value="audit">Audit Logs</TabsTrigger>
         </TabsList>
@@ -82,6 +88,9 @@ export function AdminPanel({
             emailConfigured={emailConfigured}
             defaultTestEmail={defaultTestEmail}
           />
+        </TabsContent>
+        <TabsContent value="knowledge" className="mt-4">
+          <RagKnowledgePanel initialOverview={ragOverview} />
         </TabsContent>
         <TabsContent value="ai-history" className="mt-4">
           <AiHistoryPanel

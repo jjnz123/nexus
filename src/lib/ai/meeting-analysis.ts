@@ -58,7 +58,12 @@ ${transcript.slice(0, 120000)}`;
   return JSON.parse(jsonMatch[0]) as MeetingAnalysis;
 }
 
-export async function answerMeetingQuestion(transcript: string, question: string, history: { role: string; content: string }[]) {
+export async function answerMeetingQuestion(
+  transcript: string,
+  question: string,
+  history: { role: string; content: string }[],
+  ragContext?: string
+) {
   const apiKey = process.env.XAI_API_KEY;
   if (!apiKey) throw new Error("XAI_API_KEY is not configured");
 
@@ -66,7 +71,9 @@ export async function answerMeetingQuestion(transcript: string, question: string
   const messages = [
     {
       role: "system" as const,
-      content: `You answer questions about a meeting using ONLY the transcript below. If unknown, say so.\n\nTranscript:\n${transcript.slice(0, 100000)}`,
+      content: ragContext
+        ? `You answer questions about a meeting using ONLY the retrieved excerpts below. Cite them as [1], [2] when used. If unknown, say so.\n\n${ragContext}`
+        : `You answer questions about a meeting using ONLY the transcript below. If unknown, say so.\n\nTranscript:\n${transcript.slice(0, 100000)}`,
     },
     ...history.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
     { role: "user" as const, content: question },

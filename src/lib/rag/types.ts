@@ -1,16 +1,28 @@
-import type { RagCitation, RagSourceType } from "@/lib/db/schema";
+import type { RagCitation, RagScope, RagSearchScope, RagSourceType } from "@/lib/db/schema";
 
 export const RAG_SOURCE_TYPES = {
   AI_PROJECT_FILE: "ai_project_file",
   AI_CONVERSATION_FILE: "ai_conversation_file",
+  USER_NOTE: "user_note",
+  MEETING_TRANSCRIPT: "meeting_transcript",
+  MEETING_SUMMARY: "meeting_summary",
+  MEETING_ACTION_ITEM: "meeting_action_item",
+  TASK: "task",
 } as const satisfies Record<string, RagSourceType>;
 
 export const RAG_EMBEDDING_MODEL = "text-embedding-3-small";
 export const RAG_EMBEDDING_DIMENSIONS = 1536;
 export const RAG_DEFAULT_TOP_K = 8;
+export const RAG_HYBRID_CANDIDATE_LIMIT = 20;
 export const RAG_MAX_CONTEXT_CHARS = 12_000;
-export const RAG_MIN_SIMILARITY = 0.25;
+export const RAG_MIN_SIMILARITY = 0.2;
 export const RAG_FULL_TEXT_MAX_BYTES = 2_000_000;
+export const DEFAULT_RAG_SEARCH_SCOPES: RagSearchScope[] = [
+  "files",
+  "notes",
+  "meetings",
+  "tasks",
+];
 
 export type RagChunkInput = {
   chunkIndex: number;
@@ -30,12 +42,14 @@ export type RetrievedRagChunk = {
   aiConversationId: string | null;
   metadata: Record<string, unknown>;
   similarity: number;
+  keywordScore?: number;
 };
 
 export type RagContextResult = {
   contextBlock: string;
   citations: RagCitation[];
   usedRag: boolean;
+  retrievalQuery?: string;
 };
 
 export type RagIndexInput = {
@@ -50,6 +64,38 @@ export type RagIndexInput = {
   metadata?: Record<string, unknown>;
 };
 
+export type RagTextIndexInput = {
+  userId: string;
+  sourceType: RagSourceType;
+  sourceId: string;
+  title: string;
+  text: string;
+  scope?: RagScope;
+  mimeType?: string | null;
+  aiProjectId?: string | null;
+  aiConversationId?: string | null;
+  meetingId?: string | null;
+  noteId?: string | null;
+  taskId?: string | null;
+  kanbanProjectId?: string | null;
+  metadata?: Record<string, unknown>;
+  chunkStrategy?: "document" | "markdown";
+};
+
+export type RagSearchInput = {
+  userId: string;
+  query: string;
+  queryEmbedding: number[];
+  scopes: RagSearchScope[];
+  includeOrgTasks?: boolean;
+  adminMode?: boolean;
+  aiProjectId?: string | null;
+  aiConversationId?: string | null;
+  meetingId?: string | null;
+  limit?: number;
+  minSimilarity?: number;
+};
+
 export function isRagEnabled() {
   return Boolean(process.env.OPENAI_API_KEY?.trim());
 }
@@ -58,10 +104,49 @@ export function estimateTokens(text: string) {
   return Math.max(1, Math.ceil(text.length / 4));
 }
 
+export function scopesToSourceTypes(scopes: RagSearchScope[]): RagSourceType[] {
+  const types: RagSourceType[] = [];
+  if (scopes.includes("files")) {
+    types.push(RAG_SOURCE_TYPES.AI_PROJECT_FILE, RAG_SOURCE_TYPES.AI_CONVERSATION_FILE);
+  }
+  if (scopes.includes("notes")) types.push(RAG_SOURCE_TYPES.USER_NOTE);
+  if (scopes.includes("meetings")) {
+    types.push(
+      RAG_SOURCE_TYPES.MEETING_TRANSCRIPT,
+      RAG_SOURCE_TYPES.MEETING_SUMMARY,
+      RAG_SOURCE_TYPES.MEETING_ACTION_ITEM
+    );
+  }
+  if (scopes.includes("tasks")) types.push(RAG_SOURCE_TYPES.TASK);
+  return types;
+}
+
 export function buildCitationHref(
   sourceType: RagSourceType,
-  filePath: string | undefined
+  metadata: Record<string, unknown>
 ): string {
-  if (filePath) return `/uploads/${filePath}`;
+  if (typeof metadata.filePath === "string") {
+    return `/uploads/${metadata.filePath}`;
+  }
+  if (sourceType === "user_note") return "/notes";
+  if (
+    sourceType === "meeting_transcript" ||
+    sourceType === "meeting_summary" ||
+    sourceType === "meeting_action_item"
+  ) {
+    const meetingId =
+      typeof metadata.meetingId === "string" ? metadata.meetingId : undefined;
+    return meetingId ? `/meetings/${meetingId}` : "/meetings";
+  }
+  if (sourceType === "task" && typeof metadata.taskKey === "string") {
+    return `/tasks/${metadata.taskKey}`;
+  }
   return "/chat";
+}
+
+export function normalizeSearchScopes(scopes?: RagSearchScope[] | null): RagSearchScope[] {
+  if (!scopes?.length) return [...DEFAULT_RAG_SEARCH_SCOPES];
+  const allowed = new Set(DEFAULT_RAG_SEARCH_SCOPES);
+  const normalized = scopes.filter((scope) => allowed.has(scope));
+  return normalized.length ? normalized : [...DEFAULT_RAG_SEARCH_SCOPES];
 }

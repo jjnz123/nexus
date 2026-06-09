@@ -6,6 +6,9 @@ import { z } from "zod";
 import { requireAuth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { userNotes, type NoteLanguage } from "@/lib/db/schema";
+import { indexUserNote } from "@/lib/rag/indexer";
+import { deleteRagSource } from "@/lib/rag/store";
+import { RAG_SOURCE_TYPES } from "@/lib/rag/types";
 
 const noteLanguageSchema = z.enum([
   "plaintext",
@@ -71,6 +74,7 @@ export async function createUserNote(input?: unknown) {
     .returning();
 
   revalidatePath("/notes");
+  void indexUserNote(note).catch(() => undefined);
   return note;
 }
 
@@ -91,6 +95,7 @@ export async function updateUserNote(input: unknown) {
 
   if (!note) throw new Error("Note not found");
   revalidatePath("/notes");
+  void indexUserNote(note).catch(() => undefined);
   return note;
 }
 
@@ -99,6 +104,7 @@ export async function deleteUserNote(id: string) {
   await db
     .delete(userNotes)
     .where(and(eq(userNotes.id, id), eq(userNotes.userId, session.user.id)));
+  await deleteRagSource(RAG_SOURCE_TYPES.USER_NOTE, id);
   revalidatePath("/notes");
   return { success: true };
 }

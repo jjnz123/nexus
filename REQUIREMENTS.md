@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v3.3.0
+**Current release:** v3.4.0
 
 ## 1. Overview
 
@@ -563,7 +563,7 @@ Admin system settings remain under `/admin?tab=settings`.
 
 ## 10. Administration (`/admin`)
 
-Requires `admin:access`. Tab selection via query param: `?tab=users|settings|ai-history|audit`.
+Requires `admin:access`. Tab selection via query param: `?tab=users|settings|knowledge|ai-history|audit`.
 
 ### 10.1 User Management
 
@@ -580,7 +580,19 @@ Requires `admin:access`. Tab selection via query param: `?tab=users|settings|ai-
 - **Meeting audio recording** — browser recording format (default WebM Opus) and bitrate (default 96 kbps)
 - **Email test** — send a test message via SMTP2go to verify configuration (shows configured/not configured status)
 
-### 10.3 Audit Logs
+- **Meeting audio recording** — browser recording format (default WebM Opus) and bitrate (default 96 kbps)
+
+### 10.3 Knowledge Base (RAG)
+
+Tab: **Knowledge** (`?tab=knowledge`).
+
+- Overview stats: indexed/failed sources, total chunks
+- Source breakdown by type
+- Top retrieved sources (30-day analytics from `rag_retrieval_logs`)
+- **Test search** — admin-scoped hybrid search across all indexed content
+- **Reindex** individual sources; **Backfill all** for existing notes, meetings, tasks, and files
+
+### 10.4 Audit Logs
 
 - View audit log entries (paginated, default 100)
 - Filter by search text, user email, action type
@@ -588,7 +600,7 @@ Requires `admin:access`. Tab selection via query param: `?tab=users|settings|ai-
 - Export filtered logs as JSON
 - **AI analysis** — ask Grok to summarize activity, flag anomalies, suggest follow-ups
 
-### 10.4 AI History
+### 10.5 AI History
 
 Requires `admin:access`. Tab: **AI History** (`?tab=ai-history`).
 
@@ -736,43 +748,50 @@ Requires `ai:use`. Transcription requires `OPENAI_API_KEY`; summarization requir
 
 ## 16. RAG — Retrieval-Augmented Generation
 
-**Phase 1 (current):** AI Chat file knowledge bases.
+Full RAG pipeline across AI Chat files, Notes, Meetings, and Tasks (Phases 1–4 complete).
 
 ### Architecture
 
-- **Vector store:** PostgreSQL + pgvector (`rag_chunks` table, HNSW cosine index)
+- **Vector store:** PostgreSQL + pgvector (`rag_chunks`, HNSW cosine index) + PostgreSQL FTS (`search_vector` tsvector, GIN index)
 - **Embeddings:** OpenAI `text-embedding-3-small` (1536 dimensions) via `OPENAI_API_KEY`
-- **Abstraction:** `src/lib/rag/` — chunking, embeddings, store, indexer, retriever (swappable vector backend)
-- **Permission model:** Chunks scoped by `user_id`; retrieval limited to the current user's project/conversation files
+- **Abstraction:** `src/lib/rag/` — chunking, embeddings, hybrid fusion, query rewriting, store, indexer, retriever, backfill
+- **Permission model:**
+  - **User-scoped:** notes, meetings, AI chat files (`user_id` + ownership checks)
+  - **Org-scoped:** tasks (`scope = org`; requires `tasks:view` for retrieval)
+  - **Admin mode:** cross-user search in Admin → Knowledge test search
 
-### Ingestion & indexing
+### Indexed sources
 
-- **Sources (Phase 1):** `ai_project_files`, `ai_conversation_files`
-- **Chunking:** Semantic-aware — markdown split by headings; prose split by paragraphs with overlap
-- **Metadata:** source type/id, project/conversation IDs, title, mime type, file path, content hash
-- **Incremental updates:** Content hash in `rag_index_state`; skip re-embed when unchanged; re-index on upload
-- **Delete:** Removing a file deletes associated chunks and index state
+| Source type | Content | Index triggers |
+|-------------|---------|----------------|
+| `ai_project_file` / `ai_conversation_file` | Uploaded text files | Upload, delete |
+| `user_note` | Title + content | Create, update, delete |
+| `meeting_transcript` / `meeting_summary` / `meeting_action_item` | Transcript, summary, action items | After processing, archive metadata update, delete |
+| `task` | Title, description, details, AC, DoD, subtasks, comments | Create, update, delete, comments, subtasks |
 
-### Retrieval (AI Chat)
+### Ingestion
 
-- Query-time embedding of the latest user message
-- Top-k cosine similarity search scoped to active project + conversation files
-- Context budget ~12KB; fallback to legacy 8KB text previews when RAG unavailable
-- **Citations:** Assistant messages show linked sources with excerpts; inline `[1]`, `[2]` citation prompts
+- Semantic chunking (markdown headings / paragraph overlap)
+- Content-hash incremental indexing via `rag_index_state`
+- Lazy backfill on chat query; admin **Backfill all** for existing data
 
-### Planned phases
+### Retrieval
 
-| Phase | Scope |
-|-------|--------|
-| **2** | Meetings (transcripts, summaries, action items), Notes, Tasks |
-| **3** | Hybrid search (BM25), re-ranking, query rewriting |
-| **4** | Admin knowledge UI, scoped search modes, analytics |
+- **Hybrid search:** vector similarity + PostgreSQL full-text search, fused with reciprocal rank fusion (RRF)
+- **Query rewriting:** Grok expands user queries before embedding (when `XAI_API_KEY` set)
+- **Re-ranking:** fused score ordering before context budget trim
+- **Scoped search in `/chat`:** toggle Files, Notes, Meetings, Tasks above composer
+- **Meeting Q&A:** uses RAG retrieval for long meetings instead of full transcript injection
+- Context budget ~12KB; citations with deep links; retrieval logged to `rag_retrieval_logs`
+
+### Admin
+
+- Tab `/admin?tab=knowledge` — index health, analytics, test search, reindex, backfill
 
 ### Infrastructure
 
 - Docker Postgres image: `pgvector/pgvector:pg16`
-- Migration `0015_rag_pgvector.sql` enables extension and creates tables
-- Existing stacks: update compose image and run `npm run db:migrate`
+- Migrations: `0015_rag_pgvector.sql`, `0016_rag_phases_2_4.sql`
 
 ## 17. Out of Scope / Known Gaps
 

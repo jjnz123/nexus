@@ -7,7 +7,8 @@ import {
   aiProjects,
 } from "@/lib/db/schema";
 import { retrieveChatKnowledge } from "@/lib/rag/retriever";
-import type { RagCitation } from "@/lib/db/schema";
+import type { RagCitation, RagSearchScope } from "@/lib/db/schema";
+import { hasPermission } from "@/lib/permissions";
 import { getSkillLabel } from "@/lib/ai/skills/definitions";
 import { skillDefinitionsForApi } from "@/lib/ai/skills/index";
 import { executeSkill } from "@/lib/ai/skills/executor";
@@ -40,10 +41,11 @@ type StreamEvent =
   | { type: "error"; message: string };
 
 async function loadKnowledgeContext(
-  userId: string,
+  user: ChatUser,
   projectId: string | null,
   conversationId: string | null,
-  query: string
+  query: string,
+  searchScopes?: RagSearchScope[]
 ) {
   const projectFiles = projectId
     ? await db
@@ -51,7 +53,7 @@ async function loadKnowledgeContext(
         .from(aiProjectFiles)
         .innerJoin(aiProjects, eq(aiProjectFiles.projectId, aiProjects.id))
         .where(eq(aiProjectFiles.projectId, projectId))
-        .then((rows) => rows.filter((r) => r.project.userId === userId).map((r) => r.file))
+        .then((rows) => rows.filter((r) => r.project.userId === user.id).map((r) => r.file))
     : [];
 
   const conversationFiles = conversationId
@@ -61,17 +63,19 @@ async function loadKnowledgeContext(
         .innerJoin(aiConversations, eq(aiConversationFiles.conversationId, aiConversations.id))
         .where(eq(aiConversationFiles.conversationId, conversationId))
         .then((rows) =>
-          rows.filter((r) => r.conversation.userId === userId).map((r) => r.file)
+          rows.filter((r) => r.conversation.userId === user.id).map((r) => r.file)
         )
     : [];
 
   return retrieveChatKnowledge({
-    userId,
+    userId: user.id,
     query,
     projectId,
     conversationId,
     projectFiles,
     conversationFiles,
+    scopes: searchScopes,
+    includeOrgTasks: hasPermission(user.role, "tasks:view", user.permissions),
   });
 }
 
@@ -94,6 +98,7 @@ export async function runAiChatWithSkills({
   conversationId,
   enableTools = true,
   enabledSkillNames,
+  searchScopes,
   signal,
   onEvent,
 }: {
@@ -103,6 +108,7 @@ export async function runAiChatWithSkills({
   conversationId?: string | null;
   enableTools?: boolean;
   enabledSkillNames?: string[];
+  searchScopes?: RagSearchScope[];
   signal?: AbortSignal;
   onEvent?: (event: StreamEvent) => void;
 }) {
@@ -113,10 +119,11 @@ export async function runAiChatWithSkills({
   const latestUserMessage =
     [...messages].reverse().find((message) => message.role === "user")?.content ?? "";
   const knowledge = await loadKnowledgeContext(
-    user.id,
+    user,
     projectId ?? null,
     conversationId ?? null,
-    latestUserMessage
+    latestUserMessage,
+    searchScopes
   );
 
   const systemParts = [
@@ -267,6 +274,7 @@ export function createSkillChatSseStream(
     conversationId?: string | null;
     enableTools?: boolean;
     enabledSkillNames?: string[];
+    searchScopes?: RagSearchScope[];
     signal?: AbortSignal;
   }
 ) {
@@ -282,6 +290,7 @@ export function createSkillChatSseStream(
           conversationId: options.conversationId,
           enableTools: options.enableTools,
           enabledSkillNames: options.enabledSkillNames,
+          searchScopes: options.searchScopes,
           signal: options.signal,
           onEvent: (event) => {
             controller.enqueue(encoder.encode(encodeSse(event)));

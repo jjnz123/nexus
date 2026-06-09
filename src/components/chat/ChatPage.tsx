@@ -14,7 +14,9 @@ import {
   resolveInitialEnabledSkills,
 } from "@/components/chat/ChatSkillsPanel";
 import { HistoryIndicatorBar, scrollToMessage } from "@/components/chat/HistoryIndicatorBar";
+import { ChatRagScopes } from "@/components/chat/ChatRagScopes";
 import { useAiStream } from "@/components/chat/useAiStream";
+import { DEFAULT_RAG_SEARCH_SCOPES } from "@/lib/rag/types";
 import type {
   AiConversation,
   AiMessage,
@@ -22,6 +24,7 @@ import type {
   AiProject,
   AiSkillEvent,
   RagCitation,
+  RagSearchScope,
   UserRole,
 } from "@/lib/db/schema";
 import type { UserPermissionOverrides } from "@/lib/permissions";
@@ -98,6 +101,7 @@ export function ChatPage({
   const [streamingContent, setStreamingContent] = useState("");
   const [streamingSkills, setStreamingSkills] = useState<AiSkillEvent[]>([]);
   const [streamingCitations, setStreamingCitations] = useState<RagCitation[]>([]);
+  const [searchScopes, setSearchScopes] = useState<RagSearchScope[]>([...DEFAULT_RAG_SEARCH_SCOPES]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(initialSidebarCollapsed);
   const [filesOpen, setFilesOpen] = useState(false);
   const [skillsOpen, setSkillsOpen] = useState(false);
@@ -110,6 +114,7 @@ export function ChatPage({
   const messagesRef = useRef(messages);
   const conversationIdRef = useRef(activeConversationId);
   const enabledSkillNamesRef = useRef(enabledSkillNames);
+  const searchScopesRef = useRef(searchScopes);
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -122,6 +127,10 @@ export function ChatPage({
   useEffect(() => {
     enabledSkillNamesRef.current = enabledSkillNames;
   }, [enabledSkillNames]);
+
+  useEffect(() => {
+    searchScopesRef.current = searchScopes;
+  }, [searchScopes]);
 
   const activeConversation = useMemo(
     () => conversations.find((c) => c.id === activeConversationId) ?? null,
@@ -344,6 +353,7 @@ export function ChatPage({
             projectId: projectIdRef.current,
             conversationId,
             enabledSkillNames: enabledSkillNamesRef.current,
+            searchScopes: searchScopesRef.current,
             onSkillsChange: setStreamingSkills,
             onCitationsChange: setStreamingCitations,
           }
@@ -578,7 +588,8 @@ export function ChatPage({
                 )}
               </div>
 
-              <div className="border-t bg-background/95 px-4 py-2 backdrop-blur">
+              <div className="border-t bg-background/95 px-4 py-2 backdrop-blur space-y-2">
+                <ChatRagScopes scopes={searchScopes} onChange={setSearchScopes} />
                 <ChatActiveSkillChips
                   userRole={userRole}
                   userPermissions={userPermissions}

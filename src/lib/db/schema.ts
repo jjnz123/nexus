@@ -4,6 +4,7 @@ import {
   jsonb,
   pgEnum,
   pgTable,
+  real,
   text,
   timestamp,
   uuid,
@@ -342,7 +343,18 @@ export type RagCitation = {
   href: string;
 };
 
-export type RagSourceType = "ai_project_file" | "ai_conversation_file";
+export type RagSourceType =
+  | "ai_project_file"
+  | "ai_conversation_file"
+  | "user_note"
+  | "meeting_transcript"
+  | "meeting_summary"
+  | "meeting_action_item"
+  | "task";
+
+export type RagScope = "user" | "org";
+
+export type RagSearchScope = "files" | "notes" | "meetings" | "tasks";
 
 export type RagChunkMetadata = Record<string, unknown>;
 
@@ -473,6 +485,15 @@ export const ragChunks = pgTable(
     aiConversationId: uuid("ai_conversation_id").references(() => aiConversations.id, {
       onDelete: "cascade",
     }),
+    scope: text("scope").$type<RagScope>().notNull().default("user"),
+    meetingId: uuid("meeting_id").references((): AnyPgColumn => meetings.id, {
+      onDelete: "cascade",
+    }),
+    noteId: uuid("note_id").references(() => userNotes.id, { onDelete: "cascade" }),
+    taskId: uuid("task_id").references((): AnyPgColumn => tasks.id, { onDelete: "cascade" }),
+    kanbanProjectId: uuid("kanban_project_id").references((): AnyPgColumn => projects.id, {
+      onDelete: "cascade",
+    }),
     metadata: jsonb("metadata").$type<RagChunkMetadata>().default({}).notNull(),
     tokenEstimate: integer("token_estimate"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -483,6 +504,33 @@ export const ragChunks = pgTable(
     index("rag_chunks_source_idx").on(table.sourceType, table.sourceId),
     index("rag_chunks_project_idx").on(table.aiProjectId),
     index("rag_chunks_conversation_idx").on(table.aiConversationId),
+    index("rag_chunks_scope_idx").on(table.scope),
+    index("rag_chunks_meeting_idx").on(table.meetingId),
+    index("rag_chunks_note_idx").on(table.noteId),
+    index("rag_chunks_task_idx").on(table.taskId),
+    index("rag_chunks_kanban_project_idx").on(table.kanbanProjectId),
+  ]
+);
+
+export const ragRetrievalLogs = pgTable(
+  "rag_retrieval_logs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    query: text("query").notNull(),
+    sourceType: text("source_type").$type<RagSourceType>().notNull(),
+    sourceId: uuid("source_id").notNull(),
+    chunkId: uuid("chunk_id").references(() => ragChunks.id, { onDelete: "set null" }),
+    similarity: real("similarity"),
+    context: text("context").notNull().default("chat"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("rag_retrieval_logs_created_at_idx").on(table.createdAt),
+    index("rag_retrieval_logs_source_idx").on(table.sourceType, table.sourceId),
+    index("rag_retrieval_logs_user_idx").on(table.userId),
   ]
 );
 
@@ -759,3 +807,4 @@ export type AiProjectFile = typeof aiProjectFiles.$inferSelect;
 export type AiConversationFile = typeof aiConversationFiles.$inferSelect;
 export type RagChunk = typeof ragChunks.$inferSelect;
 export type RagIndexState = typeof ragIndexState.$inferSelect;
+export type RagRetrievalLog = typeof ragRetrievalLogs.$inferSelect;

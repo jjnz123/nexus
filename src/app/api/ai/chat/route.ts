@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
     conversationId?: string | null;
     enableTools?: boolean;
     enabledSkillNames?: string[];
+    searchScopes?: ("files" | "notes" | "meetings" | "tasks")[];
     legacyStream?: boolean;
   };
 
@@ -85,6 +86,7 @@ export async function POST(req: NextRequest) {
       conversationId: body.conversationId ?? null,
       enableTools: true,
       enabledSkillNames: body.enabledSkillNames,
+      searchScopes: body.searchScopes,
     }
   );
 

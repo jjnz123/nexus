@@ -35,6 +35,9 @@ import {
 } from "@/lib/validators/tasks";
 import { createNotification } from "./users";
 import { logAudit } from "@/server/audit";
+import { indexTaskById } from "@/lib/rag/indexer";
+import { deleteRagSource } from "@/lib/rag/store";
+import { RAG_SOURCE_TYPES } from "@/lib/rag/types";
 
 export async function getProjects() {
   const session = await requireAuth();
@@ -278,6 +281,7 @@ export async function createTask(input: unknown) {
   }
 
   revalidatePath("/tasks");
+  void indexTaskById(task.id, session.user.id).catch(() => undefined);
   await logAudit({
     action: "tasks.create",
     resource: "task",
@@ -333,6 +337,7 @@ export async function updateTask(input: unknown) {
   }
 
   revalidatePath("/tasks");
+  void indexTaskById(task.id, session.user.id).catch(() => undefined);
   await logAudit({
     action: "tasks.update",
     resource: "task",
@@ -345,6 +350,7 @@ export async function updateTask(input: unknown) {
 export async function deleteTask(id: string) {
   const session = await requireAuth();
   requireSessionPermission(session, "tasks:edit");
+  await deleteRagSource(RAG_SOURCE_TYPES.TASK, id);
   await db.delete(tasks).where(eq(tasks.id, id));
   revalidatePath("/tasks");
   await logAudit({
@@ -447,6 +453,7 @@ export async function createSubtask(input: unknown) {
     .values({ ...data, sortOrder: existing.length })
     .returning();
   revalidatePath("/tasks");
+  void indexTaskById(data.taskId, session.user.id).catch(() => undefined);
   return subtask;
 }
 
@@ -459,6 +466,7 @@ export async function toggleSubtask(id: string, completed: boolean) {
     .where(eq(taskSubtasks.id, id))
     .returning();
   revalidatePath("/tasks");
+  if (subtask) void indexTaskById(subtask.taskId, session.user.id).catch(() => undefined);
   return subtask;
 }
 
@@ -494,6 +502,7 @@ export async function addComment(input: unknown) {
   }
 
   revalidatePath("/tasks");
+  void indexTaskById(data.taskId, session.user.id).catch(() => undefined);
   return comment;
 }
 

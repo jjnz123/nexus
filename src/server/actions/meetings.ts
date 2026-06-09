@@ -15,6 +15,8 @@ import { requireActiveMember } from "@/lib/auth";
 import { requireSessionPermission } from "@/lib/permissions";
 import { analyzeMeetingTranscript, answerMeetingQuestion } from "@/lib/ai/meeting-analysis";
 import { transcribeAudioFile } from "@/lib/ai/whisper";
+import { deleteMeetingIndex, indexMeetingContent } from "@/lib/rag/indexer";
+import { retrieveMeetingKnowledge } from "@/lib/rag/retriever";
 import {
   attachMeetingAudioSchema,
   convertActionItemSchema,
@@ -197,6 +199,20 @@ async function processMeetingRecording(meetingId: string) {
         }))
       );
     }
+
+    const [updatedMeeting] = await db
+      .select()
+      .from(meetings)
+      .where(eq(meetings.id, meetingId))
+      .limit(1);
+    const actionItems = await db
+      .select()
+      .from(meetingActionItems)
+      .where(eq(meetingActionItems.meetingId, meetingId));
+
+    if (updatedMeeting) {
+      void indexMeetingContent(updatedMeeting, actionItems).catch(() => undefined);
+    }
   } catch (error) {
     await db
       .update(meetings)
@@ -253,7 +269,14 @@ export async function askMeetingQuestion(input: unknown) {
   const answer = await answerMeetingQuestion(
     meeting.transcript,
     data.question,
-    historyRows.map((m) => ({ role: m.role, content: m.content }))
+    historyRows.map((m) => ({ role: m.role, content: m.content })),
+    (
+      await retrieveMeetingKnowledge({
+        userId: session.user.id,
+        meetingId: meeting.id,
+        query: data.question,
+      }).catch(() => null)
+    )?.contextBlock
   );
 
   const [assistantMessage] = await db
@@ -355,6 +378,11 @@ export async function archiveMeeting(id: string) {
     .returning();
 
   if (!meeting) throw new Error("Meeting not found");
+  const actionItems = await db
+    .select()
+    .from(meetingActionItems)
+    .where(eq(meetingActionItems.meetingId, meeting.id));
+  void indexMeetingContent(meeting, actionItems).catch(() => undefined);
   revalidatePath("/meetings");
   revalidatePath("/meetings/archived");
   revalidatePath(`/meetings/${id}`);
@@ -379,6 +407,7 @@ export async function deleteMeeting(id: string) {
 
   if (!meeting) throw new Error("Only archived meetings can be deleted");
 
+  await deleteMeetingIndex(id);
   await db.delete(meetings).where(eq(meetings.id, id));
 
   revalidatePath("/meetings/archived");

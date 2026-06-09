@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
-import type { AiSkillEvent, RagCitation } from "@/lib/db/schema";
+import type { AiSkillEvent, RagCitation, RagSearchScope } from "@/lib/db/schema";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
@@ -28,6 +28,7 @@ export function useAiStream() {
         projectId?: string | null;
         conversationId?: string | null;
         enabledSkillNames?: string[];
+        searchScopes?: RagSearchScope[];
         onSkill?: (event: AiSkillEvent) => void;
         onSkillsChange?: (skills: AiSkillEvent[]) => void;
         onCitationsChange?: (citations: RagCitation[]) => void;
@@ -42,6 +43,7 @@ export function useAiStream() {
           conversationId: options?.conversationId ?? null,
           enableTools: true,
           enabledSkillNames: options?.enabledSkillNames,
+          searchScopes: options?.searchScopes,
         }),
         signal,
       });

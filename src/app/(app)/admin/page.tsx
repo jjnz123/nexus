@@ -5,16 +5,18 @@ import { getAiProjectsForAdminFilter } from "@/server/actions/ai-chat";
 import { getAuditActions, getAuditLogs } from "@/server/actions/audit";
 import { fetchSystemSettings } from "@/server/actions/settings";
 import { getUsers } from "@/server/actions/users";
+import { getRagAdminOverview } from "@/server/actions/rag-admin";
 import { Suspense } from "react";
 
 export default async function AdminPage() {
   const session = await auth();
-  const [users, audit, actions, settings, aiProjects] = await Promise.all([
+  const [users, audit, actions, settings, aiProjects, ragOverview] = await Promise.all([
     getUsers(),
     getAuditLogs({ limit: 100 }),
     getAuditActions(),
     fetchSystemSettings(),
     getAiProjectsForAdminFilter(),
+    getRagAdminOverview(),
   ]);
 
   return (
@@ -28,6 +30,7 @@ export default async function AdminPage() {
         aiProjects={aiProjects}
         emailConfigured={isEmailConfigured()}
         defaultTestEmail={session?.user?.email ?? ""}
+        ragOverview={ragOverview}
       />
     </Suspense>
   );
