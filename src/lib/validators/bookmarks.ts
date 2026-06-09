@@ -25,6 +25,11 @@ export const bookmarkCardSchema = z.object({
   openInIframe: z.boolean().optional(),
   enabled: z.boolean().optional(),
   favourite: z.boolean().optional(),
+  tags: z.array(z.string().max(50)).max(10).optional(),
+  faviconPath: z.string().max(500).optional(),
+  autoTitle: z.string().max(200).optional(),
+  autoDescription: z.string().max(500).optional(),
+  healthMonitoringEnabled: z.boolean().optional(),
 });
 
 export const reorderSchema = z.object({
@@ -51,6 +56,7 @@ export const bulkCardActionSchema = z.object({
     "restore",
     "favourite",
     "unfavourite",
+    "enable_monitoring",
   ]),
   groupId: z.string().uuid().optional(),
   tabId: z.string().uuid().optional(),
@@ -69,8 +75,20 @@ export const exportBookmarksSchema = z.object({
 
 export const recordLaunchSchema = z.object({
   cardId: z.string().uuid(),
-  source: z.enum(["bookmarks", "landing", "search"]),
+  source: z.enum(["bookmarks", "landing", "search", "suggestions"]),
+  referrer: z.string().max(500).optional(),
 });
+
+export const bookmarkSortModeSchema = z.enum([
+  "custom",
+  "alphabetical",
+  "most_used",
+  "most_used_30d",
+  "recently_used",
+  "health",
+]);
+
+export type BookmarkSortMode = z.infer<typeof bookmarkSortModeSchema>;
 
 export const MAX_USER_FAVOURITES = 5;
 

@@ -111,6 +111,7 @@ export const userPreferences = pgTable("user_preferences", {
   bookmarksGlobalLayoutLocked: boolean("bookmarks_global_layout_locked")
     .notNull()
     .default(false),
+  bookmarksSortMode: text("bookmarks_sort_mode").notNull().default("custom"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
@@ -154,6 +155,16 @@ export const bookmarkCards = pgTable("bookmark_cards", {
   favourite: boolean("favourite").notNull().default(false),
   archivedAt: timestamp("archived_at"),
   sortOrder: integer("sort_order").notNull().default(0),
+  faviconPath: text("favicon_path"),
+  autoTitle: text("auto_title"),
+  autoDescription: text("auto_description"),
+  tags: jsonb("tags").$type<string[]>().default([]),
+  healthMonitoringEnabled: boolean("health_monitoring_enabled").notNull().default(false),
+  linkedDeviceId: uuid("linked_device_id").references(() => monitorDevices.id, {
+    onDelete: "set null",
+  }),
+  clickCount: integer("click_count").notNull().default(0),
+  lastClickedAt: timestamp("last_clicked_at"),
 });
 
 export const userBookmarkFavourites = pgTable(
@@ -183,13 +194,21 @@ export const bookmarkLaunches = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     cardId: uuid("card_id").references(() => bookmarkCards.id, { onDelete: "set null" }),
     source: text("source").notNull(),
+    referrer: text("referrer"),
     launchedAt: timestamp("launched_at").defaultNow().notNull(),
   },
   (table) => [
     index("bookmark_launches_user_idx").on(table.userId),
     index("bookmark_launches_card_idx").on(table.cardId),
+    index("bookmark_launches_launched_at_idx").on(table.launchedAt),
   ]
 );
+
+export const faviconCache = pgTable("favicon_cache", {
+  domain: text("domain").primaryKey(),
+  faviconPath: text("favicon_path").notNull(),
+  fetchedAt: timestamp("fetched_at").defaultNow().notNull(),
+});
 
 export const projects = pgTable("projects", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -335,3 +354,4 @@ export type SystemSettings = typeof systemSettings.$inferSelect;
 export type UserPreferences = typeof userPreferences.$inferSelect;
 export type UserBookmarkFavourite = typeof userBookmarkFavourites.$inferSelect;
 export type BookmarkLaunch = typeof bookmarkLaunches.$inferSelect;
+export type FaviconCache = typeof faviconCache.$inferSelect;

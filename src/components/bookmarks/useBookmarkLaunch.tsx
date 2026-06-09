@@ -5,7 +5,7 @@ import { recordBookmarkLaunch } from "@/server/actions/bookmarks";
 import { BookmarkLaunchModal } from "./BookmarkLaunchModal";
 import type { BookmarkCard } from "@/lib/db/schema";
 
-type LaunchSource = "bookmarks" | "landing" | "search";
+type LaunchSource = "bookmarks" | "landing" | "search" | "suggestions";
 
 export function useBookmarkLaunch(source: LaunchSource = "bookmarks") {
   const [iframeCard, setIframeCard] = useState<BookmarkCard | null>(null);
@@ -14,7 +14,11 @@ export function useBookmarkLaunch(source: LaunchSource = "bookmarks") {
     async (card: Pick<BookmarkCard, "id" | "url" | "title" | "openInIframe" | "enabled">) => {
       if (!card.enabled) return;
 
-      void recordBookmarkLaunch({ cardId: card.id, source }).catch(() => undefined);
+      void recordBookmarkLaunch({
+        cardId: card.id,
+        source,
+        referrer: typeof window !== "undefined" ? window.location.pathname : undefined,
+      }).catch(() => undefined);
 
       if (card.openInIframe) {
         setIframeCard(card as BookmarkCard);

@@ -14,6 +14,9 @@ const bookmarkPrefsSchema = z.object({
   activeBookmarkTabId: z.string().uuid().nullable().optional(),
   bookmarksLayoutMode: z.enum(["grid", "list"]).optional(),
   bookmarksGlobalLayoutLocked: z.boolean().optional(),
+  bookmarksSortMode: z
+    .enum(["custom", "alphabetical", "most_used", "most_used_30d", "recently_used", "health"])
+    .optional(),
 });
 
 async function getOrCreatePrefs(userId: string) {

@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/permissions";
 import { getAllBookmarkCards, getFavouriteCards } from "@/server/actions/bookmarks";
+import { getSmartBookmarkSuggestions } from "@/server/actions/bookmark-phase2";
 import { getHomeFavouriteOrder } from "@/server/actions/preferences";
 import { getDashboardStats } from "@/server/actions/users";
 import { LandingPage } from "@/components/landing/LandingPage";
@@ -34,11 +35,12 @@ export default async function AppHomePage() {
   const canViewTasks = hasPermission(role, "tasks:view", permissions);
   const canViewBookmarks = hasPermission(role, "bookmarks:view", permissions);
 
-  const [favourites, stats, allBookmarks, homeOrder] = await Promise.all([
+  const [favourites, stats, allBookmarks, homeOrder, suggestions] = await Promise.all([
     getFavouriteCards(),
     getDashboardStats(),
     getAllBookmarkCards(),
     getHomeFavouriteOrder(),
+    getSmartBookmarkSuggestions().catch(() => ({ frequent: [], stale: [] })),
   ]);
 
   return (
@@ -46,6 +48,7 @@ export default async function AppHomePage() {
       userName={session?.user.name ?? "there"}
       favourites={sortFavourites(favourites, homeOrder)}
       allBookmarks={allBookmarks}
+      smartSuggestions={suggestions}
       downDevices={canViewMonitoring ? stats.downDevices : 0}
       overdueTasks={canViewTasks ? stats.overdueTasks : 0}
       canUseAi={canUseAi}

@@ -12,6 +12,7 @@ import type { BookmarkCard, BookmarkGroup, BookmarkTab } from "@/lib/db/schema";
 import { cn, getGreeting } from "@/lib/utils";
 import { AiDrawer } from "./AiDrawer";
 import { FavouritesSection } from "./FavouritesSection";
+import { SmartSuggestionsSection } from "@/components/bookmarks/SmartSuggestionsSection";
 import { useBookmarkLaunch } from "@/components/bookmarks/useBookmarkLaunch";
 
 type BookmarkItem = {
@@ -24,6 +25,7 @@ type LandingPageProps = {
   userName: string;
   favourites: BookmarkItem[];
   allBookmarks: BookmarkItem[];
+  smartSuggestions?: { frequent: BookmarkItem[]; stale: BookmarkItem[] };
   downDevices: number;
   overdueTasks: number;
   canUseAi?: boolean;
@@ -42,6 +44,7 @@ export function LandingPage({
   userName,
   favourites,
   allBookmarks,
+  smartSuggestions,
   downDevices,
   overdueTasks,
   canUseAi = true,
@@ -214,6 +217,19 @@ export function LandingPage({
           )}
         </motion.section>
       )}
+
+      {canViewBookmarks && smartSuggestions ? (
+        <motion.section
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25, delay: 0.12 }}
+        >
+          <SmartSuggestionsSection
+            frequent={smartSuggestions.frequent}
+            stale={smartSuggestions.stale}
+          />
+        </motion.section>
+      ) : null}
 
       {canViewBookmarks && (
       <motion.section

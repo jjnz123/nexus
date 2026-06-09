@@ -122,6 +122,16 @@ export async function runMonitorCycle(db: MonitorDb) {
         .set({ lastStatus: result.status })
         .where(eq(schema.monitorDevices.id, device.id));
 
+      const { notifyUsersOfBookmarkHealthChange } = await import(
+        "@/server/bookmarks/health-notify"
+      );
+      await notifyUsersOfBookmarkHealthChange(
+        db,
+        device.id,
+        result.status,
+        device.name
+      );
+
       const admins = await db
         .select()
         .from(schema.users)

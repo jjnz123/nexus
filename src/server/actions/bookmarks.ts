@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq, asc, inArray, desc, and, isNull, count } from "drizzle-orm";
+import { eq, asc, inArray, desc, and, isNull, count, gte, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   bookmarkTabs,
@@ -39,6 +39,11 @@ function cardInputFromData(data: ReturnType<typeof bookmarkCardSchema.parse>) {
     openInIframe: data.openInIframe ?? false,
     enabled: data.enabled ?? true,
     favourite: data.favourite ?? false,
+    tags: data.tags ?? [],
+    faviconPath: data.faviconPath ?? null,
+    autoTitle: data.autoTitle ?? null,
+    autoDescription: data.autoDescription ?? null,
+    healthMonitoringEnabled: data.healthMonitoringEnabled ?? false,
   };
 }
 
@@ -202,9 +207,88 @@ export async function recordBookmarkLaunch(input: unknown) {
     userId: session.user.id,
     cardId: data.cardId,
     source: data.source,
+    referrer: data.referrer ?? null,
   });
 
+  const [card] = await db
+    .select({ clickCount: bookmarkCards.clickCount })
+    .from(bookmarkCards)
+    .where(eq(bookmarkCards.id, data.cardId))
+    .limit(1);
+
+  if (card) {
+    await db
+      .update(bookmarkCards)
+      .set({
+        clickCount: card.clickCount + 1,
+        lastClickedAt: new Date(),
+      })
+      .where(eq(bookmarkCards.id, data.cardId));
+  }
+
   return { success: true };
+}
+
+export async function getUserBookmarkClickCounts(userId: string, cardIds: string[]) {
+  if (cardIds.length === 0) return {};
+  const since30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+  const rows = await db
+    .select({
+      cardId: bookmarkLaunches.cardId,
+      total: count(),
+    })
+    .from(bookmarkLaunches)
+    .where(
+      and(eq(bookmarkLaunches.userId, userId), inArray(bookmarkLaunches.cardId, cardIds))
+    )
+    .groupBy(bookmarkLaunches.cardId);
+
+  const recentRows = await db
+    .select({
+      cardId: bookmarkLaunches.cardId,
+      recent: count(),
+    })
+    .from(bookmarkLaunches)
+    .where(
+      and(
+        eq(bookmarkLaunches.userId, userId),
+        inArray(bookmarkLaunches.cardId, cardIds),
+        gte(bookmarkLaunches.launchedAt, since30d)
+      )
+    )
+    .groupBy(bookmarkLaunches.cardId);
+
+  const lastRows = await db
+    .select({
+      cardId: bookmarkLaunches.cardId,
+      lastAt: sql<Date>`max(${bookmarkLaunches.launchedAt})`,
+    })
+    .from(bookmarkLaunches)
+    .where(
+      and(eq(bookmarkLaunches.userId, userId), inArray(bookmarkLaunches.cardId, cardIds))
+    )
+    .groupBy(bookmarkLaunches.cardId);
+
+  const result: Record<
+    string,
+    { total: number; recent30d: number; lastAt: Date | null }
+  > = {};
+
+  for (const id of cardIds) {
+    result[id] = { total: 0, recent30d: 0, lastAt: null };
+  }
+  for (const row of rows) {
+    if (row.cardId) result[row.cardId].total = Number(row.total);
+  }
+  for (const row of recentRows) {
+    if (row.cardId) result[row.cardId].recent30d = Number(row.recent);
+  }
+  for (const row of lastRows) {
+    if (row.cardId) result[row.cardId].lastAt = row.lastAt;
+  }
+
+  return result;
 }
 
 export async function createBookmarkTab(input: unknown) {
@@ -376,6 +460,12 @@ export async function updateBookmarkCard(
     favourite: boolean;
     groupId: string;
     archivedAt: Date | null;
+    tags: string[];
+    faviconPath: string | null;
+    autoTitle: string | null;
+    autoDescription: string | null;
+    healthMonitoringEnabled: boolean;
+    linkedDeviceId: string | null;
   }>
 ) {
   const session = await requireAuth();
@@ -520,6 +610,11 @@ export async function bulkBookmarkCardAction(input: unknown) {
           )
         );
       break;
+    case "enable_monitoring": {
+      const { bulkEnableHealthMonitoring } = await import("@/server/actions/bookmark-phase2");
+      await bulkEnableHealthMonitoring(data.cardIds);
+      break;
+    }
   }
 
   if (data.groupId) {

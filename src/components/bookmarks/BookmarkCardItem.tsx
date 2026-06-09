@@ -3,6 +3,7 @@
 import { CSS } from "@dnd-kit/utilities";
 import { useSortable } from "@dnd-kit/sortable";
 import { motion } from "framer-motion";
+import { formatDistanceToNow } from "date-fns";
 import {
   Copy,
   ExternalLink,
@@ -27,6 +28,19 @@ import {
 import { cn } from "@/lib/utils";
 import type { BookmarkCard } from "@/lib/db/schema";
 import { BookmarkIcon } from "./BookmarkIcon";
+import { BookmarkHealthPill } from "./BookmarkHealthPill";
+
+type ClickStats = {
+  total: number;
+  lastAt: Date | string | null;
+};
+
+type HealthInfo = {
+  status: "up" | "down" | "unknown" | "degraded";
+  checkedAt: Date | string | null;
+  deviceId: string;
+  deviceName: string;
+};
 
 type BookmarkCardItemProps = {
   card: BookmarkCard;
@@ -35,6 +49,9 @@ type BookmarkCardItemProps = {
   selected: boolean;
   isFavourited?: boolean;
   layoutMode?: "grid" | "list";
+  clickStats?: ClickStats;
+  healthInfo?: HealthInfo;
+  statusFlash?: boolean;
   onSelectedChange: (checked: boolean) => void;
   onLaunch: () => void;
   onEdit: () => void;
@@ -52,6 +69,9 @@ export function BookmarkCardItem({
   selected,
   isFavourited = false,
   layoutMode = "grid",
+  clickStats,
+  healthInfo,
+  statusFlash = false,
   onSelectedChange,
   onLaunch,
   onEdit,
@@ -65,6 +85,12 @@ export function BookmarkCardItem({
     id: card.id,
     disabled: !draggable,
   });
+
+  const totalOpens = clickStats?.total ?? card.clickCount ?? 0;
+  const lastOpened = clickStats?.lastAt ?? card.lastClickedAt;
+  const lastOpenedLabel = lastOpened
+    ? formatDistanceToNow(new Date(lastOpened), { addSuffix: true })
+    : null;
 
   return (
     <motion.div
@@ -84,6 +110,7 @@ export function BookmarkCardItem({
           "hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/20",
           !card.enabled && "opacity-60",
           isDragging && "z-10 ring-2 ring-primary/40",
+          statusFlash && "ring-2 ring-amber-500/50",
           layoutMode === "list" && "flex-row"
         )}
       >
@@ -101,26 +128,48 @@ export function BookmarkCardItem({
               }}
               role="button"
               tabIndex={card.enabled && !bulkMode ? 0 : -1}
+              title={
+                lastOpenedLabel
+                  ? `Last opened ${lastOpenedLabel} · Opened ${totalOpens} time${totalOpens === 1 ? "" : "s"}`
+                  : totalOpens > 0
+                    ? `Opened ${totalOpens} time${totalOpens === 1 ? "" : "s"}`
+                    : undefined
+              }
             >
               <div className="flex items-start gap-2">
                 <BookmarkIcon
                   title={card.title}
                   icon={card.icon}
                   iconType={card.iconType}
-                  iconValue={card.iconValue}
+                  iconValue={card.faviconPath ?? card.iconValue}
                   accentColor={card.accentColor}
                   size="sm"
                 />
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <p className="truncate text-sm font-medium text-zinc-100">{card.title}</p>
                     {isFavourited ? (
                       <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
+                    ) : null}
+                    {healthInfo ? (
+                      <BookmarkHealthPill
+                        status={healthInfo.status}
+                        checkedAt={healthInfo.checkedAt}
+                        deviceId={healthInfo.deviceId}
+                        deviceName={healthInfo.deviceName}
+                      />
                     ) : null}
                   </div>
                   <p className="line-clamp-2 text-xs text-zinc-400">
                     {card.description || card.url}
                   </p>
+                  {(lastOpenedLabel || totalOpens > 0) && (
+                    <p className="mt-1 hidden text-[10px] text-zinc-500 group-hover:block">
+                      {lastOpenedLabel ? `Last opened ${lastOpenedLabel}` : null}
+                      {lastOpenedLabel && totalOpens > 0 ? " · " : null}
+                      {totalOpens > 0 ? `${totalOpens} opens` : null}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -135,12 +184,17 @@ export function BookmarkCardItem({
           </div>
 
           <div className="relative z-10 flex items-center justify-between">
-            <div className="flex items-center gap-1">
+            <div className="flex flex-wrap items-center gap-1">
               {!card.enabled ? (
                 <Badge variant="secondary" className="bg-zinc-800 text-zinc-300">
                   Disabled
                 </Badge>
               ) : null}
+              {(card.tags ?? []).slice(0, 2).map((tag) => (
+                <Badge key={tag} variant="outline" className="text-[10px]">
+                  {tag}
+                </Badge>
+              ))}
             </div>
 
             <div className="flex items-center gap-1 opacity-0 transition group-hover:opacity-100">

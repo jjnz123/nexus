@@ -58,7 +58,19 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { fuzzyMatchCard } from "@/lib/bookmarks/fuzzy";
+import {
+  filterBookmarkCards,
+  sortBookmarkCards,
+  type BookmarkFilterChip,
+} from "@/lib/bookmarks/sort";
+import type { BookmarkSortMode } from "@/lib/validators/bookmarks";
 import type { BookmarkCard, BookmarkGroup, BookmarkTab } from "@/lib/db/schema";
+import {
+  getCardHealthMap,
+  getSmartBookmarkSuggestions,
+} from "@/server/actions/bookmark-phase2";
+import { getUserBookmarkClickCounts } from "@/server/actions/bookmarks";
+import { SmartSuggestionsSection } from "./SmartSuggestionsSection";
 import { BookmarkCardItem } from "./BookmarkCardItem";
 import { BookmarkEditDialog, type BookmarkFormInput } from "./BookmarkEditDialog";
 import { BookmarkDeleteDialog } from "./BookmarkDeleteDialog";
@@ -77,14 +89,41 @@ type TabData = {
   cards: BookmarkCard[];
 };
 
+type ClickStatsMap = Record<
+  string,
+  { total: number; recent30d: number; lastAt: Date | null }
+>;
+
+type HealthMap = Record<
+  string,
+  {
+    status: "up" | "down" | "unknown" | "degraded";
+    checkedAt: Date | null;
+    deviceId: string;
+    deviceName: string;
+  }
+>;
+
+type SuggestionItem = {
+  card: BookmarkCard;
+  group: BookmarkGroup;
+  tab: BookmarkTab;
+};
+
 type BookmarksPageProps = {
   tabs: BookmarkTab[];
   canEdit: boolean;
+  canUseAi?: boolean;
+  canConfigureMonitoring?: boolean;
+  canViewMonitoring?: boolean;
+  userId: string;
   favouriteIds: string[];
+  initialSuggestions?: { frequent: SuggestionItem[]; stale: SuggestionItem[] };
   initialPrefs: {
     activeBookmarkTabId: string | null;
     bookmarksLayoutMode: "grid" | "list";
     bookmarksGlobalLayoutLocked: boolean;
+    bookmarksSortMode?: BookmarkSortMode;
   };
 };
 
@@ -287,7 +326,12 @@ async function downloadExportJson(
 export function BookmarksPage({
   tabs: initialTabs,
   canEdit,
+  canUseAi = false,
+  canConfigureMonitoring = false,
+  canViewMonitoring = false,
+  userId,
   favouriteIds: initialFavouriteIds,
+  initialSuggestions,
   initialPrefs,
 }: BookmarksPageProps) {
   const resolvedInitialTabId =
@@ -307,6 +351,14 @@ export function BookmarksPage({
   const [globalLayoutLocked, setGlobalLayoutLocked] = useState(
     initialPrefs.bookmarksGlobalLayoutLocked
   );
+  const [sortMode, setSortMode] = useState<BookmarkSortMode>(
+    initialPrefs.bookmarksSortMode ?? "custom"
+  );
+  const [filterChip, setFilterChip] = useState<BookmarkFilterChip>("all");
+  const [clickStats, setClickStats] = useState<ClickStatsMap>({});
+  const [healthMap, setHealthMap] = useState<HealthMap>({});
+  const [flashCardIds, setFlashCardIds] = useState<Set<string>>(new Set());
+  const [suggestions, setSuggestions] = useState(initialSuggestions ?? { frequent: [], stale: [] });
 
   const [search, setSearch] = useState("");
   const [bulkMode, setBulkMode] = useState(false);
@@ -351,10 +403,20 @@ export function BookmarksPage({
   const tabLayoutLocked = activeTab?.layoutLocked ?? false;
   const effectiveLocked = globalLayoutLocked || tabLayoutLocked;
 
+  const tagFilters = useMemo(() => {
+    const tags = new Set<string>();
+    for (const card of cards) {
+      for (const tag of card.tags ?? []) tags.add(tag);
+    }
+    return [...tags].sort();
+  }, [cards]);
+
   const visibleCards = useMemo(() => {
     const query = search.trim();
-    return cards.filter((card) => fuzzyMatchCard(query, card));
-  }, [cards, search]);
+    const searched = cards.filter((card) => fuzzyMatchCard(query, card));
+    const filtered = filterBookmarkCards(searched, filterChip, clickStats, healthMap);
+    return sortBookmarkCards(filtered, sortMode, clickStats, healthMap);
+  }, [cards, search, filterChip, clickStats, healthMap, sortMode]);
 
   const matchCount = visibleCards.length;
   const totalCount = cards.length;
@@ -364,13 +426,41 @@ export function BookmarksPage({
       setLoadingData(true);
       try {
         const data = await getBookmarkTabData(tabId, includeArchived);
+        const sortedCards = sortByOrder(data.cards);
+        const cardIds = sortedCards.map((c) => c.id);
+
+        const [stats, health]: [ClickStatsMap, HealthMap] = await Promise.all([
+          getUserBookmarkClickCounts(userId, cardIds),
+          canViewMonitoring
+            ? getCardHealthMap(cardIds)
+            : Promise.resolve({} as HealthMap),
+        ]);
+
+        setClickStats((prev) => ({ ...prev, ...stats }));
+        setHealthMap((prev) => {
+          const next = { ...prev, ...health };
+          const changed = new Set<string>();
+          for (const id of cardIds) {
+            const prevStatus = prev[id]?.status;
+            const nextStatus = health[id]?.status;
+            if (prevStatus && nextStatus && prevStatus !== nextStatus) {
+              changed.add(id);
+            }
+          }
+          if (changed.size) {
+            setFlashCardIds(changed);
+            setTimeout(() => setFlashCardIds(new Set()), 2000);
+          }
+          return next;
+        });
+
         setTabDataById((prev) => {
           if (!force && prev[tabId]) return prev;
           return {
             ...prev,
             [tabId]: {
               groups: sortByOrder(data.groups),
-              cards: sortByOrder(data.cards),
+              cards: sortedCards,
             },
           };
         });
@@ -380,8 +470,14 @@ export function BookmarksPage({
         setLoadingData(false);
       }
     },
-    [showArchived]
+    [showArchived, userId, canViewMonitoring]
   );
+
+  useEffect(() => {
+    void getSmartBookmarkSuggestions()
+      .then(setSuggestions)
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     if (!activeTabId) return;
@@ -418,6 +514,17 @@ export function BookmarksPage({
     setActiveTabId(tabId);
     setSelectedCardIds([]);
     await persistActiveTab(tabId);
+  }
+
+  async function handleSortModeChange(mode: BookmarkSortMode) {
+    const previous = sortMode;
+    setSortMode(mode);
+    try {
+      await updateBookmarkPreferences({ bookmarksSortMode: mode });
+    } catch {
+      setSortMode(previous);
+      toast.error("Failed to save sort preference");
+    }
   }
 
   async function handleLayoutModeChange(mode: "grid" | "list") {
@@ -685,6 +792,11 @@ export function BookmarksPage({
         accentColor: input.accentColor,
         openInIframe: input.openInIframe,
         enabled: input.enabled,
+        tags: input.tags ?? [],
+        faviconPath: input.faviconPath ?? null,
+        autoTitle: input.autoTitle ?? null,
+        autoDescription: input.autoDescription ?? null,
+        healthMonitoringEnabled: input.healthMonitoringEnabled ?? editingCard.healthMonitoringEnabled,
       };
       updateActiveTabData((value) => ({
         ...value,
@@ -728,6 +840,14 @@ export function BookmarksPage({
       favourite: false,
       archivedAt: null,
       sortOrder: cards.filter((card) => card.groupId === input.groupId).length,
+      tags: input.tags ?? [],
+      faviconPath: input.faviconPath ?? null,
+      autoTitle: input.autoTitle ?? null,
+      autoDescription: input.autoDescription ?? null,
+      healthMonitoringEnabled: false,
+      linkedDeviceId: null,
+      clickCount: 0,
+      lastClickedAt: null,
     };
     updateActiveTabData((value) => ({
       ...value,
@@ -888,6 +1008,21 @@ export function BookmarksPage({
       toast.error("Failed to delete bookmark");
     } finally {
       setDeleteDialogLoading(false);
+    }
+  }
+
+  async function handleBulkEnableMonitoring() {
+    if (!selectedCardIds.length || !canConfigureMonitoring) return;
+    try {
+      await bulkBookmarkCardAction({
+        cardIds: selectedCardIds,
+        action: "enable_monitoring",
+      });
+      if (activeTabId) await loadTabData(activeTabId, showArchived, true);
+      setSelectedCardIds([]);
+      toast.success("Health monitoring enabled on selected cards");
+    } catch {
+      toast.error("Failed to enable monitoring");
     }
   }
 
@@ -1208,6 +1343,13 @@ export function BookmarksPage({
 
   return (
     <div className="space-y-4">
+      {suggestions.frequent.length > 0 || suggestions.stale.length > 0 ? (
+        <SmartSuggestionsSection
+          frequent={suggestions.frequent}
+          stale={suggestions.stale}
+        />
+      ) : null}
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <DndContext
           sensors={tabSensors}
@@ -1277,6 +1419,11 @@ export function BookmarksPage({
         }
         showArchived={showArchived}
         onShowArchivedChange={setShowArchived}
+        sortMode={sortMode}
+        onSortModeChange={(value) => void handleSortModeChange(value)}
+        filterChip={filterChip}
+        onFilterChipChange={setFilterChip}
+        tagFilters={tagFilters}
         canEdit={canEdit}
         hasGroups={groups.length > 0}
         onNewCard={() => openNewCardDialog()}
@@ -1299,6 +1446,8 @@ export function BookmarksPage({
           onExportSelected={() => void handleExportSelected()}
           onMoveGroup={(groupId) => void handleBulkMoveGroup(groupId)}
           onMoveTab={(tabId) => void handleBulkMoveTab(tabId)}
+          canConfigureMonitoring={canConfigureMonitoring}
+          onEnableMonitoring={() => void handleBulkEnableMonitoring()}
         />
       ) : null}
 
@@ -1428,7 +1577,8 @@ export function BookmarksPage({
                                         draggable={
                                           canEdit &&
                                           !effectiveLocked &&
-                                          !card.archivedAt
+                                          !card.archivedAt &&
+                                          sortMode === "custom"
                                         }
                                         bulkMode={bulkMode}
                                         selected={selectedCardIds.includes(
@@ -1438,6 +1588,13 @@ export function BookmarksPage({
                                           card.id
                                         )}
                                         layoutMode={layoutMode}
+                                        clickStats={clickStats[card.id]}
+                                        healthInfo={
+                                          card.healthMonitoringEnabled
+                                            ? healthMap[card.id]
+                                            : undefined
+                                        }
+                                        statusFlash={flashCardIds.has(card.id)}
                                         onSelectedChange={(checked) => {
                                           setSelectedCardIds((prev) =>
                                             checked
@@ -1594,12 +1751,29 @@ export function BookmarksPage({
         }}
         groups={groups}
         defaultGroupId={defaultGroupId || groups[0]?.id}
+        activeTabName={activeTab?.name}
         card={editingCard}
         canEdit={canEdit}
+        canUseAi={canUseAi}
+        canConfigureMonitoring={canConfigureMonitoring}
         isFavourited={
           editingCard ? favouriteIds.includes(editingCard.id) : false
         }
         onSubmit={handleSaveCard}
+        onHealthChange={(cardId, enabled) => {
+          if (activeTabId) void loadTabData(activeTabId, showArchived, true);
+          if (enabled) {
+            void getCardHealthMap([cardId]).then((map) =>
+              setHealthMap((prev) => ({ ...prev, ...map }))
+            );
+          } else {
+            setHealthMap((prev) => {
+              const next = { ...prev };
+              delete next[cardId];
+              return next;
+            });
+          }
+        }}
         onDuplicate={
           canEdit && editingCard
             ? async (card) => {
