@@ -19,6 +19,7 @@ import {
   createColumn,
   createLabel,
   createProject,
+  deleteColumn,
   getProjectBoard,
   getProjects,
   getTaskByKey,
@@ -46,6 +47,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TaskCard } from "./TaskCard";
 import { TaskModal } from "./TaskModal";
+import { CreateTaskDialog } from "./CreateTaskDialog";
 import type { BoardTask, ProjectBoard, ProjectSummary, TaskDetails, TaskPriority } from "./types";
 
 type ViewMode = "kanban" | "backlog";
@@ -170,6 +172,8 @@ export function TasksPage({
   const [modalOpen, setModalOpen] = useState(Boolean(initialTask));
   const [modalTaskKey, setModalTaskKey] = useState<string | null>(initialTaskKey);
   const [modalTaskDetails, setModalTaskDetails] = useState<TaskDetails | null>(initialTask);
+  const [createTaskOpen, setCreateTaskOpen] = useState(false);
+  const [createTaskColumnId, setCreateTaskColumnId] = useState<string | undefined>();
 
   const sortedColumns = useMemo(
     () => [...(board?.columns ?? [])].sort((a, b) => a.sortOrder - b.sortOrder),
@@ -367,6 +371,26 @@ export function TasksPage({
     });
   };
 
+  const deleteColumnNow = (columnId: string, columnName: string) => {
+    if (!window.confirm(`Delete column "${columnName}"? Tasks in this column will be removed.`)) {
+      return;
+    }
+    startTransition(async () => {
+      try {
+        await deleteColumn(columnId);
+        await refreshBoard();
+        toast.success("Column deleted");
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Unable to delete column");
+      }
+    });
+  };
+
+  const openCreateTask = (columnId?: string) => {
+    setCreateTaskColumnId(columnId);
+    setCreateTaskOpen(true);
+  };
+
   const activeDragTask = board?.tasks.find((task) => task.id === activeDragId);
 
   if (!board) {
@@ -443,6 +467,10 @@ export function TasksPage({
         </div>
 
         <div className="flex items-center gap-2">
+          <Button onClick={() => openCreateTask()}>
+            <Plus className="mr-2 h-4 w-4" />
+            New task
+          </Button>
           <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as ViewMode)}>
             <TabsList>
               <TabsTrigger value="kanban">Kanban</TabsTrigger>
@@ -499,25 +527,36 @@ export function TasksPage({
                   id={column.id}
                   className="rounded-xl border bg-card/50 p-3"
                 >
-                  <div className="mb-3 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
                       <span
                         className="inline-flex h-2.5 w-2.5 rounded-full"
                         style={{ backgroundColor: column.color }}
                       />
-                      <h3 className="text-sm font-semibold">{column.name}</h3>
+                      <h3 className="truncate text-sm font-semibold">{column.name}</h3>
                     </div>
-                    <Badge
-                      variant="outline"
-                      className={
-                        wipExceeded
-                          ? "border-rose-500/60 text-rose-400"
-                          : "border-muted-foreground/40 text-muted-foreground"
-                      }
-                    >
-                      {tasks.length}
-                      {column.wipLimit != null ? `/${column.wipLimit}` : ""}
-                    </Badge>
+                    <div className="flex items-center gap-1">
+                      <Badge
+                        variant="outline"
+                        className={
+                          wipExceeded
+                            ? "border-rose-500/60 text-rose-400"
+                            : "border-muted-foreground/40 text-muted-foreground"
+                        }
+                      >
+                        {tasks.length}
+                        {column.wipLimit != null ? `/${column.wipLimit}` : ""}
+                      </Badge>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => openCreateTask(column.id)}
+                        aria-label={`Add task to ${column.name}`}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
 
                   <SortableContext items={tasks.map((task) => task.id)} strategy={verticalListSortingStrategy}>
@@ -643,7 +682,12 @@ export function TasksPage({
             <section className="space-y-3">
               <h4 className="text-sm font-semibold">Columns</h4>
               {sortedColumns.map((column) => (
-                <EditableColumnRow key={column.id} column={column} onSave={saveColumn} />
+                <EditableColumnRow
+                  key={column.id}
+                  column={column}
+                  onSave={saveColumn}
+                  onDelete={deleteColumnNow}
+                />
               ))}
               <div className="grid gap-2 rounded-lg border p-3 md:grid-cols-[1fr_140px_120px_auto]">
                 <Input
@@ -702,6 +746,15 @@ export function TasksPage({
         </DialogContent>
       </Dialog>
 
+      <CreateTaskDialog
+        open={createTaskOpen}
+        onOpenChange={setCreateTaskOpen}
+        projectId={board.project.id}
+        columns={sortedColumns}
+        defaultColumnId={createTaskColumnId}
+        onCreated={refreshBoard}
+      />
+
       <TaskModal
         open={modalOpen}
         onOpenChange={onModalOpenChange}
@@ -716,6 +769,13 @@ export function TasksPage({
             setModalTaskDetails(details);
           }
         }}
+        onTaskDeleted={() => {
+          setModalOpen(false);
+          setModalTaskDetails(null);
+          setModalTaskKey(null);
+          if (pathname !== "/tasks") router.replace("/tasks");
+          void refreshBoard();
+        }}
       />
     </div>
   );
@@ -724,9 +784,11 @@ export function TasksPage({
 function EditableColumnRow({
   column,
   onSave,
+  onDelete,
 }: {
   column: ProjectBoard["columns"][number];
   onSave: (columnId: string, name: string, color: string, wipLimit: string) => void;
+  onDelete: (columnId: string, columnName: string) => void;
 }) {
   const [name, setName] = useState(column.name);
   const [color, setColor] = useState(column.color);
@@ -751,6 +813,15 @@ function EditableColumnRow({
       <Button variant="outline" onClick={() => onSave(column.id, name, color, wipLimit)}>
         Save
       </Button>
+      {!column.isBacklog ? (
+        <Button
+          variant="ghost"
+          className="text-destructive"
+          onClick={() => onDelete(column.id, column.name)}
+        >
+          Delete
+        </Button>
+      ) : null}
     </div>
   );
 }

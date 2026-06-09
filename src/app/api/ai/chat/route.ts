@@ -23,6 +23,15 @@ export async function POST(req: NextRequest) {
 
   const model = await getAiModel();
 
+  const systemMessage = {
+    role: "system",
+    content:
+      "You are Grok, a helpful AI assistant embedded in Nexus, an internal operations portal. " +
+      "You help staff with bookmarks, tasks, network monitoring, and day-to-day operational questions. " +
+      "Be concise, practical, and friendly. Use markdown when it improves clarity (lists, headings, code blocks). " +
+      "If you lack live data about the user's portal, say so and suggest where in Nexus they can check.",
+  };
+
   const response = await fetch("https://api.x.ai/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -31,8 +40,9 @@ export async function POST(req: NextRequest) {
     },
     body: JSON.stringify({
       model,
-      messages,
+      messages: [systemMessage, ...messages],
       stream: true,
+      temperature: 0.6,
     }),
   });
 

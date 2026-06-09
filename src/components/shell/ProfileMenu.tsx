@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { useQuery } from "@tanstack/react-query";
-import { Bell, LogOut, ScrollText, Settings, Shield, User } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Bell, LogOut, Menu, ScrollText, Settings, Shield, User, X } from "lucide-react";
+import { useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,6 +37,7 @@ function initials(name: string) {
 
 export function ProfileMenu({
   user,
+  navItems = [],
 }: {
   user: {
     name: string;
@@ -43,7 +46,11 @@ export function ProfileMenu({
     avatarPath: string | null;
     permissions?: UserPermissionOverrides | null;
   };
+  navItems?: { href: string; label: string }[];
 }) {
+  const queryClient = useQueryClient();
+  const pathname = usePathname();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const isAdmin = hasPermission(user.role, "admin:access", user.permissions);
 
   const { data: unread = 0 } = useQuery({
@@ -56,8 +63,79 @@ export function ProfileMenu({
     queryFn: getNotifications,
   });
 
+  async function invalidateNotifications() {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["notifications-unread"] }),
+      queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+    ]);
+  }
+
+  async function handleMarkRead(id: string) {
+    await markNotificationRead(id);
+    await invalidateNotifications();
+  }
+
+  async function handleMarkAllRead() {
+    await markAllNotificationsRead();
+    await invalidateNotifications();
+  }
+
   return (
     <div className="flex items-center gap-2">
+      {navItems.length > 0 ? (
+        <>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="md:hidden"
+            onClick={() => setMobileNavOpen(true)}
+            aria-label="Open navigation"
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+          {mobileNavOpen ? (
+            <div className="fixed inset-0 z-50 md:hidden">
+              <button
+                type="button"
+                className="absolute inset-0 bg-black/50"
+                aria-label="Close navigation"
+                onClick={() => setMobileNavOpen(false)}
+              />
+              <div className="absolute left-0 top-0 flex h-full w-72 flex-col border-r bg-background p-4 shadow-xl">
+                <div className="mb-4 flex items-center justify-between">
+                  <span className="font-semibold">Navigation</span>
+                  <Button variant="ghost" size="icon" onClick={() => setMobileNavOpen(false)}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+                <nav className="space-y-1">
+                  {navItems.map((item) => {
+                    const active =
+                      item.href === "/"
+                        ? pathname === "/"
+                        : pathname.startsWith(item.href);
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => setMobileNavOpen(false)}
+                        className={`block rounded-lg px-3 py-2 text-sm font-medium ${
+                          active
+                            ? "bg-primary/15 text-primary"
+                            : "text-muted-foreground hover:bg-accent"
+                        }`}
+                      >
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+                </nav>
+              </div>
+            </div>
+          ) : null}
+        </>
+      ) : null}
+
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="icon" className="relative">
@@ -75,7 +153,7 @@ export function ProfileMenu({
             {unread > 0 && (
               <button
                 className="text-xs text-primary hover:underline"
-                onClick={() => markAllNotificationsRead()}
+                onClick={() => void handleMarkAllRead()}
               >
                 Mark all read
               </button>
@@ -97,23 +175,25 @@ export function ProfileMenu({
                 </div>
                 <p className="text-xs text-muted-foreground line-clamp-2">{n.body}</p>
                 <div className="flex gap-2">
-                  {n.link && (
+                  {n.link ? (
                     <Link
                       href={n.link}
                       className="text-xs text-primary hover:underline"
-                      onClick={() => !n.readAt && markNotificationRead(n.id)}
+                      onClick={() => {
+                        if (!n.readAt) void handleMarkRead(n.id);
+                      }}
                     >
                       Open
                     </Link>
-                  )}
-                  {!n.readAt && (
+                  ) : null}
+                  {!n.readAt ? (
                     <button
                       className="text-xs text-muted-foreground hover:underline"
-                      onClick={() => markNotificationRead(n.id)}
+                      onClick={() => void handleMarkRead(n.id)}
                     >
                       Mark read
                     </button>
-                  )}
+                  ) : null}
                 </div>
               </DropdownMenuItem>
             ))

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   Area,
@@ -18,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { MonitorCheck, MonitorDevice } from "@/lib/db/schema";
 import { DeviceFormDialog } from "./DeviceFormDialog";
+import { DiscoverDevicesDialog } from "./DiscoverDevicesDialog";
 
 type DeviceWithChecks = {
   device: MonitorDevice;
@@ -61,6 +63,8 @@ export function MonitoringOverview({
   devices: DeviceWithChecks[];
   stats: MonitoringStats;
 }) {
+  const router = useRouter();
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
@@ -70,14 +74,17 @@ export function MonitoringOverview({
             Track uptime, latency, and the latest checks across monitored targets.
           </p>
         </div>
-        <DeviceFormDialog
-          trigger={
-            <Button className="gap-2">
-              <PlusCircle className="h-4 w-4" />
-              Add Device
-            </Button>
-          }
-        />
+        <div className="flex flex-wrap gap-2">
+          <DiscoverDevicesDialog onComplete={() => router.refresh()} />
+          <DeviceFormDialog
+            trigger={
+              <Button className="gap-2">
+                <PlusCircle className="h-4 w-4" />
+                Add Device
+              </Button>
+            }
+          />
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

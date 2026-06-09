@@ -35,13 +35,25 @@ export default async function AppHomePage() {
   const canViewTasks = hasPermission(role, "tasks:view", permissions);
   const canViewBookmarks = hasPermission(role, "bookmarks:view", permissions);
 
-  const [favourites, stats, allBookmarks, homeOrder, suggestions] = await Promise.all([
-    getFavouriteCards(),
+  const [stats, homeOrder] = await Promise.all([
     getDashboardStats(),
-    getAllBookmarkCards(),
-    getHomeFavouriteOrder(),
-    getSmartBookmarkSuggestions().catch(() => ({ frequent: [], stale: [] })),
+    canViewBookmarks ? getHomeFavouriteOrder() : Promise.resolve([]),
   ]);
+
+  let favourites: BookmarkItem[] = [];
+  let allBookmarks: BookmarkItem[] = [];
+  let suggestions: { frequent: BookmarkItem[]; stale: BookmarkItem[] } = {
+    frequent: [],
+    stale: [],
+  };
+
+  if (canViewBookmarks) {
+    [favourites, allBookmarks, suggestions] = await Promise.all([
+      getFavouriteCards(),
+      getAllBookmarkCards(),
+      getSmartBookmarkSuggestions().catch(() => ({ frequent: [], stale: [] })),
+    ]);
+  }
 
   return (
     <LandingPage

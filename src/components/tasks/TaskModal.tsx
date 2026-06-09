@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { CheckCheck, Copy, MessageSquarePlus, Plus } from "lucide-react";
+import { CheckCheck, Copy, MessageSquarePlus, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   addComment,
   createSubtask,
+  deleteTask,
   setTaskLabels,
   toggleSubtask,
   updateTask,
@@ -51,6 +52,7 @@ export function TaskModal({
   columns,
   labels,
   onTaskSaved,
+  onTaskDeleted,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -59,6 +61,7 @@ export function TaskModal({
   columns: TaskColumn[];
   labels: TaskLabel[];
   onTaskSaved: () => Promise<void> | void;
+  onTaskDeleted?: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
   const [title, setTitle] = useState("");
@@ -177,6 +180,20 @@ export function TaskModal({
     setSelectedLabels((prev) =>
       prev.includes(labelId) ? prev.filter((id) => id !== labelId) : [...prev, labelId]
     );
+  };
+
+  const deleteTaskNow = () => {
+    if (!taskDetails) return;
+    if (!window.confirm(`Delete task "${taskDetails.task.title}" permanently?`)) return;
+    startTransition(async () => {
+      try {
+        await deleteTask(taskDetails.task.id);
+        toast.success("Task deleted");
+        onTaskDeleted?.();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Unable to delete task");
+      }
+    });
   };
 
   return (
@@ -347,7 +364,16 @@ export function TaskModal({
               </div>
             </div>
 
-            <div className="flex justify-end">
+            <div className="flex items-center justify-between gap-2">
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={deleteTaskNow}
+                disabled={isPending}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete task
+              </Button>
               <Button onClick={saveTask} disabled={isPending || !title.trim()}>
                 {isPending ? "Saving..." : "Save changes"}
               </Button>

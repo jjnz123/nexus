@@ -1,11 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq, desc, and, gte } from "drizzle-orm";
+import { eq, desc, and, gte, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { monitorDevices, monitorChecks } from "@/lib/db/schema";
+import { monitorDevices, monitorChecks, bookmarkCards } from "@/lib/db/schema";
 import { requireAuth } from "@/lib/auth";
-import { requireSessionPermission, hasPermission } from "@/lib/permissions";
+import { requireSessionPermission } from "@/lib/permissions";
 import { deviceSchema, updateDeviceSchema } from "@/lib/validators/monitoring";
 import { forceCheckDevice } from "@/server/jobs/monitor-runner";
 import { logAudit } from "@/server/audit";
@@ -139,4 +139,79 @@ export async function getMonitoringStats() {
     down: devices.filter((d) => d.lastStatus === "down").length,
     unknown: devices.filter((d) => d.lastStatus === "unknown" || !d.lastStatus).length,
   };
+}
+
+function normalizeTarget(url: string) {
+  try {
+    const parsed = new URL(url.startsWith("http") ? url : `https://${url}`);
+    return `${parsed.protocol}//${parsed.hostname}${parsed.port ? `:${parsed.port}` : ""}`.toLowerCase();
+  } catch {
+    return url.trim().toLowerCase();
+  }
+}
+
+export async function discoverUnmonitoredTargets() {
+  const session = await requireAuth();
+  requireSessionPermission(session, "monitoring:configure");
+
+  const cards = await db
+    .select({
+      id: bookmarkCards.id,
+      title: bookmarkCards.title,
+      url: bookmarkCards.url,
+    })
+    .from(bookmarkCards)
+    .where(and(isNull(bookmarkCards.archivedAt), eq(bookmarkCards.enabled, true)));
+
+  const devices = await db.select({ target: monitorDevices.target }).from(monitorDevices);
+  const monitored = new Set(devices.map((d) => normalizeTarget(d.target)));
+
+  const seen = new Set<string>();
+  const candidates: { id: string; name: string; target: string }[] = [];
+
+  for (const card of cards) {
+    if (!/^https?:\/\//i.test(card.url)) continue;
+    const key = normalizeTarget(card.url);
+    if (monitored.has(key) || seen.has(key)) continue;
+    seen.add(key);
+    candidates.push({ id: card.id, name: card.title, target: card.url });
+  }
+
+  return candidates.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export async function bulkCreateMonitorDevices(input: {
+  targets: { name: string; target: string }[];
+  checkType: "http" | "ping" | "tcp";
+  intervalSec: number;
+  timeoutMs: number;
+  enabled?: boolean;
+}) {
+  const session = await requireAuth();
+  requireSessionPermission(session, "monitoring:configure");
+
+  const created = [];
+  for (const target of input.targets) {
+    const data = deviceSchema.parse({
+      name: target.name,
+      target: target.target,
+      checkType: input.checkType,
+      intervalSec: input.intervalSec,
+      timeoutMs: input.timeoutMs,
+      enabled: input.enabled ?? true,
+    });
+    const [device] = await db.insert(monitorDevices).values(data).returning();
+    created.push(device);
+  }
+
+  revalidatePath("/monitoring");
+  revalidatePath("/bookmarks");
+  await logAudit({
+    action: "monitoring.device.bulk_create",
+    resource: "monitor_device",
+    summary: `Bulk created ${created.length} monitor devices`,
+    details: { count: created.length },
+  });
+
+  return created;
 }

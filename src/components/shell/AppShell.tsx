@@ -91,7 +91,10 @@ export function AppShell({
           ) : (
             <div className="hidden md:block" />
           )}
-          <ProfileMenu user={user} />
+          <ProfileMenu
+            user={user}
+            navItems={visibleNav.map((item) => ({ href: item.href, label: item.label }))}
+          />
         </header>
 
         <motion.main

@@ -125,7 +125,7 @@ export function canAccessRoute(
   if (path.startsWith("/tasks")) return hasPermission(role, "tasks:view", overrides);
   if (path.startsWith("/monitoring"))
     return hasPermission(role, "monitoring:view", overrides);
-  if (path.startsWith("/settings")) return hasPermission(role, "admin:access", overrides);
+  if (path.startsWith("/settings")) return true;
   return true;
 }
 
