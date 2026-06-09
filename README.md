@@ -241,6 +241,27 @@ Deploy from the GitHub repo with build enabled. Set these stack environment vari
 
 Default host port: **8374** (maps to container port 3000).
 
+### SonarQube (code quality)
+
+Static analysis runs automatically via **GitHub Actions** on every push to `main` and on pull requests (`.github/workflows/sonar.yml`).
+
+**One-time setup**
+
+1. Create a SonarQube project with key **`nexus`** (matches `sonar-project.properties`).
+2. In GitHub → **Settings → Secrets and variables → Actions**, add:
+
+| Secret | Description |
+|--------|-------------|
+| `SONAR_TOKEN` | User token from SonarQube (My Account → Security) |
+| `SONAR_HOST_URL` | SonarQube server URL, e.g. `https://sonar.example.com` |
+
+**Configuration**
+
+- Project settings: `sonar-project.properties` at the repo root
+- Sources: repository root (excludes tests, `node_modules`, `.next`, `dist`, `coverage`, Drizzle meta)
+
+After secrets are set, pushes and PRs trigger the **SonarQube Analysis** workflow. Results appear in SonarQube and (for PRs) as GitHub checks when the server is linked.
+
 ### Releasing a new version
 
 After merging changes to `main`:
