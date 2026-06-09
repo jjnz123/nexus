@@ -35,6 +35,7 @@ Organise internal tools, dashboards, docs, and URLs in a structured library. The
 - **Search** across titles, URLs, tags, and descriptions
 - **Settings modal** — create tabs/groups/cards, rename/delete, bulk select, import/export, sort/filter/layout
 - **Import and export** — back up or migrate bookmark collections as JSON
+- Reliable optimistic IDs when creating groups and cards (works in all browser environments)
 - **Optional health checks** — tie a bookmark to a monitored endpoint and see up/down status on the card
 
 Editors can create and manage the library; viewers can browse and launch.
@@ -45,8 +46,10 @@ A **Jira-inspired** task board with tickets, hierarchy, roadmap planning, and co
 
 - Multiple **projects**, each with ticket keys (e.g. `OPS-001`).
 - **Kanban board** (horizontal columns) plus **backlog panel** with expanded create form.
+- **Issues view** — sortable columns, column visibility, quick filters, row selection, and bulk actions (assign, move, priority, delete).
+- **View switcher** — jump between Board, Issues, and Roadmap from the page header.
 - **Roadmap** — inline bulk editing with draft/commit workflow; add any ticket type; hierarchy, assignee, dates, story points, status.
-- **Tickets** — title, description, details, acceptance criteria, definition of done, story points, attachments (preview), linked issues, threaded comments.
+- **Tickets** — tabbed detail modal (Overview, Specification, Links & files, Discussion) with title, description, details, acceptance criteria, definition of done, story points, attachments (preview), linked issues, threaded comments.
 - **Project settings** — columns, labels, and **per-type field configuration** (show/hide + drag reorder).
 
 ### Monitoring

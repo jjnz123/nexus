@@ -49,6 +49,7 @@ import { TasksBacklogPanel } from "./TasksBacklogPanel";
 import { TasksIssuesView } from "./TasksIssuesView";
 import { TasksRoadmapView } from "./TasksRoadmapView";
 import { TasksProjectSettings } from "./TasksProjectSettings";
+import { TasksViewSwitcher } from "./TasksViewSwitcher";
 import type { BoardTask, ProjectBoard, ProjectSummary, TaskDetails, TaskPriority } from "./types";
 import {
   parseProjectTicketFieldSettings,
@@ -429,7 +430,7 @@ export function TasksPage({
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-3">
             <Select value={board.project.id} onValueChange={switchProject}>
               <SelectTrigger className="w-64">
                 <SelectValue placeholder="Select project" />
@@ -446,6 +447,9 @@ export function TasksPage({
               <Plus className="mr-2 h-4 w-4" />
               Project
             </Button>
+            {sidebarView !== "settings" ? (
+              <TasksViewSwitcher activeView={sidebarView} onViewChange={setSidebarView} />
+            ) : null}
           </div>
 
           <div className="flex items-center gap-2">
@@ -613,6 +617,7 @@ export function TasksPage({
               onAssigneeFilterChange={setAssigneeFilter}
               projectUsers={projectUsers}
               onOpenTask={openTaskModal}
+              onRefresh={refreshBoard}
             />
           ) : null}
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createId } from "@/lib/create-id";
 import {
   closestCenter,
   DndContext,
@@ -717,7 +718,7 @@ export function BookmarksPage({
     if (!trimmed) return;
 
     const optimistic: BookmarkGroup = {
-      id: crypto.randomUUID(),
+      id: createId(),
       tabId: activeTabId,
       name: trimmed,
       description: null,
@@ -885,7 +886,7 @@ export function BookmarksPage({
     }
 
     const optimistic: BookmarkCard = {
-      id: crypto.randomUUID(),
+      id: createId(),
       groupId: input.groupId,
       title: input.title,
       description: input.description ?? null,

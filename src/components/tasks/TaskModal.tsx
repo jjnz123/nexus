@@ -10,6 +10,7 @@ import {
   toggleSubtask,
   updateTask,
 } from "@/server/actions/tasks";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -28,6 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import {
   isTicketFieldVisible,
@@ -49,6 +51,21 @@ function asDateInput(value: string | Date | null) {
 function asIsoDate(value: string): string | null {
   if (!value) return null;
   return new Date(`${value}T12:00:00.000Z`).toISOString();
+}
+
+function MetadataField({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs uppercase tracking-wide text-muted-foreground">{label}</Label>
+      {children}
+    </div>
+  );
 }
 
 export function TaskModal({
@@ -79,6 +96,7 @@ export function TaskModal({
   onTaskDeleted?: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
+  const [activeTab, setActiveTab] = useState("overview");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [details, setDetails] = useState("");
@@ -117,6 +135,7 @@ export function TaskModal({
     setLocalComments(taskDetails.comments);
     setLocalAttachments(taskDetails.attachments);
     setLocalLinks(taskDetails.links);
+    setActiveTab("overview");
   }, [taskDetails]);
 
   const visible = (key: TicketFieldKey) => isTicketFieldVisible(fieldSettings, taskType, key);
@@ -126,10 +145,16 @@ export function TaskModal({
     [localSubtasks]
   );
 
+  const statusColumn = columns.find((column) => column.id === columnId);
+
   const copyTaskUrl = async () => {
     if (!taskKey || typeof window === "undefined") return;
     await navigator.clipboard.writeText(`${window.location.origin}/tasks/${taskKey}`);
     toast.success("Ticket link copied");
+  };
+
+  const refreshDetails = async () => {
+    await onTaskSaved();
   };
 
   const saveTask = () => {
@@ -152,7 +177,7 @@ export function TaskModal({
           parentId: parentId === "none" ? null : parentId,
         });
         await setTaskLabels(taskDetails.task.id, selectedLabels);
-        await onTaskSaved();
+        await refreshDetails();
         toast.success("Ticket saved");
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Unable to save ticket");
@@ -170,7 +195,7 @@ export function TaskModal({
         });
         setLocalSubtasks((prev) => [...prev, subtask]);
         setSubtaskDraft("");
-        await onTaskSaved();
+        await refreshDetails();
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Unable to add subtask");
       }
@@ -184,7 +209,7 @@ export function TaskModal({
         setLocalSubtasks((prev) =>
           prev.map((item) => (item.id === subtaskId ? { ...item, completed } : item))
         );
-        await onTaskSaved();
+        await refreshDetails();
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Unable to update subtask");
       }
@@ -211,304 +236,344 @@ export function TaskModal({
     });
   };
 
+  const metadataPanel = (
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      {visible("type") ? (
+        <MetadataField label="Type">
+          <Select value={taskType} onValueChange={(v) => setTaskType(v as TaskType)}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="epic">Epic</SelectItem>
+              <SelectItem value="feature">Feature</SelectItem>
+              <SelectItem value="story">Story</SelectItem>
+              <SelectItem value="task">Task</SelectItem>
+            </SelectContent>
+          </Select>
+        </MetadataField>
+      ) : null}
+      {visible("column") ? (
+        <MetadataField label="Status">
+          <Select value={columnId} onValueChange={setColumnId}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {columns.map((column) => (
+                <SelectItem key={column.id} value={column.id}>
+                  {column.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </MetadataField>
+      ) : null}
+      {visible("assignee") ? (
+        <MetadataField label="Assignee">
+          <Select value={assigneeId} onValueChange={setAssigneeId}>
+            <SelectTrigger>
+              <SelectValue placeholder="Unassigned" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Unassigned</SelectItem>
+              {projectUsers.map((user) => (
+                <SelectItem key={user.id} value={user.id}>
+                  {user.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </MetadataField>
+      ) : null}
+      {visible("priority") ? (
+        <MetadataField label="Priority">
+          <Select value={priority} onValueChange={(v) => setPriority(v as TaskPriority)}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="low">Low</SelectItem>
+              <SelectItem value="medium">Medium</SelectItem>
+              <SelectItem value="high">High</SelectItem>
+              <SelectItem value="urgent">Urgent</SelectItem>
+            </SelectContent>
+          </Select>
+        </MetadataField>
+      ) : null}
+      {visible("dueDate") ? (
+        <MetadataField label="Due date">
+          <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+        </MetadataField>
+      ) : null}
+      {visible("storyPoints") ? (
+        <MetadataField label="Story points">
+          <Input
+            type="number"
+            min={0}
+            value={storyPoints}
+            onChange={(e) => setStoryPoints(e.target.value)}
+          />
+        </MetadataField>
+      ) : null}
+      {visible("parent") ? (
+        <MetadataField label="Parent">
+          <Select value={parentId} onValueChange={setParentId}>
+            <SelectTrigger>
+              <SelectValue placeholder="None" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">None</SelectItem>
+              {parentCandidates
+                .filter((candidate) => candidate.id !== taskDetails?.task.id)
+                .map((candidate) => (
+                  <SelectItem key={candidate.id} value={candidate.id}>
+                    {candidate.type} · {candidate.title}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+        </MetadataField>
+      ) : null}
+    </div>
+  );
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => void copyTaskUrl()}
-              className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
-            >
-              <Copy className="h-3.5 w-3.5" />
-              {taskKey ?? "Ticket"}
-            </button>
-          </DialogTitle>
-          <DialogDescription>
-            Edit ticket details, links, attachments, and discussion.
-          </DialogDescription>
+      <DialogContent className="flex max-h-[92vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl">
+        <DialogHeader className="space-y-3 border-b px-6 py-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="space-y-2">
+              <DialogTitle className="flex flex-wrap items-center gap-2 text-left">
+                <button
+                  type="button"
+                  onClick={() => void copyTaskUrl()}
+                  className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                  {taskKey ?? "Ticket"}
+                </button>
+                {taskDetails ? (
+                  <>
+                    <Badge variant="outline" className="capitalize">
+                      {taskType}
+                    </Badge>
+                    {statusColumn ? (
+                      <Badge
+                        variant="secondary"
+                        style={{ borderColor: statusColumn.color }}
+                      >
+                        {statusColumn.name}
+                      </Badge>
+                    ) : null}
+                  </>
+                ) : null}
+              </DialogTitle>
+              <DialogDescription className="text-left">
+                Organized ticket editor with specification, links, files, and discussion.
+              </DialogDescription>
+            </div>
+          </div>
+          {!taskDetails ? null : visible("title") ? (
+            <Input
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              className="text-base font-medium"
+              placeholder="Ticket title"
+            />
+          ) : null}
         </DialogHeader>
 
         {!taskDetails ? (
-          <p className="text-sm text-muted-foreground">Loading ticket details…</p>
+          <p className="px-6 py-8 text-sm text-muted-foreground">Loading ticket details…</p>
         ) : (
-          <div className="space-y-6">
-            {visible("title") ? (
-              <div className="space-y-2">
-                <Label htmlFor="task-title">Title</Label>
-                <Input
-                  id="task-title"
-                  value={title}
-                  onChange={(event) => setTitle(event.target.value)}
-                />
-              </div>
-            ) : null}
+          <>
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList className="mb-4">
+                  <TabsTrigger value="overview">Overview</TabsTrigger>
+                  <TabsTrigger value="spec">Specification</TabsTrigger>
+                  <TabsTrigger value="links">Links & files</TabsTrigger>
+                  <TabsTrigger value="discussion">
+                    Discussion
+                    {localComments.length ? (
+                      <Badge variant="secondary" className="ml-1.5 h-5 px-1.5 text-[10px]">
+                        {localComments.length}
+                      </Badge>
+                    ) : null}
+                  </TabsTrigger>
+                </TabsList>
 
-            {visible("description") ? (
-              <div className="space-y-2">
-                <Label htmlFor="task-description">Description</Label>
-                <Textarea
-                  id="task-description"
-                  value={description}
-                  onChange={(event) => setDescription(event.target.value)}
-                  rows={4}
-                />
-              </div>
-            ) : null}
-
-            {visible("details") ? (
-              <div className="space-y-2">
-                <Label htmlFor="task-details">Details</Label>
-                <Textarea
-                  id="task-details"
-                  value={details}
-                  onChange={(event) => setDetails(event.target.value)}
-                  rows={6}
-                  placeholder="Extended context, notes, or technical detail…"
-                />
-              </div>
-            ) : null}
-
-            {visible("acceptanceCriteria") ? (
-              <div className="space-y-2">
-                <Label htmlFor="task-ac">Acceptance criteria</Label>
-                <Textarea
-                  id="task-ac"
-                  value={acceptanceCriteria}
-                  onChange={(event) => setAcceptanceCriteria(event.target.value)}
-                  rows={4}
-                />
-              </div>
-            ) : null}
-
-            {visible("definitionOfDone") ? (
-              <div className="space-y-2">
-                <Label htmlFor="task-dod">Definition of done</Label>
-                <Textarea
-                  id="task-dod"
-                  value={definitionOfDone}
-                  onChange={(event) => setDefinitionOfDone(event.target.value)}
-                  rows={3}
-                />
-              </div>
-            ) : null}
-
-            <div className="grid gap-4 md:grid-cols-3">
-              {visible("priority") ? (
-                <div className="space-y-2">
-                  <Label>Priority</Label>
-                  <Select value={priority} onValueChange={(v) => setPriority(v as TaskPriority)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                      <SelectItem value="urgent">Urgent</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : null}
-              {visible("dueDate") ? (
-                <div className="space-y-2">
-                  <Label htmlFor="task-due-date">Due date</Label>
-                  <Input
-                    id="task-due-date"
-                    type="date"
-                    value={dueDate}
-                    onChange={(event) => setDueDate(event.target.value)}
-                  />
-                </div>
-              ) : null}
-              {visible("storyPoints") ? (
-                <div className="space-y-2">
-                  <Label htmlFor="task-points">Story points</Label>
-                  <Input
-                    id="task-points"
-                    type="number"
-                    min={0}
-                    value={storyPoints}
-                    onChange={(event) => setStoryPoints(event.target.value)}
-                  />
-                </div>
-              ) : null}
-              {visible("column") ? (
-                <div className="space-y-2">
-                  <Label>Status</Label>
-                  <Select value={columnId} onValueChange={setColumnId}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {columns.map((column) => (
-                        <SelectItem key={column.id} value={column.id}>
-                          {column.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : null}
-              {visible("type") ? (
-                <div className="space-y-2">
-                  <Label>Type</Label>
-                  <Select value={taskType} onValueChange={(v) => setTaskType(v as TaskType)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="epic">Epic</SelectItem>
-                      <SelectItem value="feature">Feature</SelectItem>
-                      <SelectItem value="story">Story</SelectItem>
-                      <SelectItem value="task">Task</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : null}
-              {visible("assignee") ? (
-                <div className="space-y-2">
-                  <Label>Assignee</Label>
-                  <Select value={assigneeId} onValueChange={setAssigneeId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Unassigned" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Unassigned</SelectItem>
-                      {projectUsers.map((user) => (
-                        <SelectItem key={user.id} value={user.id}>
-                          {user.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : null}
-              {visible("parent") ? (
-                <div className="space-y-2">
-                  <Label>Parent</Label>
-                  <Select value={parentId} onValueChange={setParentId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="None" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      {parentCandidates
-                        .filter((candidate) => candidate.id !== taskDetails.task.id)
-                        .map((candidate) => (
-                          <SelectItem key={candidate.id} value={candidate.id}>
-                            {candidate.type} · {candidate.title}
-                          </SelectItem>
+                <TabsContent value="overview" className="mt-0 space-y-5">
+                  {metadataPanel}
+                  {visible("description") ? (
+                    <div className="space-y-2">
+                      <Label htmlFor="task-description">Description</Label>
+                      <Textarea
+                        id="task-description"
+                        value={description}
+                        onChange={(event) => setDescription(event.target.value)}
+                        rows={5}
+                        placeholder="Summary of the work…"
+                      />
+                    </div>
+                  ) : null}
+                  {visible("labels") ? (
+                    <div className="space-y-2">
+                      <Label>Labels</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {labels.map((label) => {
+                          const checked = selectedLabels.includes(label.id);
+                          return (
+                            <button
+                              key={label.id}
+                              type="button"
+                              onClick={() => toggleLabel(label.id)}
+                              className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs transition ${
+                                checked ? "border-primary bg-primary/10 text-primary" : "hover:bg-accent"
+                              }`}
+                            >
+                              <span
+                                className="inline-flex h-2 w-2 rounded-full"
+                                style={{ backgroundColor: label.color }}
+                              />
+                              {label.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
+                  {visible("subtasks") ? (
+                    <div className="space-y-3 rounded-lg border p-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-medium">Subtasks</h4>
+                        <p className="text-xs text-muted-foreground">
+                          <CheckCheck className="mr-1 inline h-3 w-3" />
+                          {completedSubtasks}/{localSubtasks.length}
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        {localSubtasks.map((subtask) => (
+                          <label
+                            key={subtask.id}
+                            className="flex items-center gap-2 rounded-md border px-2 py-2"
+                          >
+                            <Checkbox
+                              checked={subtask.completed}
+                              onCheckedChange={(checked) =>
+                                toggleSubtaskItem(subtask.id, checked === true)
+                              }
+                            />
+                            <span
+                              className={
+                                subtask.completed ? "text-muted-foreground line-through" : ""
+                              }
+                            >
+                              {subtask.title}
+                            </span>
+                          </label>
                         ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : null}
+                      </div>
+                      <div className="flex gap-2">
+                        <Input
+                          value={subtaskDraft}
+                          onChange={(event) => setSubtaskDraft(event.target.value)}
+                          placeholder="Add subtask"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") addSubtaskItem();
+                          }}
+                        />
+                        <Button variant="outline" onClick={addSubtaskItem} disabled={isPending}>
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
+                </TabsContent>
+
+                <TabsContent value="spec" className="mt-0 space-y-4">
+                  {visible("details") ? (
+                    <div className="space-y-2">
+                      <Label htmlFor="task-details">Details</Label>
+                      <Textarea
+                        id="task-details"
+                        value={details}
+                        onChange={(event) => setDetails(event.target.value)}
+                        rows={8}
+                        placeholder="Extended context, technical notes, implementation guidance…"
+                      />
+                    </div>
+                  ) : null}
+                  {visible("acceptanceCriteria") ? (
+                    <div className="space-y-2">
+                      <Label htmlFor="task-ac">Acceptance criteria</Label>
+                      <Textarea
+                        id="task-ac"
+                        value={acceptanceCriteria}
+                        onChange={(event) => setAcceptanceCriteria(event.target.value)}
+                        rows={6}
+                        placeholder="What must be true for this ticket to be accepted?"
+                      />
+                    </div>
+                  ) : null}
+                  {visible("definitionOfDone") ? (
+                    <div className="space-y-2">
+                      <Label htmlFor="task-dod">Definition of done</Label>
+                      <Textarea
+                        id="task-dod"
+                        value={definitionOfDone}
+                        onChange={(event) => setDefinitionOfDone(event.target.value)}
+                        rows={4}
+                        placeholder="Checklist or criteria for completion…"
+                      />
+                    </div>
+                  ) : null}
+                </TabsContent>
+
+                <TabsContent value="links" className="mt-0 space-y-4">
+                  {visible("linkedIssues") ? (
+                    <TaskLinkedIssuesPanel
+                      taskId={taskDetails.task.id}
+                      projectId={taskDetails.project.id}
+                      links={localLinks}
+                      onOpenLinkedTask={onOpenLinkedTask}
+                      onChange={refreshDetails}
+                    />
+                  ) : null}
+                  {visible("attachments") ? (
+                    <TaskAttachmentsPanel
+                      taskId={taskDetails.task.id}
+                      attachments={localAttachments}
+                      onChange={refreshDetails}
+                    />
+                  ) : null}
+                </TabsContent>
+
+                <TabsContent value="discussion" className="mt-0">
+                  {visible("comments") ? (
+                    <TaskCommentsPanel
+                      taskId={taskDetails.task.id}
+                      comments={localComments}
+                      onChange={setLocalComments}
+                    />
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Comments are hidden for this ticket type.</p>
+                  )}
+                </TabsContent>
+              </Tabs>
             </div>
 
-            {visible("labels") ? (
-              <div className="space-y-2">
-                <Label>Labels</Label>
-                <div className="grid gap-2 md:grid-cols-2">
-                  {labels.map((label) => (
-                    <label
-                      key={label.id}
-                      className="flex items-center gap-2 rounded-md border p-2 text-sm"
-                    >
-                      <Checkbox
-                        checked={selectedLabels.includes(label.id)}
-                        onCheckedChange={() => toggleLabel(label.id)}
-                      />
-                      <span
-                        className="inline-flex h-2.5 w-2.5 rounded-full"
-                        style={{ backgroundColor: label.color }}
-                      />
-                      {label.name}
-                    </label>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
-            {visible("linkedIssues") ? (
-              <TaskLinkedIssuesPanel
-                taskId={taskDetails.task.id}
-                projectId={taskDetails.project.id}
-                links={localLinks}
-                onOpenLinkedTask={onOpenLinkedTask}
-                onChange={onTaskSaved}
-              />
-            ) : null}
-
-            {visible("attachments") ? (
-              <TaskAttachmentsPanel
-                taskId={taskDetails.task.id}
-                attachments={localAttachments}
-                onChange={async () => {
-                  await onTaskSaved();
-                  if (taskKey) {
-                    // attachments refreshed via parent
-                  }
-                }}
-              />
-            ) : null}
-
-            {visible("subtasks") ? (
-              <div className="space-y-3 rounded-lg border p-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-medium">Subtasks</h4>
-                  <p className="text-xs text-muted-foreground">
-                    <CheckCheck className="mr-1 inline h-3 w-3" />
-                    {completedSubtasks}/{localSubtasks.length}
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  {localSubtasks.map((subtask) => (
-                    <label key={subtask.id} className="flex items-center gap-2 rounded-md border p-2">
-                      <Checkbox
-                        checked={subtask.completed}
-                        onCheckedChange={(checked) =>
-                          toggleSubtaskItem(subtask.id, checked === true)
-                        }
-                      />
-                      <span className={subtask.completed ? "text-muted-foreground line-through" : ""}>
-                        {subtask.title}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-                <div className="flex gap-2">
-                  <Input
-                    value={subtaskDraft}
-                    onChange={(event) => setSubtaskDraft(event.target.value)}
-                    placeholder="Add subtask"
-                  />
-                  <Button variant="outline" onClick={addSubtaskItem} disabled={isPending}>
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ) : null}
-
-            {visible("comments") ? (
-              <TaskCommentsPanel
-                taskId={taskDetails.task.id}
-                comments={localComments}
-                onChange={setLocalComments}
-              />
-            ) : null}
-
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center justify-between gap-2 border-t bg-background px-6 py-4">
               <Button type="button" variant="destructive" onClick={deleteTaskNow} disabled={isPending}>
                 <Trash2 className="mr-2 h-4 w-4" />
-                Delete ticket
+                Delete
               </Button>
               <Button onClick={saveTask} disabled={isPending || !title.trim()}>
                 {isPending ? "Saving…" : "Save changes"}
               </Button>
             </div>
-          </div>
+          </>
         )}
       </DialogContent>
     </Dialog>

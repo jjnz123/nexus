@@ -83,6 +83,19 @@ export const updateProjectFieldSettingsSchema = z.object({
   ),
 });
 
+export const bulkUpdateTasksSchema = z.object({
+  taskIds: z.array(z.string().uuid()).min(1),
+  updates: z.object({
+    assigneeId: z.string().uuid().nullable().optional(),
+    columnId: z.string().uuid().optional(),
+    priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
+  }),
+});
+
+export const bulkDeleteTasksSchema = z.object({
+  taskIds: z.array(z.string().uuid()).min(1),
+});
+
 export const roadmapCommitSchema = z.object({
   projectId: z.string().uuid(),
   creates: z.array(

@@ -49,23 +49,38 @@ function CommentThread({
   onSubmitReply: () => void;
   isPending: boolean;
 }) {
+  const initials = node.userName
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
   return (
-    <div className={depth > 0 ? "ml-4 border-l pl-3" : ""}>
-      <div className="rounded-md border bg-card/40 p-2">
-        <p className="text-xs text-muted-foreground">
-          {node.userName} • {new Date(node.createdAt).toLocaleString()}
-        </p>
-        <p className="mt-1 text-sm whitespace-pre-wrap">{node.body}</p>
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          className="mt-1 h-7 px-2 text-xs"
-          onClick={() => onReply(node.id)}
-        >
-          <Reply className="mr-1 h-3 w-3" />
-          Reply
-        </Button>
+    <div className={depth > 0 ? "ml-6 border-l border-dashed pl-4" : ""}>
+      <div className="flex gap-3 rounded-lg border bg-card/50 p-3">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary">
+          {initials}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium">{node.userName}</span>
+            <span className="text-xs text-muted-foreground">
+              {new Date(node.createdAt).toLocaleString()}
+            </span>
+          </div>
+          <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed">{node.body}</p>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="mt-1 h-7 px-2 text-xs"
+            onClick={() => onReply(node.id)}
+          >
+            <Reply className="mr-1 h-3 w-3" />
+            Reply
+          </Button>
+        </div>
       </div>
 
       {replyingTo === node.id ? (
@@ -143,9 +158,14 @@ export function TaskCommentsPanel({
   }
 
   return (
-    <div className="space-y-3 rounded-lg border p-4">
-      <h4 className="font-medium">Comments</h4>
-      <div className="max-h-72 space-y-3 overflow-y-auto pr-1">
+    <div className="flex min-h-[360px] flex-col rounded-lg border">
+      <div className="border-b px-4 py-3">
+        <h4 className="font-medium">Comments</h4>
+        <p className="text-xs text-muted-foreground">
+          Threaded discussion with replies. {comments.length} comment{comments.length === 1 ? "" : "s"}.
+        </p>
+      </div>
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
         {tree.length === 0 ? (
           <p className="text-sm text-muted-foreground">No comments yet.</p>
         ) : (
@@ -167,21 +187,25 @@ export function TaskCommentsPanel({
           ))
         )}
       </div>
-      <div className="flex gap-2">
-        <Textarea
-          value={commentDraft}
-          onChange={(e) => setCommentDraft(e.target.value)}
-          placeholder="Write a comment…"
-          rows={3}
-        />
-        <Button
-          type="button"
-          variant="outline"
-          disabled={isPending || !commentDraft.trim()}
-          onClick={() => submitComment(commentDraft.trim())}
-        >
-          <MessageSquarePlus className="h-4 w-4" />
-        </Button>
+      <div className="border-t p-4">
+        <div className="flex gap-2">
+          <Textarea
+            value={commentDraft}
+            onChange={(e) => setCommentDraft(e.target.value)}
+            placeholder="Write a comment…"
+            rows={3}
+            className="min-h-[80px]"
+          />
+          <Button
+            type="button"
+            variant="default"
+            className="self-end"
+            disabled={isPending || !commentDraft.trim()}
+            onClick={() => submitComment(commentDraft.trim())}
+          >
+            <MessageSquarePlus className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
     </div>
   );

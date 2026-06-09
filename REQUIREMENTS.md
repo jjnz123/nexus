@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v2.0.0
+**Current release:** v2.0.1
 
 ## 1. Overview
 
@@ -344,6 +344,7 @@ Requires `bookmarks:edit`. Available from **Settings → Import & export** and e
 - Import modes: merge or replace
 - **Create tab**, **Add group**, and **Import JSON** work from empty states (no tabs / no groups / no cards)
 - **Add group** opens a proper create-group dialog (not browser `prompt`); tab data initializes immediately so create actions work before async load completes
+- Optimistic create/update uses shared `createId()` helper (not raw `crypto.randomUUID`) for environments where `randomUUID` is unavailable
 - Settings sub-dialogs open after the settings modal closes (avoids Radix dialog stacking issues)
 
 ### 5.8 Admin Bookmark Sharing
@@ -381,6 +382,7 @@ Requires `tasks:view`. Edit operations require `tasks:edit`.
 ### 6.2 Layout & Views
 
 - **Collapsible Tasks sidebar** — Board, Issues, Roadmap, Project settings (icon-only + hover expand)
+- **View switcher** in the page header — quick toggle between Board, Issues, and Roadmap (alongside sidebar navigation)
 - **Kanban board** — non-backlog columns only, single horizontal scroll row (no wrapping)
 - **Backlog panel** — slide-out panel (top-right button); create/manage backlog items; move to board (To Do)
 - WIP limit display per column with visual warning when exceeded
@@ -404,8 +406,11 @@ Requires `tasks:view`. Edit operations require `tasks:edit`.
 
 ### 6.5 Issues View
 
-- Jira-style table of all project tasks with key, type, title, assignee, priority, parent
-- Same search/priority/assignee filters as board
+- Jira-style table of all project tasks with sortable columns: key, type, title, status, assignee, priority, parent, due date, story points
+- **Column visibility** menu — show/hide columns per user session
+- **Filters** — search (title, description, key), type, status/column, priority, assignee
+- **Row selection** with bulk action bar: assign, move column, set priority, delete (requires `tasks:edit`)
+- Click row to open ticket detail modal
 
 ### 6.6 Roadmap View
 
@@ -442,15 +447,17 @@ Requires `tasks:edit`.
 ### 6.10 Ticket Detail Modal
 
 - Deep-linkable via `/tasks/[KEY]` (e.g. `/tasks/OPS-001`)
+- **Tabbed layout** — Overview, Specification, Links & files, Discussion (reduces cramped single-page scrolling)
+- Header: ticket key badge, type/status badges, inline title edit
 - Field visibility/order driven by project ticket field settings for the ticket type
 - Edit all ticket fields (see §6.3)
-- **Linked issues** — search, link, unlink, open linked ticket
-- **Attachments** — upload, preview (images, PDFs), delete
+- **Overview tab** — metadata grid, description, labels (pill toggles), subtasks
+- **Specification tab** — details, acceptance criteria, definition of done
+- **Links & files tab** — linked issues panel (search, link, unlink, open linked ticket); attachments (upload, preview images/PDFs, delete)
+- **Discussion tab** — threaded comments with avatars, sticky composer
 - **Subtasks:** add, toggle complete, progress indicator
-- **Comments:** threaded replies with author and timestamp
 - Copy shareable ticket URL
-- Save changes
-- **Delete ticket** with confirmation
+- Sticky footer: Save / Delete (with confirmation)
 
 ### 6.11 Server Actions (No UI Yet)
 

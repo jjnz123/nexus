@@ -30,6 +30,8 @@ import {
   taskAttachmentSchema,
   updateProjectFieldSettingsSchema,
   roadmapCommitSchema,
+  bulkUpdateTasksSchema,
+  bulkDeleteTasksSchema,
 } from "@/lib/validators/tasks";
 import { createNotification } from "./users";
 import { logAudit } from "@/server/audit";
@@ -754,4 +756,40 @@ export async function commitRoadmapChanges(input: unknown) {
     summary: `Committed roadmap: ${data.creates.length} created, ${data.updates.length} updated, ${data.deletes.length} deleted`,
   });
   return { success: true, createdMap };
+}
+
+export async function bulkUpdateTasks(input: unknown) {
+  const session = await requireAuth();
+  requireSessionPermission(session, "tasks:edit");
+  const { taskIds, updates } = bulkUpdateTasksSchema.parse(input);
+
+  for (const id of taskIds) {
+    await updateTask({ id, ...updates });
+  }
+
+  revalidatePath("/tasks");
+  await logAudit({
+    action: "tasks.bulk.update",
+    summary: `Bulk updated ${taskIds.length} tasks`,
+    details: { count: taskIds.length, updates },
+  });
+  return { success: true };
+}
+
+export async function bulkDeleteTasks(input: unknown) {
+  const session = await requireAuth();
+  requireSessionPermission(session, "tasks:edit");
+  const { taskIds } = bulkDeleteTasksSchema.parse(input);
+
+  for (const id of taskIds) {
+    await deleteTask(id);
+  }
+
+  revalidatePath("/tasks");
+  await logAudit({
+    action: "tasks.bulk.delete",
+    summary: `Bulk deleted ${taskIds.length} tasks`,
+    details: { count: taskIds.length },
+  });
+  return { success: true };
 }

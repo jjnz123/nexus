@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { createId } from "@/lib/create-id";
 import {
   ChevronDown,
   ChevronRight,
@@ -223,7 +224,7 @@ export function TasksRoadmapView({
   }
 
   function addRow(type: TaskType) {
-    const draftId = `draft-${crypto.randomUUID()}`;
+    const draftId = `draft-${createId()}`;
     setDraftCreates((prev) => [
       ...prev,
       {
