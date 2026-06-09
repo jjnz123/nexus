@@ -17,6 +17,8 @@ const bookmarkPrefsSchema = z.object({
   bookmarksSortMode: z
     .enum(["custom", "alphabetical", "most_used", "most_used_30d", "recently_used", "health"])
     .optional(),
+  activeAiProjectId: z.string().uuid().nullable().optional(),
+  activeAiConversationId: z.string().uuid().nullable().optional(),
 });
 
 async function getOrCreatePrefs(userId: string) {

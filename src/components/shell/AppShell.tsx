@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   Bookmark,
+  Bot,
   CheckSquare,
   Home,
   LayoutDashboard,
@@ -17,6 +18,7 @@ import { ProfileMenu } from "./ProfileMenu";
 
 const navItems = [
   { href: "/", label: "Home", icon: Home },
+  { href: "/chat", label: "AI Chat", icon: Bot, perm: "ai:use" as const },
   { href: "/bookmarks", label: "Bookmarks", icon: Bookmark, perm: "bookmarks:view" as const },
   { href: "/tasks", label: "Tasks", icon: CheckSquare, perm: "tasks:view" as const },
   { href: "/monitoring", label: "Monitoring", icon: Activity, perm: "monitoring:view" as const },

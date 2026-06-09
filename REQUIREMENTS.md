@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v1.2.1
+**Current release:** v1.3.0
 
 ## 1. Overview
 
@@ -53,6 +53,7 @@ Admin-only permissions (not overridable via custom flags):
 
 | Route prefix | Required permission |
 |--------------|---------------------|
+| `/chat` | `ai:use` |
 | `/admin` | `admin:access` |
 | `/bookmarks` | `bookmarks:view` |
 | `/tasks` | `tasks:view` |
@@ -66,7 +67,7 @@ Available on all authenticated app routes.
 
 ### 3.1 Navigation
 
-- Sidebar: Home, Bookmarks, Tasks, Monitoring
+- Sidebar: Home, **AI Chat**, Bookmarks, Tasks, Monitoring
 - Nav items hidden when the user lacks the required permission
 - Active route highlighting
 - Mobile-responsive header with product branding
@@ -149,6 +150,50 @@ Requires `ai:use`.
 - Nexus-aware system prompt on the chat API
 - Initial prompt support from home search (`ai:` prefix or Enter)
 - Error handling for missing API key or insufficient permissions
+- Ephemeral session only (no database persistence); use `/chat` for saved history
+
+## 4.7 AI Chat Workspace (`/chat`)
+
+Requires `ai:use`. Also linked from the sidebar as **AI Chat**.
+
+### Layout
+
+Three-panel workspace:
+
+- **Left** — Projects and conversations list
+- **Center** — Main chat area with composer
+- **Right** — Vertical history indicator bar (one marker per user/assistant message)
+
+### Projects & Conversations
+
+- Create, rename, and delete **Projects** (user-owned; separate from kanban `projects`)
+- **General** pseudo-project for conversations without a project
+- Create, rename, delete, and **search** conversations within the active project
+- Last message preview and relative timestamp on each conversation
+- Active project and conversation persisted in user preferences
+
+### Chat Interface
+
+- Streaming Grok responses via `/api/ai/chat` with messages persisted to PostgreSQL
+- User vs assistant bubbles with markdown (assistant), copy, and regenerate (latest assistant reply)
+- **Attachments** — images, PDFs, and text files via `/api/uploads`; thumbnails for images, file cards for documents
+- Starter prompt chips on empty conversation
+- Stop streaming mid-generation (partial assistant reply saved when content exists)
+
+### Vertical History Indicator Bar
+
+- Scrollable timeline with a marker for **every** user and assistant message
+- Click marker → smooth scroll to that message (Framer Motion highlight)
+- Hover marker → preview card (excerpt, sender, timestamp)
+- Distinct colors for user vs Grok markers
+- Active message tracked via scroll intersection
+
+### Data Model
+
+- `ai_projects` — user-owned project folders
+- `ai_conversations` — title, project link, last message preview/at
+- `ai_messages` — role, content, attachments (jsonb), timestamps
+- User preferences: `active_ai_project_id`, `active_ai_conversation_id`
 
 ## 5. Bookmarks (`/bookmarks`)
 
@@ -356,7 +401,7 @@ Admin system settings remain under `/admin?tab=settings`.
 
 ## 10. Administration (`/admin`)
 
-Requires `admin:access`. Tab selection via query param: `?tab=users|settings|audit`.
+Requires `admin:access`. Tab selection via query param: `?tab=users|settings|ai-history|audit`.
 
 ### 10.1 User Management
 
@@ -378,6 +423,17 @@ Requires `admin:access`. Tab selection via query param: `?tab=users|settings|aud
 - Refresh log list
 - Export filtered logs as JSON
 - **AI analysis** — ask Grok to summarize activity, flag anomalies, suggest follow-ups
+
+### 10.4 AI History
+
+Requires `admin:access`. Tab: **AI History** (`?tab=ai-history`).
+
+- Search across **all users'** persisted AI chat data
+- Search fields: conversation titles, message content (user and assistant), user names/emails
+- Filters: user, project, date range
+- Results show conversation title, project, owner, role badge, matched snippet, timestamp
+- **View conversation** opens read-only dialog with full message thread
+- Export search results as **JSON** or **CSV**
 
 ## 11. Bookmark Health Monitoring Integration
 
@@ -410,13 +466,19 @@ Requires `monitoring:configure` to enable; `monitoring:view` to display status.
 - Bookmarks global layout lock
 - Bookmarks sort mode
 - Home favourites order
+- Active AI project and conversation (`/chat`)
 
-### 13.2 Audit Trail
+### 13.2 AI Chat Persistence
+
+- Per-user projects, conversations, and messages (see §4.7)
+- Attachments stored as jsonb on messages; files in upload directory
+
+### 13.3 Audit Trail
 
 - Log user actions across the application
 - Filterable and exportable from admin panel
 
-### 13.3 Notifications
+### 13.4 Notifications
 
 - In-app notifications with title, body, optional link
 - Read/unread state per user
@@ -444,13 +506,12 @@ Requires `monitoring:configure` to enable; `monitoring:view` to display status.
 - Toast notifications for success and error feedback
 - Optimistic UI updates with rollback on failure (bookmarks)
 - Page transitions via Framer Motion
-- Grok-like AI chat with markdown, streaming, and message actions
+- Grok-like AI chat with markdown, streaming, and message actions (home drawer + `/chat` workspace)
 
 ## 15. Out of Scope / Known Gaps
 
 - Task assignee picker in task modal (server supports `assigneeId`)
 - Task attachment upload/view UI (schema exists)
 - Project export UI (server action exists, no front-end)
-- Global AI entry point from AppShell (AI currently opened from home search)
-- Persistent AI conversation history across sessions
+- Message list virtualization for very long `/chat` conversations (may be added later)
 - Network autodiscovery beyond bookmark URL scanning

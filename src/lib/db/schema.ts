@@ -112,6 +112,8 @@ export const userPreferences = pgTable("user_preferences", {
     .notNull()
     .default(false),
   bookmarksSortMode: text("bookmarks_sort_mode").notNull().default("custom"),
+  activeAiProjectId: uuid("active_ai_project_id"),
+  activeAiConversationId: uuid("active_ai_conversation_id"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
@@ -209,6 +211,68 @@ export const faviconCache = pgTable("favicon_cache", {
   faviconPath: text("favicon_path").notNull(),
   fetchedAt: timestamp("fetched_at").defaultNow().notNull(),
 });
+
+export type AiMessageAttachment = {
+  path: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+};
+
+export const aiProjects = pgTable(
+  "ai_projects",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [index("ai_projects_user_idx").on(table.userId)]
+);
+
+export const aiConversations = pgTable(
+  "ai_conversations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").references(() => aiProjects.id, {
+      onDelete: "cascade",
+    }),
+    title: text("title").notNull().default("New conversation"),
+    lastMessagePreview: text("last_message_preview"),
+    lastMessageAt: timestamp("last_message_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("ai_conversations_user_idx").on(table.userId),
+    index("ai_conversations_project_idx").on(table.projectId),
+    index("ai_conversations_last_message_at_idx").on(table.lastMessageAt),
+  ]
+);
+
+export const aiMessages = pgTable(
+  "ai_messages",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => aiConversations.id, { onDelete: "cascade" }),
+    role: text("role").$type<"user" | "assistant">().notNull(),
+    content: text("content").notNull(),
+    attachments: jsonb("attachments").$type<AiMessageAttachment[]>().default([]),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("ai_messages_conversation_idx").on(table.conversationId),
+    index("ai_messages_created_at_idx").on(table.createdAt),
+  ]
+);
 
 export const projects = pgTable("projects", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -355,3 +419,6 @@ export type UserPreferences = typeof userPreferences.$inferSelect;
 export type UserBookmarkFavourite = typeof userBookmarkFavourites.$inferSelect;
 export type BookmarkLaunch = typeof bookmarkLaunches.$inferSelect;
 export type FaviconCache = typeof faviconCache.$inferSelect;
+export type AiProject = typeof aiProjects.$inferSelect;
+export type AiConversation = typeof aiConversations.$inferSelect;
+export type AiMessage = typeof aiMessages.$inferSelect;
