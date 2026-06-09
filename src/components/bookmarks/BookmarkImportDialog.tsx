@@ -37,21 +37,29 @@ export function BookmarkImportDialog({
   const [preview, setPreview] = useState<{ tabs: number; groups: number; cards: number } | null>(
     null
   );
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     if (!open || !json.trim()) {
       setPreview(null);
+      setPreviewError(null);
       return;
     }
 
     let cancelled = false;
     void previewImportBookmarks(json)
       .then((stats) => {
-        if (!cancelled) setPreview(stats);
+        if (!cancelled) {
+          setPreview(stats);
+          setPreviewError(null);
+        }
       })
-      .catch(() => {
-        if (!cancelled) setPreview(null);
+      .catch((error) => {
+        if (!cancelled) {
+          setPreview(null);
+          setPreviewError(error instanceof Error ? error.message : "Unable to parse import file");
+        }
       });
 
     return () => {
@@ -77,8 +85,10 @@ export function BookmarkImportDialog({
                 <li>{preview.groups} groups</li>
                 <li>{preview.cards} cards</li>
               </ul>
+            ) : previewError ? (
+              <p className="text-destructive">{previewError}</p>
             ) : (
-              <p className="text-muted-foreground">Unable to parse preview.</p>
+              <p className="text-muted-foreground">Parsing import file…</p>
             )}
           </div>
 

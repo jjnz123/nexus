@@ -101,7 +101,12 @@ export function ChatMessageBubble({
           isUser ? "bg-primary text-primary-foreground" : "border bg-card"
         )}
       >
-        {!isUser ? <SkillEvents skills={skills} /> : null}
+        {!isUser ? (
+          <SkillEvents
+            skills={skills}
+            defaultCollapsed={!isStreaming && Boolean(message.content)}
+          />
+        ) : null}
 
         {isUser ? (
           <>

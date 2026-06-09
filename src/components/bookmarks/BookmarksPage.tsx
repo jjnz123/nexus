@@ -499,13 +499,17 @@ export function BookmarksPage({
   function updateActiveTabData(updater: (value: TabData) => TabData) {
     if (!activeTabId) return;
     setTabDataById((prev) => {
-      const current = prev[activeTabId];
-      if (!current) return prev;
+      const current = prev[activeTabId] ?? { groups: [], cards: [] };
       return {
         ...prev,
         [activeTabId]: updater(current),
       };
     });
+  }
+
+  function openDialogAfterSettings(action: () => void) {
+    setSettingsOpen(false);
+    window.requestAnimationFrame(action);
   }
 
   function visibleCardsForGroup(groupId: string) {
@@ -594,18 +598,29 @@ export function BookmarksPage({
   }
 
   async function handleCreateTab() {
+    if (!canEdit) {
+      toast.error("You don't have permission to edit bookmarks");
+      return;
+    }
     const name = newTabName.trim();
-    if (!name) return;
+    if (!name) {
+      toast.error("Enter a tab name");
+      return;
+    }
     try {
       const created = await createBookmarkTab({ name });
       setTabs((prev) => sortByOrder([...prev, created]));
+      setTabDataById((prev) => ({
+        ...prev,
+        [created.id]: prev[created.id] ?? { groups: [], cards: [] },
+      }));
       setNewTabName("");
       setCreateTabOpen(false);
       setActiveTabId(created.id);
       await persistActiveTab(created.id);
       toast.success("Tab created");
-    } catch {
-      toast.error("Failed to create tab");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to create tab");
     }
   }
 
@@ -690,7 +705,14 @@ export function BookmarksPage({
   }
 
   async function handleCreateGroup(name: string) {
-    if (!activeTabId || !canEdit) return;
+    if (!canEdit) {
+      toast.error("You don't have permission to edit bookmarks");
+      return;
+    }
+    if (!activeTabId) {
+      toast.error("Select or create a tab first");
+      return;
+    }
     const trimmed = name.trim();
     if (!trimmed) return;
 
@@ -721,13 +743,14 @@ export function BookmarksPage({
         ],
       }));
       setGroupDialog({ open: false, mode: "create" });
+      await loadTabData(activeTabId, showArchived, true);
       toast.success("Group created");
-    } catch {
+    } catch (error) {
       updateActiveTabData((value) => ({
         ...value,
         groups: value.groups.filter((group) => group.id !== optimistic.id),
       }));
-      toast.error("Failed to create group");
+      toast.error(error instanceof Error ? error.message : "Failed to create group");
     }
   }
 
@@ -1252,9 +1275,17 @@ export function BookmarksPage({
   }
 
   async function handleImportComplete() {
-    await refreshTabs();
-    if (activeTabId) await loadTabData(activeTabId, true);
-    toast.success("Bookmarks imported");
+    const updated = sortByOrder(await getBookmarkTabs());
+    setTabs(updated);
+    const nextTabId =
+      activeTabId && updated.some((tab) => tab.id === activeTabId)
+        ? activeTabId
+        : updated[0]?.id ?? "";
+    if (nextTabId !== activeTabId) {
+      setActiveTabId(nextTabId);
+      if (nextTabId) await persistActiveTab(nextTabId);
+    }
+    if (nextTabId) await loadTabData(nextTabId, showArchived, true);
   }
 
   async function syncCardReorder(
@@ -1372,7 +1403,7 @@ export function BookmarksPage({
       <input
         ref={importInputRef}
         type="file"
-        accept="application/json"
+        accept="application/json,.json,text/json"
         className="hidden"
         onChange={(event) => void handleImportFile(event.target.files?.[0])}
       />
@@ -1401,7 +1432,12 @@ export function BookmarksPage({
             <Button variant="ghost" onClick={() => setCreateTabOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={() => void handleCreateTab()}>Create</Button>
+            <Button
+              onClick={() => void handleCreateTab()}
+              disabled={!newTabName.trim()}
+            >
+              Create
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -1635,42 +1671,38 @@ export function BookmarksPage({
         onFilterChipChange={setFilterChip}
         tagFilters={tagFilters}
         onCreateTab={() => {
-          setSettingsOpen(false);
-          setCreateTabOpen(true);
+          openDialogAfterSettings(() => setCreateTabOpen(true));
         }}
         onCreateGroup={() => {
-          setSettingsOpen(false);
-          openGroupDialog("create");
+          openDialogAfterSettings(() => openGroupDialog("create"));
         }}
         onCreateCard={() => {
-          setSettingsOpen(false);
-          openNewCardDialog();
+          openDialogAfterSettings(() => openNewCardDialog());
         }}
         onRenameTab={() => {
-          setSettingsOpen(false);
-          setRenameTabName(activeTab?.name ?? "");
-          setRenameTabOpen(true);
+          openDialogAfterSettings(() => {
+            setRenameTabName(activeTab?.name ?? "");
+            setRenameTabOpen(true);
+          });
         }}
         onDeleteTab={() => setDeleteTabOpen(true)}
         onShareTab={() => {
-          setSettingsOpen(false);
-          setShareDialogOpen(true);
+          openDialogAfterSettings(() => setShareDialogOpen(true));
         }}
         disableDeleteTab={tabs.length <= 1}
         onRenameGroup={(group) => {
-          setSettingsOpen(false);
-          openGroupDialog("rename", group);
+          openDialogAfterSettings(() => openGroupDialog("rename", group));
         }}
         onDeleteGroup={(group) => void handleDeleteGroup(group)}
         onEditCard={(card) => {
-          setSettingsOpen(false);
-          setEditingCard(card);
-          setDefaultGroupId(card.groupId);
-          setCardDialogOpen(true);
+          openDialogAfterSettings(() => {
+            setEditingCard(card);
+            setDefaultGroupId(card.groupId);
+            setCardDialogOpen(true);
+          });
         }}
         onImport={() => {
-          setSettingsOpen(false);
-          importInputRef.current?.click();
+          openDialogAfterSettings(() => importInputRef.current?.click());
         }}
         onExportTab={() => void handleExportCurrentTab()}
         onExportAll={() => void handleExportAll()}

@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v1.8.0
+**Current release:** v1.9.0
 
 ## 1. Overview
 
@@ -209,6 +209,7 @@ Three-panel workspace (full-bleed within app shell):
 - **Per-conversation skill toggles** — Skills panel to enable/disable each skill; stored in `enabled_skills` on the conversation (`null` = all permitted skills; `[]` = none)
 - Active skills shown as chips above the composer; header **Skills** button opens management dialog
 - Skill usage shown inline in assistant messages with Grok-style result cards (status, structured results)
+- **Collapsed by default** once the assistant's final answer is displayed; users can expand to view full skill output (Web/X search show summary + citations, not raw JSON)
 - Skill results persisted in message `metadata` jsonb
 - Only enabled skills are sent to the model as tools
 - Extensible skill registry in `src/lib/ai/skills/`
@@ -339,10 +340,11 @@ Requires `bookmarks:edit`. Enabled from **Settings → Bulk actions**.
 Requires `bookmarks:edit`. Available from **Settings → Import & export** and empty states.
 
 - **Export:** current tab, all tabs, or selected cards as JSON
-- **Import:** JSON file upload with preview (tab/group/card counts); preview loads when dialog opens
+- **Import:** JSON file upload with preview (tab/group/card counts); preview loads when dialog opens; accepts `.json` files on all browsers
 - Import modes: merge or replace
-- **Create tab** and **Import JSON** work from empty states (no tabs / no groups / no cards)
-- **Add group** opens a proper create-group dialog (not browser `prompt`)
+- **Create tab**, **Add group**, and **Import JSON** work from empty states (no tabs / no groups / no cards)
+- **Add group** opens a proper create-group dialog (not browser `prompt`); tab data initializes immediately so create actions work before async load completes
+- Settings sub-dialogs open after the settings modal closes (avoids Radix dialog stacking issues)
 
 ### 5.8 Admin Bookmark Sharing
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -26,10 +26,19 @@ export function BookmarkGroupDialog({
   onSubmit: (name: string) => void | Promise<void>;
 }) {
   const [name, setName] = useState(initialName);
+  const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     if (open) setName(initialName);
   }, [open, initialName]);
+
+  function submit() {
+    const trimmed = name.trim();
+    if (!trimmed || isPending) return;
+    startTransition(async () => {
+      await onSubmit(trimmed);
+    });
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -50,25 +59,16 @@ export function BookmarkGroupDialog({
             onChange={(e) => setName(e.target.value)}
             placeholder="Infrastructure"
             onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                const trimmed = name.trim();
-                if (trimmed) void onSubmit(trimmed);
-              }
+              if (e.key === "Enter") submit();
             }}
           />
         </div>
         <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isPending}>
             Cancel
           </Button>
-          <Button
-            onClick={() => {
-              const trimmed = name.trim();
-              if (trimmed) void onSubmit(trimmed);
-            }}
-            disabled={!name.trim()}
-          >
-            {mode === "create" ? "Create" : "Save"}
+          <Button onClick={submit} disabled={!name.trim() || isPending}>
+            {isPending ? "Saving…" : mode === "create" ? "Create" : "Save"}
           </Button>
         </div>
       </DialogContent>

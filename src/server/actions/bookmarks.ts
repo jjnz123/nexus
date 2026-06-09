@@ -755,14 +755,29 @@ export async function importBookmarks(input: unknown) {
 export async function previewImportBookmarks(json: string) {
   const session = await requireAuth();
   requireSessionPermission(session, "bookmarks:edit");
-  const data = JSON.parse(json) as {
-    tabs: unknown[];
-    groups: unknown[];
-    cards: unknown[];
-  };
+
+  let data: { tabs?: unknown; groups?: unknown; cards?: unknown };
+  try {
+    data = JSON.parse(json) as { tabs?: unknown; groups?: unknown; cards?: unknown };
+  } catch {
+    throw new Error("Invalid JSON file");
+  }
+
+  if (!data || typeof data !== "object") {
+    throw new Error("Invalid import format");
+  }
+
+  const tabs = Array.isArray(data.tabs) ? data.tabs : [];
+  const groups = Array.isArray(data.groups) ? data.groups : [];
+  const cards = Array.isArray(data.cards) ? data.cards : [];
+
+  if (!tabs.length && !groups.length && !cards.length) {
+    throw new Error("Import file has no tabs, groups, or cards");
+  }
+
   return {
-    tabs: data.tabs?.length ?? 0,
-    groups: data.groups?.length ?? 0,
-    cards: data.cards?.length ?? 0,
+    tabs: tabs.length,
+    groups: groups.length,
+    cards: cards.length,
   };
 }
