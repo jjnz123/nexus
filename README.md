@@ -28,14 +28,14 @@ A personal **scratchpad** at `/notes` (VS Code / Code Runner style):
 
 ### Bookmarks
 
-Organise internal tools, dashboards, docs, and URLs in a structured library. Admins can share restricted tabs with specific users.
+Organise internal tools, dashboards, docs, and URLs in a structured library. The main view is **browse-first**: tabs, groups, and cards for launching links. A **Settings** cog opens a modal for all management (create, edit, bulk, import/export, view options). Admins can share restricted tabs with specific users.
 
-- **Tabs, groups, and cards** — like folders within folders, with drag-and-drop ordering.
-- **Launch links** in a new tab or inside the portal (iframe).
-- **Favourites** per user, separate from the shared library.
-- **Search, sort, and filter** — by name, usage, health status, tags, and more.
-- **Import and export** — back up or migrate bookmark collections as JSON.
-- **Optional health checks** — tie a bookmark to a monitored endpoint and see up/down status on the card.
+- **Tabs, groups, and cards** — hierarchical organisation with drag-and-drop when unlocked
+- **Launch links** in a new tab or inside the portal (iframe)
+- **Search** across titles, URLs, tags, and descriptions
+- **Settings modal** — create tabs/groups/cards, rename/delete, bulk select, import/export, sort/filter/layout
+- **Import and export** — back up or migrate bookmark collections as JSON
+- **Optional health checks** — tie a bookmark to a monitored endpoint and see up/down status on the card
 
 Editors can create and manage the library; viewers can browse and launch.
 

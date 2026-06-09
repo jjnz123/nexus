@@ -20,7 +20,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Plus } from "lucide-react";
+import { GripVertical } from "lucide-react";
 import { toast } from "sonner";
 import {
   archiveBookmarkCard,
@@ -78,10 +78,11 @@ import { BookmarkImportDialog } from "./BookmarkImportDialog";
 import { BookmarkShareDialog } from "./BookmarkShareDialog";
 import { BookmarksEmptyState } from "./BookmarksEmptyState";
 import { BookmarksSkeleton } from "./BookmarksSkeleton";
+import { BookmarkGroupDialog } from "./BookmarkGroupDialog";
 import {
-  BookmarksToolbar,
+  BookmarksBrowseToolbar,
+  BookmarksSettingsDialog,
   BulkToolbar,
-  TabActions,
 } from "./BookmarksToolbar";
 import { useBookmarkLaunch } from "./useBookmarkLaunch";
 
@@ -387,6 +388,13 @@ export function BookmarksPage({
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importJson, setImportJson] = useState("");
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [deleteTabOpen, setDeleteTabOpen] = useState(false);
+  const [groupDialog, setGroupDialog] = useState<{
+    open: boolean;
+    mode: "create" | "rename";
+    group?: BookmarkGroup;
+  }>({ open: false, mode: "create" });
 
   const importInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -628,7 +636,6 @@ export function BookmarksPage({
 
   async function handleDeleteActiveTab() {
     if (!activeTabId || tabs.length <= 1) return;
-    if (!window.confirm("Delete this tab and all its groups/cards?")) return;
 
     const deletingId = activeTabId;
     const fallbackTab = tabs.find((tab) => tab.id !== deletingId);
@@ -646,6 +653,8 @@ export function BookmarksPage({
         delete next[deletingId];
         return next;
       });
+      setDeleteTabOpen(false);
+      setSettingsOpen(false);
       toast.success("Tab deleted");
     } catch {
       await refreshTabs();
@@ -676,15 +685,19 @@ export function BookmarksPage({
     }
   }
 
-  async function handleCreateGroup() {
+  function openGroupDialog(mode: "create" | "rename", group?: BookmarkGroup) {
+    setGroupDialog({ open: true, mode, group });
+  }
+
+  async function handleCreateGroup(name: string) {
     if (!activeTabId || !canEdit) return;
-    const name = window.prompt("Group name");
-    if (!name?.trim()) return;
+    const trimmed = name.trim();
+    if (!trimmed) return;
 
     const optimistic: BookmarkGroup = {
       id: crypto.randomUUID(),
       tabId: activeTabId,
-      name: name.trim(),
+      name: trimmed,
       description: null,
       icon: null,
       collapsed: false,
@@ -698,7 +711,7 @@ export function BookmarksPage({
     try {
       const created = await createBookmarkGroup({
         tabId: activeTabId,
-        name: name.trim(),
+        name: trimmed,
       });
       updateActiveTabData((value) => ({
         ...value,
@@ -707,6 +720,7 @@ export function BookmarksPage({
           created,
         ],
       }));
+      setGroupDialog({ open: false, mode: "create" });
       toast.success("Group created");
     } catch {
       updateActiveTabData((value) => ({
@@ -737,19 +751,23 @@ export function BookmarksPage({
     }
   }
 
-  async function handleRenameGroup(group: BookmarkGroup) {
+  async function handleRenameGroup(group: BookmarkGroup, name: string) {
     if (!canEdit) return;
-    const name = window.prompt("Group name", group.name)?.trim();
-    if (!name || name === group.name) return;
+    const trimmed = name.trim();
+    if (!trimmed || trimmed === group.name) {
+      setGroupDialog({ open: false, mode: "create" });
+      return;
+    }
     const previous = group.name;
     updateActiveTabData((value) => ({
       ...value,
       groups: value.groups.map((entry) =>
-        entry.id === group.id ? { ...entry, name } : entry
+        entry.id === group.id ? { ...entry, name: trimmed } : entry
       ),
     }));
     try {
-      await updateBookmarkGroup(group.id, { name });
+      await updateBookmarkGroup(group.id, { name: trimmed });
+      setGroupDialog({ open: false, mode: "create" });
       toast.success("Group updated");
     } catch {
       updateActiveTabData((value) => ({
@@ -762,9 +780,23 @@ export function BookmarksPage({
     }
   }
 
+  async function handleGroupDialogSubmit(name: string) {
+    if (groupDialog.mode === "create") {
+      await handleCreateGroup(name);
+      return;
+    }
+    if (groupDialog.group) {
+      await handleRenameGroup(groupDialog.group, name);
+    }
+  }
+
   async function handleDeleteGroup(group: BookmarkGroup) {
     if (!canEdit) return;
-    if (!window.confirm(`Delete empty group "${group.name}"?`)) return;
+    const cardCount = cards.filter((card) => card.groupId === group.id).length;
+    if (cardCount > 0) {
+      toast.error("Group must be empty before deletion");
+      return;
+    }
     const previousGroups = groups;
     updateActiveTabData((value) => ({
       ...value,
@@ -1131,7 +1163,7 @@ export function BookmarksPage({
     try {
       await bulkBookmarkCardAction({
         cardIds: selectedCardIds,
-        action: "enable",
+        action: "move",
         groupId,
       });
       setSelectedCardIds([]);
@@ -1153,7 +1185,7 @@ export function BookmarksPage({
     try {
       await bulkBookmarkCardAction({
         cardIds: movingIds,
-        action: "enable",
+        action: "move",
         tabId,
       });
       setSelectedCardIds([]);
@@ -1335,7 +1367,7 @@ export function BookmarksPage({
     !search &&
     !showArchived;
 
-  const sharedDialogs = (
+  const managementDialogs = (
     <>
       <input
         ref={importInputRef}
@@ -1374,418 +1406,6 @@ export function BookmarksPage({
         </DialogContent>
       </Dialog>
 
-      <BookmarkImportDialog
-        open={importDialogOpen}
-        onOpenChange={setImportDialogOpen}
-        json={importJson}
-        onComplete={() => void handleImportComplete()}
-      />
-    </>
-  );
-
-  if (!tabs.length) {
-    return (
-      <>
-        <BookmarksEmptyState
-          variant="no-tabs"
-          canEdit={canEdit}
-          onAddTab={() => setCreateTabOpen(true)}
-          onImport={() => importInputRef.current?.click()}
-        />
-        {sharedDialogs}
-      </>
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      {suggestions.frequent.length > 0 || suggestions.stale.length > 0 ? (
-        <SmartSuggestionsSection
-          frequent={suggestions.frequent}
-          stale={suggestions.stale}
-        />
-      ) : null}
-
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <DndContext
-          sensors={tabSensors}
-          collisionDetection={closestCenter}
-          onDragEnd={(event) => void handleTabDragEnd(event)}
-        >
-          <SortableContext
-            items={tabs.map((tab) => tab.id)}
-            strategy={horizontalListSortingStrategy}
-          >
-            <div className="flex max-w-full flex-wrap items-center gap-1 rounded-lg bg-zinc-900 p-1">
-              {tabs.map((tab) => (
-                <SortableTab
-                  key={tab.id}
-                  tab={tab}
-                  isActive={tab.id === activeTabId}
-                  onSelect={() => void handleTabChange(tab.id)}
-                  canDrag={canEdit}
-                />
-              ))}
-            </div>
-          </SortableContext>
-        </DndContext>
-
-        <div className="flex flex-wrap items-center gap-2">
-          {canEdit ? (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCreateTabOpen(true)}
-            >
-              <Plus className="h-4 w-4" />
-              New tab
-            </Button>
-          ) : null}
-          <TabActions
-            canEdit={canEdit}
-            isAdmin={isAdmin}
-            onRename={() => {
-              setRenameTabName(activeTab?.name ?? "");
-              setRenameTabOpen(true);
-            }}
-            onDelete={() => void handleDeleteActiveTab()}
-            onShare={() => setShareDialogOpen(true)}
-            disableDelete={tabs.length <= 1}
-          />
-        </div>
-      </div>
-
-      <BookmarksToolbar
-        search={search}
-        onSearchChange={setSearch}
-        matchCount={matchCount}
-        totalCount={totalCount}
-        bulkMode={bulkMode}
-        onBulkModeChange={(value) => {
-          setBulkMode(value);
-          if (!value) setSelectedCardIds([]);
-        }}
-        layoutMode={layoutMode}
-        onLayoutModeChange={(value) => void handleLayoutModeChange(value)}
-        layoutLocked={tabLayoutLocked}
-        globalLayoutLocked={globalLayoutLocked}
-        onGlobalLayoutLockedChange={(value) =>
-          void handleGlobalLayoutLockedChange(value)
-        }
-        onTabLayoutLockedChange={(value) =>
-          void handleTabLayoutLockedChange(value)
-        }
-        showArchived={showArchived}
-        onShowArchivedChange={setShowArchived}
-        sortMode={sortMode}
-        onSortModeChange={(value) => void handleSortModeChange(value)}
-        filterChip={filterChip}
-        onFilterChipChange={setFilterChip}
-        tagFilters={tagFilters}
-        canEdit={canEdit}
-        hasGroups={groups.length > 0}
-        onNewCard={() => openNewCardDialog()}
-        onNewGroup={() => void handleCreateGroup()}
-        onExport={() => void handleExportCurrentTab()}
-        onImport={() => importInputRef.current?.click()}
-      />
-
-      {bulkMode ? (
-        <BulkToolbar
-          count={selectedCardIds.length}
-          canEdit={canEdit}
-          groups={groups.map((group) => ({ id: group.id, name: group.name }))}
-          tabs={tabs.map((tab) => ({ id: tab.id, name: tab.name }))}
-          activeTabId={activeTabId}
-          onEnable={() => void handleBulk("enable")}
-          onDisable={() => void handleBulk("disable")}
-          onArchive={() => void handleBulk("archive")}
-          onDelete={() => void handleBulk("delete")}
-          onExportSelected={() => void handleExportSelected()}
-          onMoveGroup={(groupId) => void handleBulkMoveGroup(groupId)}
-          onMoveTab={(tabId) => void handleBulkMoveTab(tabId)}
-          canConfigureMonitoring={canConfigureMonitoring}
-          onEnableMonitoring={() => void handleBulkEnableMonitoring()}
-        />
-      ) : null}
-
-      {loadingData ? (
-        <BookmarksSkeleton layoutMode={layoutMode} />
-      ) : showNoGroupsState ? (
-        <BookmarksEmptyState
-          variant="no-groups"
-          canEdit={canEdit}
-          onAddGroup={() => void handleCreateGroup()}
-          onImport={() => importInputRef.current?.click()}
-        />
-      ) : showNoCardsState ? (
-        <BookmarksEmptyState
-          variant="no-cards"
-          canEdit={canEdit}
-          onAddCard={() => openNewCardDialog()}
-          onImport={() => importInputRef.current?.click()}
-        />
-      ) : (
-        <DndContext
-          sensors={contentSensors}
-          collisionDetection={closestCenter}
-          onDragStart={handleContentDragStart}
-          onDragOver={handleContentDragOver}
-          onDragEnd={(event) => void handleContentDragEnd(event)}
-        >
-          <SortableContext
-            items={groups.map((group) => `group-order-${group.id}`)}
-            strategy={verticalListSortingStrategy}
-          >
-            <div
-              className={cn(
-                layoutMode === "list"
-                  ? "space-y-4"
-                  : "grid gap-4 md:grid-cols-2 xl:grid-cols-3"
-              )}
-            >
-              {groups.map((group) => {
-                const groupCards = visibleCardsForGroup(group.id);
-                const groupHasVisibleCards = groupCards.length > 0;
-                const showGroupEmpty =
-                  !group.collapsed && !groupHasVisibleCards;
-
-                return (
-                  <SortableGroupShell
-                    key={group.id}
-                    groupId={group.id}
-                    disabled={effectiveLocked || !canEdit}
-                  >
-                    {({ attributes, listeners }) => (
-                      <Card className="border-zinc-800 bg-zinc-950/70">
-                        <CardContent className="space-y-3 p-3">
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex min-w-0 items-center gap-1">
-                              {canEdit && !effectiveLocked ? (
-                                <button
-                                  type="button"
-                                  className="shrink-0 text-zinc-500 hover:text-zinc-200"
-                                  {...attributes}
-                                  {...listeners}
-                                  aria-label={`Reorder ${group.name}`}
-                                >
-                                  <GripVertical className="h-4 w-4" />
-                                </button>
-                              ) : null}
-                              <button
-                                type="button"
-                                className="truncate text-left text-sm font-medium text-zinc-100"
-                                onClick={() =>
-                                  void handleToggleGroupCollapsed(group)
-                                }
-                              >
-                                {group.collapsed ? "▸" : "▾"} {group.name}
-                              </button>
-                            </div>
-                            {canEdit ? (
-                              <div className="flex items-center gap-1">
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => void handleRenameGroup(group)}
-                                >
-                                  Rename
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => void handleDeleteGroup(group)}
-                                >
-                                  Delete
-                                </Button>
-                              </div>
-                            ) : null}
-                          </div>
-
-                          {group.collapsed ? null : (
-                            <GroupDropZone id={group.id}>
-                              <SortableContext
-                                items={groupCards.map((card) => card.id)}
-                                strategy={verticalListSortingStrategy}
-                              >
-                                <div
-                                  className={cn(
-                                    layoutMode === "list" ? "space-y-2" : "space-y-2"
-                                  )}
-                                >
-                                  {groupCards.map((card) => (
-                                    <div
-                                      key={card.id}
-                                      className={cn(
-                                        card.archivedAt && "opacity-75"
-                                      )}
-                                    >
-                                      {card.archivedAt ? (
-                                        <div className="mb-1 flex justify-end">
-                                          <Badge
-                                            variant="secondary"
-                                            className="bg-zinc-800 text-zinc-300"
-                                          >
-                                            Archived
-                                          </Badge>
-                                        </div>
-                                      ) : null}
-                                      <BookmarkCardItem
-                                        card={card}
-                                        draggable={
-                                          canEdit &&
-                                          !effectiveLocked &&
-                                          !card.archivedAt &&
-                                          sortMode === "custom"
-                                        }
-                                        bulkMode={bulkMode}
-                                        selected={selectedCardIds.includes(
-                                          card.id
-                                        )}
-                                        isFavourited={favouriteIds.includes(
-                                          card.id
-                                        )}
-                                        layoutMode={layoutMode}
-                                        clickStats={clickStats[card.id]}
-                                        healthInfo={
-                                          card.healthMonitoringEnabled
-                                            ? healthMap[card.id]
-                                            : undefined
-                                        }
-                                        statusFlash={flashCardIds.has(card.id)}
-                                        onSelectedChange={(checked) => {
-                                          setSelectedCardIds((prev) =>
-                                            checked
-                                              ? [
-                                                  ...new Set([
-                                                    ...prev,
-                                                    card.id,
-                                                  ]),
-                                                ]
-                                              : prev.filter(
-                                                  (id) => id !== card.id
-                                                )
-                                          );
-                                        }}
-                                        onLaunch={() => void launch(card)}
-                                        onEdit={() => {
-                                          setEditingCard(card);
-                                          setDefaultGroupId(card.groupId);
-                                          setCardDialogOpen(true);
-                                        }}
-                                        onDuplicate={
-                                          canEdit && !card.archivedAt
-                                            ? () =>
-                                                void handleDuplicateCard(card)
-                                            : undefined
-                                        }
-                                        onArchive={
-                                          canEdit && !card.archivedAt
-                                            ? () => void handleArchiveCard(card)
-                                            : undefined
-                                        }
-                                        onDelete={
-                                          canEdit
-                                            ? () => openDeleteDialog(card)
-                                            : undefined
-                                        }
-                                        onToggleFavourite={() =>
-                                          void handleToggleFavourite(card.id)
-                                        }
-                                        onToggleEnabled={
-                                          canEdit && !card.archivedAt
-                                            ? () => void toggleCardEnabled(card)
-                                            : undefined
-                                        }
-                                      />
-                                      {card.archivedAt && canEdit ? (
-                                        <div className="mt-1 flex justify-end">
-                                          <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() =>
-                                              void handleRestoreCard(card)
-                                            }
-                                          >
-                                            Restore
-                                          </Button>
-                                        </div>
-                                      ) : null}
-                                    </div>
-                                  ))}
-
-                                  {showGroupEmpty ? (
-                                    <div className="rounded-md border border-dashed border-zinc-700 p-4 text-center text-xs text-zinc-500">
-                                      {search
-                                        ? "No matches in this group"
-                                        : "Drop cards here"}
-                                    </div>
-                                  ) : null}
-                                </div>
-                              </SortableContext>
-                            </GroupDropZone>
-                          )}
-                        </CardContent>
-                      </Card>
-                    )}
-                  </SortableGroupShell>
-                );
-              })}
-            </div>
-          </SortableContext>
-        </DndContext>
-      )}
-
-      {search && !loadingData && matchCount === 0 ? (
-        <div className="rounded-xl border border-dashed border-zinc-700 bg-zinc-950/50 px-6 py-8 text-center text-sm text-zinc-400">
-          No bookmarks match your search.
-        </div>
-      ) : null}
-
-      <input
-        ref={importInputRef}
-        type="file"
-        accept="application/json"
-        className="hidden"
-        onChange={(event) => void handleImportFile(event.target.files?.[0])}
-      />
-
-      <Dialog open={createTabOpen} onOpenChange={setCreateTabOpen}>
-        <DialogContent className="border-zinc-800 bg-zinc-950 text-zinc-100">
-          <DialogHeader>
-            <DialogTitle>Create tab</DialogTitle>
-            <DialogDescription className="text-zinc-400">
-              Add a new bookmark tab.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="new-tab-name-main">Name</Label>
-            <Input
-              id="new-tab-name-main"
-              value={newTabName}
-              onChange={(event) => setNewTabName(event.target.value)}
-              placeholder="Engineering"
-              onKeyDown={(event) => {
-                if (event.key === "Enter") void handleCreateTab();
-              }}
-            />
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setCreateTabOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={() => void handleCreateTab()}>Create</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <BookmarkImportDialog
-        open={importDialogOpen}
-        onOpenChange={setImportDialogOpen}
-        json={importJson}
-        onComplete={() => void handleImportComplete()}
-      />
-
       <Dialog open={renameTabOpen} onOpenChange={setRenameTabOpen}>
         <DialogContent className="border-zinc-800 bg-zinc-950 text-zinc-100">
           <DialogHeader>
@@ -1810,6 +1430,41 @@ export function BookmarksPage({
           </div>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={deleteTabOpen} onOpenChange={setDeleteTabOpen}>
+        <DialogContent className="border-zinc-800 bg-zinc-950 text-zinc-100">
+          <DialogHeader>
+            <DialogTitle>Delete tab</DialogTitle>
+            <DialogDescription className="text-zinc-400">
+              Delete &quot;{activeTab?.name}&quot; and all groups and cards inside it? This
+              cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setDeleteTabOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={() => void handleDeleteActiveTab()}>
+              Delete tab
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <BookmarkGroupDialog
+        open={groupDialog.open}
+        onOpenChange={(open) => setGroupDialog((prev) => ({ ...prev, open }))}
+        mode={groupDialog.mode}
+        initialName={groupDialog.group?.name ?? ""}
+        onSubmit={handleGroupDialogSubmit}
+      />
+
+      <BookmarkImportDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        json={importJson}
+        onComplete={() => void handleImportComplete()}
+      />
 
       <BookmarkEditDialog
         open={cardDialogOpen}
@@ -1882,21 +1537,6 @@ export function BookmarksPage({
         onConfirm={handleConfirmDelete}
       />
 
-      {canEdit ? (
-        <div className="flex justify-end">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-zinc-500"
-            onClick={() => void handleExportAll()}
-          >
-            Export all tabs
-          </Button>
-        </div>
-      ) : null}
-
-      {LaunchModal}
-
       <BookmarkShareDialog
         open={shareDialogOpen}
         onOpenChange={setShareDialogOpen}
@@ -1904,6 +1544,335 @@ export function BookmarksPage({
         resourceId={activeTabId}
         resourceName={activeTab?.name ?? "Tab"}
       />
+    </>
+  );
+
+  if (!tabs.length) {
+    return (
+      <>
+        <BookmarksEmptyState
+          variant="no-tabs"
+          canEdit={canEdit}
+          onAddTab={() => setCreateTabOpen(true)}
+          onImport={() => importInputRef.current?.click()}
+        />
+        {managementDialogs}
+      </>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {suggestions.frequent.length > 0 || suggestions.stale.length > 0 ? (
+        <SmartSuggestionsSection
+          frequent={suggestions.frequent}
+          stale={suggestions.stale}
+        />
+      ) : null}
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <DndContext
+          sensors={tabSensors}
+          collisionDetection={closestCenter}
+          onDragEnd={(event) => void handleTabDragEnd(event)}
+        >
+          <SortableContext
+            items={tabs.map((tab) => tab.id)}
+            strategy={horizontalListSortingStrategy}
+          >
+            <div className="flex max-w-full flex-wrap items-center gap-1 rounded-lg bg-zinc-900 p-1">
+              {tabs.map((tab) => (
+                <SortableTab
+                  key={tab.id}
+                  tab={tab}
+                  isActive={tab.id === activeTabId}
+                  onSelect={() => void handleTabChange(tab.id)}
+                  canDrag={canEdit && !effectiveLocked}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
+      </div>
+
+      <BookmarksBrowseToolbar
+        search={search}
+        onSearchChange={setSearch}
+        matchCount={matchCount}
+        totalCount={totalCount}
+        onOpenSettings={() => setSettingsOpen(true)}
+      />
+
+      <BookmarksSettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        canEdit={canEdit}
+        isAdmin={isAdmin}
+        activeTab={activeTab ?? undefined}
+        groups={groups}
+        cards={cards}
+        bulkMode={bulkMode}
+        selectedCount={selectedCardIds.length}
+        onBulkModeChange={(value) => {
+          setBulkMode(value);
+          if (!value) setSelectedCardIds([]);
+        }}
+        layoutMode={layoutMode}
+        onLayoutModeChange={(value) => void handleLayoutModeChange(value)}
+        layoutLocked={tabLayoutLocked}
+        globalLayoutLocked={globalLayoutLocked}
+        onGlobalLayoutLockedChange={(value) =>
+          void handleGlobalLayoutLockedChange(value)
+        }
+        onTabLayoutLockedChange={(value) =>
+          void handleTabLayoutLockedChange(value)
+        }
+        showArchived={showArchived}
+        onShowArchivedChange={setShowArchived}
+        sortMode={sortMode}
+        onSortModeChange={(value) => void handleSortModeChange(value)}
+        filterChip={filterChip}
+        onFilterChipChange={setFilterChip}
+        tagFilters={tagFilters}
+        onCreateTab={() => {
+          setSettingsOpen(false);
+          setCreateTabOpen(true);
+        }}
+        onCreateGroup={() => {
+          setSettingsOpen(false);
+          openGroupDialog("create");
+        }}
+        onCreateCard={() => {
+          setSettingsOpen(false);
+          openNewCardDialog();
+        }}
+        onRenameTab={() => {
+          setSettingsOpen(false);
+          setRenameTabName(activeTab?.name ?? "");
+          setRenameTabOpen(true);
+        }}
+        onDeleteTab={() => setDeleteTabOpen(true)}
+        onShareTab={() => {
+          setSettingsOpen(false);
+          setShareDialogOpen(true);
+        }}
+        disableDeleteTab={tabs.length <= 1}
+        onRenameGroup={(group) => {
+          setSettingsOpen(false);
+          openGroupDialog("rename", group);
+        }}
+        onDeleteGroup={(group) => void handleDeleteGroup(group)}
+        onEditCard={(card) => {
+          setSettingsOpen(false);
+          setEditingCard(card);
+          setDefaultGroupId(card.groupId);
+          setCardDialogOpen(true);
+        }}
+        onImport={() => {
+          setSettingsOpen(false);
+          importInputRef.current?.click();
+        }}
+        onExportTab={() => void handleExportCurrentTab()}
+        onExportAll={() => void handleExportAll()}
+      />
+
+      {bulkMode ? (
+        <BulkToolbar
+          count={selectedCardIds.length}
+          canEdit={canEdit}
+          groups={groups.map((group) => ({ id: group.id, name: group.name }))}
+          tabs={tabs.map((tab) => ({ id: tab.id, name: tab.name }))}
+          activeTabId={activeTabId}
+          onEnable={() => void handleBulk("enable")}
+          onDisable={() => void handleBulk("disable")}
+          onArchive={() => void handleBulk("archive")}
+          onDelete={() => void handleBulk("delete")}
+          onExportSelected={() => void handleExportSelected()}
+          onMoveGroup={(groupId) => void handleBulkMoveGroup(groupId)}
+          onMoveTab={(tabId) => void handleBulkMoveTab(tabId)}
+          canConfigureMonitoring={canConfigureMonitoring}
+          onEnableMonitoring={() => void handleBulkEnableMonitoring()}
+        />
+      ) : null}
+
+      {loadingData ? (
+        <BookmarksSkeleton layoutMode={layoutMode} />
+      ) : showNoGroupsState ? (
+        <BookmarksEmptyState
+          variant="no-groups"
+          canEdit={canEdit}
+          onAddGroup={() => openGroupDialog("create")}
+          onImport={() => importInputRef.current?.click()}
+        />
+      ) : showNoCardsState ? (
+        <BookmarksEmptyState
+          variant="no-cards"
+          canEdit={canEdit}
+          onAddCard={() => openNewCardDialog()}
+          onImport={() => importInputRef.current?.click()}
+        />
+      ) : (
+        <DndContext
+          sensors={contentSensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleContentDragStart}
+          onDragOver={handleContentDragOver}
+          onDragEnd={(event) => void handleContentDragEnd(event)}
+        >
+          <SortableContext
+            items={groups.map((group) => `group-order-${group.id}`)}
+            strategy={verticalListSortingStrategy}
+          >
+            <div
+              className={cn(
+                layoutMode === "list"
+                  ? "space-y-4"
+                  : "grid gap-4 md:grid-cols-2 xl:grid-cols-3"
+              )}
+            >
+              {groups.map((group) => {
+                const groupCards = visibleCardsForGroup(group.id);
+                const groupHasVisibleCards = groupCards.length > 0;
+                const showGroupEmpty =
+                  !group.collapsed && !groupHasVisibleCards;
+
+                return (
+                  <SortableGroupShell
+                    key={group.id}
+                    groupId={group.id}
+                    disabled={effectiveLocked || !canEdit}
+                  >
+                    {({ attributes, listeners }) => (
+                      <Card className="border-zinc-800 bg-zinc-950/70">
+                        <CardContent className="space-y-3 p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex min-w-0 items-center gap-1">
+                              {canEdit && !effectiveLocked ? (
+                                <button
+                                  type="button"
+                                  className="shrink-0 text-zinc-500 hover:text-zinc-200"
+                                  {...attributes}
+                                  {...listeners}
+                                  aria-label={`Reorder ${group.name}`}
+                                >
+                                  <GripVertical className="h-4 w-4" />
+                                </button>
+                              ) : null}
+                              <button
+                                type="button"
+                                className="truncate text-left text-sm font-medium text-zinc-100"
+                                onClick={() =>
+                                  void handleToggleGroupCollapsed(group)
+                                }
+                              >
+                                {group.collapsed ? "▸" : "▾"} {group.name}
+                              </button>
+                            </div>
+                          </div>
+
+                          {group.collapsed ? null : (
+                            <GroupDropZone id={group.id}>
+                              <SortableContext
+                                items={groupCards.map((card) => card.id)}
+                                strategy={verticalListSortingStrategy}
+                              >
+                                <div
+                                  className={cn(
+                                    layoutMode === "list" ? "space-y-2" : "space-y-2"
+                                  )}
+                                >
+                                  {groupCards.map((card) => (
+                                    <div
+                                      key={card.id}
+                                      className={cn(
+                                        card.archivedAt && "opacity-75"
+                                      )}
+                                    >
+                                      {card.archivedAt ? (
+                                        <div className="mb-1 flex justify-end">
+                                          <Badge
+                                            variant="secondary"
+                                            className="bg-zinc-800 text-zinc-300"
+                                          >
+                                            Archived
+                                          </Badge>
+                                        </div>
+                                      ) : null}
+                                      <BookmarkCardItem
+                                        card={card}
+                                        browseMode
+                                        draggable={
+                                          canEdit &&
+                                          !effectiveLocked &&
+                                          !card.archivedAt &&
+                                          sortMode === "custom"
+                                        }
+                                        bulkMode={bulkMode}
+                                        selected={selectedCardIds.includes(
+                                          card.id
+                                        )}
+                                        isFavourited={favouriteIds.includes(
+                                          card.id
+                                        )}
+                                        layoutMode={layoutMode}
+                                        clickStats={clickStats[card.id]}
+                                        healthInfo={
+                                          card.healthMonitoringEnabled
+                                            ? healthMap[card.id]
+                                            : undefined
+                                        }
+                                        statusFlash={flashCardIds.has(card.id)}
+                                        onSelectedChange={(checked) => {
+                                          setSelectedCardIds((prev) =>
+                                            checked
+                                              ? [
+                                                  ...new Set([
+                                                    ...prev,
+                                                    card.id,
+                                                  ]),
+                                                ]
+                                              : prev.filter(
+                                                  (id) => id !== card.id
+                                                )
+                                          );
+                                        }}
+                                        onLaunch={() => void launch(card)}
+                                        onEdit={() => {}}
+                                      />
+                                    </div>
+                                  ))}
+
+                                  {showGroupEmpty ? (
+                                    <div className="rounded-md border border-dashed border-zinc-700 p-4 text-center text-xs text-zinc-500">
+                                      {search
+                                        ? "No matches in this group"
+                                        : "Drop cards here"}
+                                    </div>
+                                  ) : null}
+                                </div>
+                              </SortableContext>
+                            </GroupDropZone>
+                          )}
+                        </CardContent>
+                      </Card>
+                    )}
+                  </SortableGroupShell>
+                );
+              })}
+            </div>
+          </SortableContext>
+        </DndContext>
+      )}
+
+      {search && !loadingData && matchCount === 0 ? (
+        <div className="rounded-xl border border-dashed border-zinc-700 bg-zinc-950/50 px-6 py-8 text-center text-sm text-zinc-400">
+          No bookmarks match your search.
+        </div>
+      ) : null}
+
+      {managementDialogs}
+
+      {LaunchModal}
 
       {activeDragId ? <div className="sr-only">{activeDragId}</div> : null}
     </div>

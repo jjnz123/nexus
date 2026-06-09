@@ -57,6 +57,7 @@ export const bulkCardActionSchema = z.object({
     "favourite",
     "unfavourite",
     "enable_monitoring",
+    "move",
   ]),
   groupId: z.string().uuid().optional(),
   tabId: z.string().uuid().optional(),

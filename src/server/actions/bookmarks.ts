@@ -617,6 +617,8 @@ export async function bulkBookmarkCardAction(input: unknown) {
       await bulkEnableHealthMonitoring(data.cardIds);
       break;
     }
+    case "move":
+      break;
   }
 
   if (data.groupId) {

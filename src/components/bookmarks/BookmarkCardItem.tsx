@@ -46,6 +46,7 @@ type BookmarkCardItemProps = {
   card: BookmarkCard;
   draggable: boolean;
   bulkMode: boolean;
+  browseMode?: boolean;
   selected: boolean;
   isFavourited?: boolean;
   layoutMode?: "grid" | "list";
@@ -66,6 +67,7 @@ export function BookmarkCardItem({
   card,
   draggable,
   bulkMode,
+  browseMode = false,
   selected,
   isFavourited = false,
   layoutMode = "grid",
@@ -198,7 +200,7 @@ export function BookmarkCardItem({
             </div>
 
             <div className="flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
-              {draggable ? (
+              {!browseMode && draggable ? (
                 <Button
                   type="button"
                   size="icon"
@@ -212,95 +214,117 @@ export function BookmarkCardItem({
                 </Button>
               ) : null}
 
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className={cn(
-                  "h-7 w-7 text-zinc-400 hover:text-zinc-100",
-                  !card.enabled && "pointer-events-none opacity-40"
-                )}
-                disabled={!card.enabled}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onLaunch();
-                }}
-              >
-                <ExternalLink />
-              </Button>
+              {!browseMode ? (
+                <>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className={cn(
+                      "h-7 w-7 text-zinc-400 hover:text-zinc-100",
+                      !card.enabled && "pointer-events-none opacity-40"
+                    )}
+                    disabled={!card.enabled}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onLaunch();
+                    }}
+                  >
+                    <ExternalLink />
+                  </Button>
 
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="h-7 w-7 text-zinc-400 hover:text-zinc-100"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onEdit();
-                }}
-              >
-                <Pencil />
-              </Button>
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
                   <Button
                     type="button"
                     size="icon"
                     variant="ghost"
                     className="h-7 w-7 text-zinc-400 hover:text-zinc-100"
-                    onClick={(event) => event.stopPropagation()}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onEdit();
+                    }}
                   >
-                    <MoreHorizontal />
+                    <Pencil />
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={onLaunch} disabled={!card.enabled}>
-                    <ExternalLink className="mr-2 h-4 w-4" />
-                    Launch
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={onEdit}>
-                    <Pencil className="mr-2 h-4 w-4" />
-                    Edit
-                  </DropdownMenuItem>
-                  {onToggleFavourite ? (
-                    <DropdownMenuItem onClick={onToggleFavourite}>
-                      {isFavourited ? (
-                        <>
-                          <StarOff className="mr-2 h-4 w-4" />
-                          Remove favourite
-                        </>
-                      ) : (
-                        <>
-                          <Star className="mr-2 h-4 w-4" />
-                          Add favourite
-                        </>
-                      )}
-                    </DropdownMenuItem>
-                  ) : null}
-                  {onToggleEnabled ? (
-                    <DropdownMenuItem onClick={onToggleEnabled}>
-                      <Power className="mr-2 h-4 w-4" />
-                      {card.enabled ? "Disable" : "Enable"}
-                    </DropdownMenuItem>
-                  ) : null}
-                  {onDuplicate ? (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={onDuplicate}>
-                        <Copy className="mr-2 h-4 w-4" />
-                        Duplicate
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7 text-zinc-400 hover:text-zinc-100"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <MoreHorizontal />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={onLaunch} disabled={!card.enabled}>
+                        <ExternalLink className="mr-2 h-4 w-4" />
+                        Launch
                       </DropdownMenuItem>
-                    </>
-                  ) : null}
-                  {onArchive ? <DropdownMenuItem onClick={onArchive}>Archive</DropdownMenuItem> : null}
-                  {onDelete ? (
-                    <DropdownMenuItem className="text-destructive" onClick={onDelete}>
-                      Delete permanently
-                    </DropdownMenuItem>
-                  ) : null}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                      <DropdownMenuItem onClick={onEdit}>
+                        <Pencil className="mr-2 h-4 w-4" />
+                        Edit
+                      </DropdownMenuItem>
+                      {onToggleFavourite ? (
+                        <DropdownMenuItem onClick={onToggleFavourite}>
+                          {isFavourited ? (
+                            <>
+                              <StarOff className="mr-2 h-4 w-4" />
+                              Remove favourite
+                            </>
+                          ) : (
+                            <>
+                              <Star className="mr-2 h-4 w-4" />
+                              Add favourite
+                            </>
+                          )}
+                        </DropdownMenuItem>
+                      ) : null}
+                      {onToggleEnabled ? (
+                        <DropdownMenuItem onClick={onToggleEnabled}>
+                          <Power className="mr-2 h-4 w-4" />
+                          {card.enabled ? "Disable" : "Enable"}
+                        </DropdownMenuItem>
+                      ) : null}
+                      {onDuplicate ? (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={onDuplicate}>
+                            <Copy className="mr-2 h-4 w-4" />
+                            Duplicate
+                          </DropdownMenuItem>
+                        </>
+                      ) : null}
+                      {onArchive ? <DropdownMenuItem onClick={onArchive}>Archive</DropdownMenuItem> : null}
+                      {onDelete ? (
+                        <DropdownMenuItem className="text-destructive" onClick={onDelete}>
+                          Delete permanently
+                        </DropdownMenuItem>
+                      ) : null}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </>
+              ) : (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className={cn(
+                    "h-7 w-7 text-zinc-400 hover:text-zinc-100",
+                    !card.enabled && "pointer-events-none opacity-40"
+                  )}
+                  disabled={!card.enabled}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onLaunch();
+                  }}
+                  title="Open link"
+                >
+                  <ExternalLink />
+                </Button>
+              )}
             </div>
           </div>
         </CardContent>

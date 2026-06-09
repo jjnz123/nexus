@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v1.7.0
+**Current release:** v1.8.0
 
 ## 1. Overview
 
@@ -258,6 +258,17 @@ All authenticated users.
 
 Requires `bookmarks:view`. Edit operations require `bookmarks:edit`.
 
+### 5.0 Browse-first layout
+
+The main bookmarks view is **read-focused**:
+
+- **Tabs bar** — switch between tabs (drag reorder when unlocked)
+- **Search bar** — fuzzy search with match count
+- **Settings cog** — opens a management modal for all create/edit/bulk/import/view options
+- **Groups and cards** — browse and launch; no inline rename/delete/edit controls on the main canvas
+
+All creation, editing, deletion, bulk actions, import/export, and view preferences live in the **Settings** modal (or sub-modals it opens). Cards launch on click; card editing is available from Settings → Manage cards or the bookmark editor modal.
+
 ### 5.1 Structure
 
 - **Tabs** — top-level organization
@@ -295,13 +306,12 @@ Requires `bookmarks:view`. Edit operations require `bookmarks:edit`.
 
 Each card supports:
 
-- Launch in new tab or in-app iframe modal
-- Favourite toggle (per user, independent of card data)
-- Enable/disable toggle
+- Launch in new tab or in-app iframe modal (click card or hover open icon in browse mode)
 - Health status pill when linked to monitoring
 - Click statistics (total clicks, last used)
 - Visual flash on health status change
-- Context menu: edit, duplicate, archive, delete, favourite, enable/disable
+- Bulk selection checkbox when bulk mode is enabled from Settings
+- Edit, duplicate, archive, delete, favourite, and enable/disable via **Settings → Manage cards** or the bookmark editor modal (not inline on the card)
 
 ### 5.5 Bookmark Editor
 
@@ -316,22 +326,23 @@ Each card supports:
 
 ### 5.6 Bulk Operations
 
-Requires `bookmarks:edit`.
+Requires `bookmarks:edit`. Enabled from **Settings → Bulk actions**.
 
-- Bulk selection mode
+- Bulk selection mode (bulk bar appears below search when active)
 - Bulk enable, disable, archive, delete
-- Bulk move to group or tab
+- Bulk move to group or tab (uses dedicated `move` action — does not change enabled state)
 - Bulk enable health monitoring (requires `monitoring:configure`)
 - Bulk export selected cards
 
 ### 5.7 Import & Export
 
-Requires `bookmarks:edit`.
+Requires `bookmarks:edit`. Available from **Settings → Import & export** and empty states.
 
 - **Export:** current tab, all tabs, or selected cards as JSON
 - **Import:** JSON file upload with preview (tab/group/card counts); preview loads when dialog opens
 - Import modes: merge or replace
-- Create Tab and Import work from empty-state (no tabs) as well as main toolbar
+- **Create tab** and **Import JSON** work from empty states (no tabs / no groups / no cards)
+- **Add group** opens a proper create-group dialog (not browser `prompt`)
 
 ### 5.8 Admin Bookmark Sharing
 
@@ -339,7 +350,7 @@ Requires `admin:access`.
 
 - Share tabs with selected users (`bookmark_shares` table)
 - Tab visibility: **everyone** (default) or **restricted** (only admins + shared users)
-- Share dialog on active tab toolbar
+- Share dialog opened from **Settings → Active tab**
 - Shares on groups/cards resolve to parent tab visibility for recipients
 
 ### 5.9 Launch Analytics
