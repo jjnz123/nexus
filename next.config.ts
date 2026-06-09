@@ -6,6 +6,8 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: "10mb",
     },
+    // Allow large meeting audio uploads through /api/uploads (default is 10MB).
+    middlewareClientMaxBodySize: "200mb",
   },
   images: {
     remotePatterns: [],

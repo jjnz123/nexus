@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { format } from "date-fns";
-import { Archive, ArrowLeft, Mic, Pencil, Play, Square, Trash2, Upload } from "lucide-react";
+import { Archive, ArrowLeft, Loader2, Mic, Pencil, Play, Square, Trash2, Upload } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
 import type { Meeting, MeetingActionItem, MeetingMessage, Project, Task } from "@/lib/db/schema";
@@ -18,6 +18,7 @@ import {
   attachMeetingAudio,
   convertActionItemToTask,
   deleteMeeting,
+  getMeeting,
   reprocessMeeting,
   updateMeeting,
 } from "@/server/actions/meetings";
@@ -35,6 +36,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { WHISPER_MAX_BYTES } from "@/lib/uploads";
 
 type MeetingDetailProps = {
   meeting: Meeting;
@@ -71,8 +73,15 @@ export function MeetingDetailView({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
+  const [isUploading, setIsUploading] = useState(false);
 
   const isArchived = !!meeting.archivedAt;
+
+  useEffect(() => {
+    setMeeting(initialMeeting);
+    setActionItems(initialActionItems);
+    setMessages(initialMessages);
+  }, [initialMeeting, initialActionItems, initialMessages]);
 
   useEffect(() => {
     if (isArchived) return;
@@ -84,26 +93,53 @@ export function MeetingDetailView({
 
   useEffect(() => {
     if (meeting.status !== "processing") return;
-    const timer = setInterval(() => router.refresh(), 4000);
-    return () => clearInterval(timer);
-  }, [meeting.status, router]);
+
+    let cancelled = false;
+
+    const poll = async () => {
+      try {
+        const detail = await getMeeting(meeting.id);
+        if (cancelled) return;
+        setMeeting(detail.meeting);
+        setActionItems(detail.actionItems);
+        setMessages(detail.messages);
+      } catch {
+        // ignore transient poll errors
+      }
+    };
+
+    void poll();
+    const timer = setInterval(poll, 3000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [meeting.id, meeting.status]);
 
   async function uploadBlob(blob: Blob, filename: string) {
-    const form = new FormData();
-    form.append("file", blob, filename);
-    const res = await fetch("/api/uploads", { method: "POST", body: form });
-    if (!res.ok) throw new Error("Upload failed");
-    const { path } = (await res.json()) as { path: string };
-    await attachMeetingAudio({
-      meetingId: meeting.id,
-      audioPath: path,
-      audioFilename: filename,
-      audioMimeType: blob.type || "audio/webm",
-      audioSize: blob.size,
-    });
-    setMeeting((m) => ({ ...m, status: "processing" }));
-    toast.success("Audio uploaded — processing started");
-    router.refresh();
+    setIsUploading(true);
+    try {
+      const form = new FormData();
+      form.append("file", blob, filename);
+      const res = await fetch("/api/uploads", { method: "POST", body: form });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error ?? `Upload failed (${res.status})`);
+      }
+      const { path } = (await res.json()) as { path: string };
+      await attachMeetingAudio({
+        meetingId: meeting.id,
+        audioPath: path,
+        audioFilename: filename,
+        audioMimeType: blob.type || "audio/webm",
+        audioSize: blob.size,
+      });
+      setMeeting((m) => ({ ...m, status: "processing" }));
+      toast.success("Audio uploaded — processing started");
+      router.refresh();
+    } finally {
+      setIsUploading(false);
+    }
   }
 
   function startRecording() {
@@ -118,12 +154,8 @@ export function MeetingDetailView({
         recorder.onstop = () => {
           stream.getTracks().forEach((t) => t.stop());
           const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
-          startTransition(async () => {
-            try {
-              await uploadBlob(blob, `meeting-${Date.now()}.webm`);
-            } catch (error) {
-              toast.error(error instanceof Error ? error.message : "Upload failed");
-            }
+          void uploadBlob(blob, `meeting-${Date.now()}.webm`).catch((error) => {
+            toast.error(error instanceof Error ? error.message : "Upload failed");
           });
         };
         recorder.start();
@@ -141,12 +173,13 @@ export function MeetingDetailView({
 
   function onFileSelected(file: File | null) {
     if (!file) return;
-    startTransition(async () => {
-      try {
-        await uploadBlob(file, file.name);
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Upload failed");
-      }
+    if (file.size > WHISPER_MAX_BYTES) {
+      toast.warning(
+        `This file is ${Math.round(file.size / 1024 / 1024)}MB. Whisper accepts at most 25MB — transcription will fail unless you compress it.`
+      );
+    }
+    void uploadBlob(file, file.name).catch((error) => {
+      toast.error(error instanceof Error ? error.message : "Upload failed");
     });
   }
 
@@ -355,11 +388,17 @@ export function MeetingDetailView({
         <Card>
           <CardHeader>
             <CardTitle>Capture audio</CardTitle>
-            <CardDescription>Record in the browser or upload an audio file.</CardDescription>
+            <CardDescription>Record in the browser or upload an audio file (max 25MB for Whisper).</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
+            {isUploading ? (
+              <div className="flex w-full items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Uploading audio…
+              </div>
+            ) : null}
             {!recording ? (
-              <Button className="gap-2" onClick={startRecording}>
+              <Button className="gap-2" onClick={startRecording} disabled={isUploading}>
                 <Mic className="h-4 w-4" />
                 Start recording
               </Button>
@@ -369,7 +408,12 @@ export function MeetingDetailView({
                 Stop & process
               </Button>
             )}
-            <Button variant="outline" className="gap-2" onClick={() => fileInputRef.current?.click()}>
+            <Button
+              variant="outline"
+              className="gap-2"
+              disabled={isUploading || recording}
+              onClick={() => fileInputRef.current?.click()}
+            >
               <Upload className="h-4 w-4" />
               Upload file
             </Button>
@@ -386,8 +430,13 @@ export function MeetingDetailView({
 
       {!isArchived && meeting.status === "processing" ? (
         <Card>
-          <CardContent className="py-8 text-center text-sm text-muted-foreground">
-            Processing… transcribing with Whisper and summarizing with Grok.
+          <CardContent className="flex flex-col items-center gap-3 py-10 text-center text-sm text-muted-foreground">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <div>
+              <p className="font-medium text-foreground">Processing your meeting</p>
+              <p className="mt-1">Transcribing with Whisper and summarizing with Grok…</p>
+              <p className="mt-2 text-xs">This page updates automatically when finished.</p>
+            </div>
           </CardContent>
         </Card>
       ) : null}

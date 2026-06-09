@@ -81,7 +81,7 @@ Leave the API key unset to run Nexus without AI features.
 At `/meetings` (requires `ai:use`):
 
 - **Create** meetings with title, **date/time** (defaults to now), and optional **project** — or **create a new project** inline (`tasks:edit`).
-- **Record** audio in the browser or **upload** an audio file.
+- **Record** or upload meeting audio (Whisper accepts files up to **25MB**; larger files are rejected with a clear error).
 - **Transcribe** with OpenAI Whisper (`OPENAI_API_KEY`).
 - **Summarize** and extract **action items** with Grok.
 - **Ask questions** about the meeting in a scoped chat interface.

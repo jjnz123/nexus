@@ -219,12 +219,18 @@ export function ProfileMenu({
             <div className="text-xs font-normal text-muted-foreground">{user.email}</div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
+          <DropdownMenuItem asChild>
+            <Link href="/settings">
+              <User className="mr-2 h-4 w-4" />
+              Profile Settings
+            </Link>
+          </DropdownMenuItem>
           {isAdmin && (
             <>
               <DropdownMenuItem asChild>
                 <Link href="/admin?tab=settings">
                   <Settings className="mr-2 h-4 w-4" />
-                  Settings
+                  System Settings
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
@@ -239,20 +245,9 @@ export function ProfileMenu({
                   Audit Logs
                 </Link>
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
             </>
           )}
-          {!isAdmin && (
-            <>
-              <DropdownMenuItem asChild>
-                <Link href="/settings">
-                  <User className="mr-2 h-4 w-4" />
-                  Profile Settings
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-            </>
-          )}
+          <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/login" })}>
             <LogOut className="mr-2 h-4 w-4" />
             Log out

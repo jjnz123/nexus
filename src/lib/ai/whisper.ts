@@ -1,5 +1,6 @@
 import { readFile } from "fs/promises";
 import path from "path";
+import { WHISPER_MAX_BYTES } from "@/lib/uploads";
 
 export async function transcribeAudioFile(audioPath: string): Promise<string> {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -8,6 +9,11 @@ export async function transcribeAudioFile(audioPath: string): Promise<string> {
   const uploadDir = process.env.UPLOAD_DIR ?? "./uploads";
   const fullPath = path.join(uploadDir, audioPath);
   const buffer = await readFile(fullPath);
+  if (buffer.length > WHISPER_MAX_BYTES) {
+    throw new Error(
+      `Audio file is ${Math.round(buffer.length / 1024 / 1024)}MB but Whisper accepts at most ${WHISPER_MAX_BYTES / 1024 / 1024}MB. Compress or split the recording before uploading.`
+    );
+  }
   const ext = path.extname(audioPath) || ".webm";
   const mime =
     ext === ".mp3"

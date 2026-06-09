@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v3.2.0
+**Current release:** v3.2.1
 
 ## 1. Overview
 
@@ -700,9 +700,10 @@ Requires `ai:use`. Transcription requires `OPENAI_API_KEY`; summarization requir
 
 - Create meeting with **title**, **date/time** (defaults to now), and optional **project** link
 - **Create a new Tasks project** inline from the meeting form when the user has `tasks:edit`
-- **Record** in browser (MediaRecorder) or **upload** audio file
+- **Record** in browser (MediaRecorder) or **upload** audio file (up to 200MB upload; **Whisper transcription limited to 25MB**)
 - States: `recording` → `processing` → `ready` (or `failed`)
 - Background processing: Whisper transcription → Grok summary + action item extraction
+- Processing view shows spinner and **auto-refreshes** when transcription completes
 
 ### 15.2 Meeting detail
 
