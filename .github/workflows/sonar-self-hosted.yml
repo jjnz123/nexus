@@ -1,0 +1,49 @@
+# SonarQube analysis via a self-hosted runner on your LAN.
+# SonarQube UI: http://192.168.2.135:9000/projects
+#
+# GitHub secrets (Settings → Secrets → Actions):
+#   SONAR_HOST_URL = http://192.168.2.135:9000   (no /projects path, no trailing slash)
+#   SONAR_TOKEN    = sqp_… project analysis token for project key "nexus"
+#
+# Register the runner on 192.168.2.135 (or any host that can reach that URL):
+#   GitHub repo → Settings → Actions → Runners → New self-hosted runner → Linux x64
+
+name: SonarQube Analysis (self-hosted)
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  sonarqube:
+    name: Build and analyze
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify SonarQube connectivity
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SONAR_HOST_URL:-}" ]; then
+            echo "::error::Set SONAR_HOST_URL secret to http://192.168.2.135:9000"
+            exit 1
+          fi
+          URL="${SONAR_HOST_URL%/}"
+          echo "Checking ${URL}/api/system/status ..."
+          curl -sf "${URL}/api/system/status" >/dev/null
+          echo "Validating token ..."
+          curl -sf -u "${SONAR_TOKEN}:" "${URL}/api/authentication/validate" | grep -q '"valid":true'
+
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v5.0.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}

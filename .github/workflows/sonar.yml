@@ -1,10 +1,10 @@
 name: SonarQube Analysis
 
+# GitHub-hosted runners are blocked by Cloudflare on sonarqube.q1.co.nz.
+# Use sonar-self-hosted.yml after registering a LAN runner, or run this manually
+# once Cloudflare access is fixed (IP allowlist / DNS-only origin URL).
+
 on:
-  push:
-    branches: [main, master]
-  pull_request:
-    branches: [main, master]
   workflow_dispatch:
 
 jobs:

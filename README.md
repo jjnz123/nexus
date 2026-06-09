@@ -243,18 +243,27 @@ Default host port: **8374** (maps to container port 3000).
 
 ### SonarQube (code quality)
 
-Static analysis runs automatically via **GitHub Actions** on every push to `main` and on pull requests (`.github/workflows/sonar.yml`).
+Static analysis runs via a **self-hosted GitHub Actions runner** on your LAN (`.github/workflows/sonar-self-hosted.yml`), because Cloudflare blocks GitHub-hosted runners from `sonarqube.q1.co.nz`. The runner talks to SonarQube directly at **`http://192.168.2.135:9000`**.
 
 **One-time setup**
 
-1. Create a SonarQube project with key **`nexus`** (matches `sonar-project.properties`).
-2. Generate a **Project Analysis Token** (`sqp_…`) in SonarQube: **Project → Project Settings → Analysis Method → GitHub Actions** (or regenerate under your user tokens if you prefer a `squ_…` token with *Execute Analysis* on this project).
-3. In GitHub → **Settings → Secrets and variables → Actions**, add:
+1. Create a SonarQube project with key **`nexus`** at [http://192.168.2.135:9000/projects](http://192.168.2.135:9000/projects) (matches `sonar-project.properties`).
+2. Generate a **Project Analysis Token** (`sqp_…`): **Project nexus → Project Settings → Analysis Method**.
+3. In GitHub → **Settings → Secrets and variables → Actions**, set:
 
-| Secret | Description |
-|--------|-------------|
-| `SONAR_TOKEN` | Project analysis token (`sqp_…`) or user token with analysis permission — **no quotes, no trailing spaces** |
-| `SONAR_HOST_URL` | `https://sonarqube.q1.co.nz` (no trailing slash) |
+| Secret | Value |
+|--------|--------|
+| `SONAR_HOST_URL` | `http://192.168.2.135:9000` — **no** `/projects` path, **no** trailing slash |
+| `SONAR_TOKEN` | Your `sqp_…` token (no quotes or trailing spaces) |
+
+4. Register a **self-hosted runner** on `192.168.2.135` (or any LAN host that can reach that URL):
+   - GitHub repo → **Settings → Actions → Runners → New self-hosted runner** → Linux x64
+   - Run the install commands on the server, then `./run.sh` (or install as a service)
+   - The runner must stay online for push/PR scans to run
+
+5. Push to `main` or run **Actions → SonarQube Analysis (self-hosted) → Run workflow**.
+
+The cloud workflow (`.github/workflows/sonar.yml`) is **manual-only** for optional tests against the public hostname once Cloudflare access is fixed.
 
 **Configuration**
 
@@ -274,9 +283,17 @@ Static analysis runs automatically via **GitHub Actions** on every push to `main
 
 GitHub-hosted runners use public cloud IPs that Cloudflare often treats as bots. For `sonarqube.q1.co.nz`:
 
-1. **WAF custom rule (recommended):** Skip Bot Fight Mode / relevant managed rules when `http.host` equals `sonarqube.q1.co.nz` and `http.request.uri.path` starts with `/api/`.
-2. **IP Access Rules:** Allow [GitHub Actions IP ranges](https://api.github.com/meta) (`actions` key in the JSON) for the SonarQube hostname.
-3. **Self-hosted runner:** Register a runner on your LAN that reaches SonarQube directly (bypasses Cloudflare entirely) and set `runs-on: self-hosted` in the workflow.
+**Without paid WAF**, use one of these instead:
+
+| Option | Effort | Notes |
+|--------|--------|--------|
+| **1. Self-hosted GitHub runner** (recommended) | Medium | Install a runner on **`192.168.2.135`**. Set `SONAR_HOST_URL` to `http://192.168.2.135:9000`. See `.github/workflows/sonar-self-hosted.yml`. |
+| **2. DNS-only subdomain** | Low | Add `sonarqube-origin.q1.co.nz` with **proxy disabled** (grey cloud) pointing at SonarQube’s public IP. Set GitHub secret `SONAR_HOST_URL` to that hostname. Traffic bypasses Cloudflare. Only works if the origin is reachable from the internet. |
+| **3. Free Firewall Rules / IP Access Rules** | Low | On the **Free** plan you get **IP Access Rules** and a few **Firewall Rules** (not WAF custom rules). Allow [GitHub Actions IP ranges](https://api.github.com/meta) (`actions` in JSON) for host `sonarqube.q1.co.nz`. Ranges change over time. |
+| **4. Reduce bot blocking** | Low | Turn off **Bot Fight Mode** for the SonarQube subdomain, or lower **Security Level** (Page Rule / Configuration Rule if available on your plan). Less precise than IP allowlisting. |
+| **5. Scan on your network, not in GitHub** | Medium | Run `sonar-scanner` from Portainer deploy, a cron job, or your dev machine against the internal SonarQube URL. Skip GitHub Actions for analysis entirely. |
+
+Paid **WAF custom rules** are optional — options 1–4 avoid them.
 
 The workflow **Verify** step checks `/api/system/status` (no auth) first — if that returns Cloudflare HTML, the problem is network/WAF, not the token.
 
