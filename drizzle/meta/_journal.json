@@ -85,6 +85,13 @@
       "when": 1780999600000,
       "tag": "0013_email_2fa",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1781000400000,
+      "tag": "0014_recording_settings",
+      "breakpoints": true
     }
   ]
 }

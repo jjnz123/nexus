@@ -5,6 +5,7 @@ import { hasPermission } from "@/lib/permissions";
 import { MeetingDetailView } from "@/components/meetings/MeetingDetailView";
 import { getMeeting } from "@/server/actions/meetings";
 import { getProjects } from "@/server/actions/tasks";
+import { getRecordingSettings } from "@/server/settings";
 
 export default async function MeetingDetailPage({
   params,
@@ -13,9 +14,10 @@ export default async function MeetingDetailPage({
 }) {
   const { id } = await params;
   const session = await auth();
-  const [detail, projects] = await Promise.all([
+  const [detail, projects, recordingSettings] = await Promise.all([
     getMeeting(id).catch(() => null),
     getProjects(),
+    getRecordingSettings(),
   ]);
   if (!detail) notFound();
 
@@ -33,6 +35,7 @@ export default async function MeetingDetailPage({
         messages={detail.messages}
         projects={projects}
         canCreateProject={canCreateProject}
+        recordingSettings={recordingSettings}
       />
     </Suspense>
   );

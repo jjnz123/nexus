@@ -37,6 +37,11 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WHISPER_MAX_BYTES } from "@/lib/uploads";
+import {
+  buildMediaRecorderOptions,
+  getRecordingExtension,
+  type RecordingSettings,
+} from "@/lib/recording";
 
 type MeetingDetailProps = {
   meeting: Meeting;
@@ -46,6 +51,7 @@ type MeetingDetailProps = {
   messages: MeetingMessage[];
   projects: Project[];
   canCreateProject?: boolean;
+  recordingSettings: RecordingSettings;
 };
 
 export function MeetingDetailView({
@@ -56,6 +62,7 @@ export function MeetingDetailView({
   messages: initialMessages,
   projects: initialProjects,
   canCreateProject = false,
+  recordingSettings,
 }: MeetingDetailProps) {
   const [meeting, setMeeting] = useState(initialMeeting);
   const [projects, setProjects] = useState(initialProjects);
@@ -146,15 +153,17 @@ export function MeetingDetailView({
     void navigator.mediaDevices
       .getUserMedia({ audio: true })
       .then((stream) => {
-        const recorder = new MediaRecorder(stream);
+        const recorder = new MediaRecorder(stream, buildMediaRecorderOptions(recordingSettings));
         chunksRef.current = [];
         recorder.ondataavailable = (e) => {
           if (e.data.size) chunksRef.current.push(e.data);
         };
         recorder.onstop = () => {
           stream.getTracks().forEach((t) => t.stop());
-          const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
-          void uploadBlob(blob, `meeting-${Date.now()}.webm`).catch((error) => {
+          const mimeType = recorder.mimeType || recordingSettings.recordingAudioMimeType;
+          const blob = new Blob(chunksRef.current, { type: mimeType });
+          const ext = getRecordingExtension(mimeType);
+          void uploadBlob(blob, `meeting-${Date.now()}.${ext}`).catch((error) => {
             toast.error(error instanceof Error ? error.message : "Upload failed");
           });
         };

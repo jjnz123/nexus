@@ -129,6 +129,10 @@ export const systemSettings = pgTable("system_settings", {
   aiModel: text("ai_model").notNull().default("grok-3"),
   portalSubtitle: text("portal_subtitle").default("Internal Operations Portal"),
   portalSubtitleEnabled: boolean("portal_subtitle_enabled").notNull().default(true),
+  recordingAudioMimeType: text("recording_audio_mime_type")
+    .notNull()
+    .default("audio/webm;codecs=opus"),
+  recordingAudioBitrateKbps: integer("recording_audio_bitrate_kbps").notNull().default(96),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 

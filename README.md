@@ -81,7 +81,7 @@ Leave the API key unset to run Nexus without AI features.
 At `/meetings` (requires `ai:use`):
 
 - **Create** meetings with title, **date/time** (defaults to now), and optional **project** — or **create a new project** inline (`tasks:edit`).
-- **Record** or upload meeting audio (Whisper accepts files up to **25MB**; larger files are rejected with a clear error).
+- **Record** or upload meeting audio (browser recordings default to **96 kbps Opus WebM**; admins can change format/bitrate under System Settings).
 - **Transcribe** with OpenAI Whisper (`OPENAI_API_KEY`).
 - **Summarize** and extract **action items** with Grok.
 - **Ask questions** about the meeting in a scoped chat interface.
@@ -101,7 +101,7 @@ At `/meetings` (requires `ai:use`):
 Admins manage the portal itself:
 
 - **Users** — create pending accounts, assign roles, elevate status (`pending` → `member` / `administrator`), send welcome emails, disable users, and override permissions per person.
-- **System settings** — AI model choice, header subtitle, and **send test email** to verify SMTP2go.
+- **System settings** — AI model choice, header subtitle, meeting recording format/bitrate, and **send test email** to verify SMTP2go.
 - **Audit logs** — review who did what, filter, export, or ask AI to summarise activity.
 
 ---

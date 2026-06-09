@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v3.2.1
+**Current release:** v3.2.2
 
 ## 1. Overview
 
@@ -575,6 +575,7 @@ Requires `admin:access`. Tab selection via query param: `?tab=users|settings|ai-
 
 - **AI model** — select preset Grok model or enter custom model ID
 - **Portal header subtitle** — text and enable/disable toggle
+- **Meeting audio recording** — browser recording format (default WebM Opus) and bitrate (default 96 kbps)
 - **Email test** — send a test message via SMTP2go to verify configuration (shows configured/not configured status)
 
 ### 10.3 Audit Logs
@@ -700,7 +701,7 @@ Requires `ai:use`. Transcription requires `OPENAI_API_KEY`; summarization requir
 
 - Create meeting with **title**, **date/time** (defaults to now), and optional **project** link
 - **Create a new Tasks project** inline from the meeting form when the user has `tasks:edit`
-- **Record** in browser (MediaRecorder) or **upload** audio file (up to 200MB upload; **Whisper transcription limited to 25MB**)
+- **Record** in browser (MediaRecorder; format/bitrate configurable in Admin → System Settings, default **96 kbps Opus WebM**) or **upload** audio file (up to 200MB upload; **Whisper transcription limited to 25MB**)
 - States: `recording` → `processing` → `ready` (or `failed`)
 - Background processing: Whisper transcription → Grok summary + action item extraction
 - Processing view shows spinner and **auto-refreshes** when transcription completes

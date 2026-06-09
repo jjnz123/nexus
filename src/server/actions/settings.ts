@@ -10,11 +10,24 @@ import { requireSessionPermission } from "@/lib/permissions";
 import { getSystemSettings } from "@/server/settings";
 import { logAudit } from "@/server/audit";
 import { isEmailConfigured, sendEmail } from "@/lib/email";
+import {
+  MAX_RECORDING_BITRATE_KBPS,
+  MIN_RECORDING_BITRATE_KBPS,
+  RECORDING_FORMAT_PRESETS,
+} from "@/lib/recording";
 
 const updateSettingsSchema = z.object({
   aiModel: z.string().min(1).max(100),
   portalSubtitle: z.string().max(120).optional(),
   portalSubtitleEnabled: z.boolean(),
+  recordingAudioMimeType: z.enum(
+    RECORDING_FORMAT_PRESETS.map((preset) => preset.mimeType) as [string, ...string[]]
+  ),
+  recordingAudioBitrateKbps: z
+    .number()
+    .int()
+    .min(MIN_RECORDING_BITRATE_KBPS)
+    .max(MAX_RECORDING_BITRATE_KBPS),
 });
 
 export async function fetchSystemSettings() {
@@ -35,6 +48,8 @@ export async function updateSystemSettings(input: unknown) {
       aiModel: data.aiModel,
       portalSubtitle: data.portalSubtitle ?? current.portalSubtitle,
       portalSubtitleEnabled: data.portalSubtitleEnabled,
+      recordingAudioMimeType: data.recordingAudioMimeType,
+      recordingAudioBitrateKbps: data.recordingAudioBitrateKbps,
       updatedAt: new Date(),
     })
     .where(eq(systemSettings.id, current.id))
@@ -51,6 +66,8 @@ export async function updateSystemSettings(input: unknown) {
     details: {
       aiModel: settings.aiModel,
       portalSubtitleEnabled: settings.portalSubtitleEnabled,
+      recordingAudioMimeType: settings.recordingAudioMimeType,
+      recordingAudioBitrateKbps: settings.recordingAudioBitrateKbps,
     },
   });
 

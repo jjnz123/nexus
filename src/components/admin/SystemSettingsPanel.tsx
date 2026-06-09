@@ -6,6 +6,13 @@ import { Mail } from "lucide-react";
 import { toast } from "sonner";
 import type { SystemSettings } from "@/lib/db/schema";
 import { sendTestEmail, updateSystemSettings } from "@/server/actions/settings";
+import {
+  DEFAULT_RECORDING_BITRATE_KBPS,
+  DEFAULT_RECORDING_MIME_TYPE,
+  MAX_RECORDING_BITRATE_KBPS,
+  MIN_RECORDING_BITRATE_KBPS,
+  RECORDING_FORMAT_PRESETS,
+} from "@/lib/recording";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,6 +54,12 @@ export function SystemSettingsPanel({
   const [portalSubtitleEnabled, setPortalSubtitleEnabled] = useState(
     settings.portalSubtitleEnabled
   );
+  const [recordingAudioMimeType, setRecordingAudioMimeType] = useState(
+    settings.recordingAudioMimeType ?? DEFAULT_RECORDING_MIME_TYPE
+  );
+  const [recordingAudioBitrateKbps, setRecordingAudioBitrateKbps] = useState(
+    settings.recordingAudioBitrateKbps ?? DEFAULT_RECORDING_BITRATE_KBPS
+  );
   const [testEmailTo, setTestEmailTo] = useState(defaultTestEmail);
   const [isPending, startTransition] = useTransition();
   const [isEmailPending, startEmailTransition] = useTransition();
@@ -66,6 +79,8 @@ export function SystemSettingsPanel({
           aiModel: model,
           portalSubtitle,
           portalSubtitleEnabled,
+          recordingAudioMimeType,
+          recordingAudioBitrateKbps,
         });
         toast.success("Settings saved");
         router.refresh();
@@ -152,6 +167,47 @@ export function SystemSettingsPanel({
               checked={portalSubtitleEnabled}
               onCheckedChange={setPortalSubtitleEnabled}
             />
+          </div>
+        </div>
+
+        <div className="space-y-4 rounded-md border p-4">
+          <div>
+            <p className="text-sm font-medium">Meeting audio recording</p>
+            <p className="text-xs text-muted-foreground">
+              Browser in-meeting recordings use these defaults. Uploads are unaffected.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label>Audio format</Label>
+            <Select value={recordingAudioMimeType} onValueChange={setRecordingAudioMimeType}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {RECORDING_FORMAT_PRESETS.map((preset) => (
+                  <SelectItem key={preset.id} value={preset.mimeType}>
+                    {preset.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="recording-bitrate">Bitrate (kbps)</Label>
+            <Input
+              id="recording-bitrate"
+              type="number"
+              min={MIN_RECORDING_BITRATE_KBPS}
+              max={MAX_RECORDING_BITRATE_KBPS}
+              value={recordingAudioBitrateKbps}
+              onChange={(event) =>
+                setRecordingAudioBitrateKbps(Number.parseInt(event.target.value, 10) || DEFAULT_RECORDING_BITRATE_KBPS)
+              }
+            />
+            <p className="text-xs text-muted-foreground">
+              Default: 96 kbps Opus in WebM. Range: {MIN_RECORDING_BITRATE_KBPS}–
+              {MAX_RECORDING_BITRATE_KBPS} kbps. Browsers may fall back if unsupported.
+            </p>
           </div>
         </div>
 
