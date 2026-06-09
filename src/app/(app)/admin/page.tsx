@@ -1,13 +1,15 @@
 import { AdminPanel } from "@/components/admin/AdminPanel";
 import { getAuditActions, getAuditLogs } from "@/server/actions/audit";
+import { fetchSystemSettings } from "@/server/actions/settings";
 import { getUsers } from "@/server/actions/users";
 import { Suspense } from "react";
 
 export default async function AdminPage() {
-  const [users, audit, actions] = await Promise.all([
+  const [users, audit, actions, settings] = await Promise.all([
     getUsers(),
     getAuditLogs({ limit: 100 }),
     getAuditActions(),
+    fetchSystemSettings(),
   ]);
 
   return (
@@ -17,6 +19,7 @@ export default async function AdminPage() {
         auditLogs={audit.logs}
         auditTotal={audit.total}
         auditActions={actions}
+        settings={settings}
       />
     </Suspense>
   );

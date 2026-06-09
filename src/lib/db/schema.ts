@@ -8,6 +8,7 @@ import {
   timestamp,
   uuid,
   index,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 
 export const userRoleEnum = pgEnum("user_role", [
@@ -46,6 +47,9 @@ export const users = pgTable("users", {
   avatarPath: text("avatar_path"),
   role: userRoleEnum("role").notNull().default("user"),
   disabled: boolean("disabled").notNull().default(false),
+  permissions: jsonb("permissions")
+    .$type<import("@/lib/permissions").UserPermissionOverrides>()
+    .default({}),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -89,6 +93,27 @@ export const auditLogs = pgTable(
   ]
 );
 
+export const systemSettings = pgTable("system_settings", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  aiModel: text("ai_model").notNull().default("grok-3"),
+  portalSubtitle: text("portal_subtitle").default("Internal Operations Portal"),
+  portalSubtitleEnabled: boolean("portal_subtitle_enabled").notNull().default(true),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const userPreferences = pgTable("user_preferences", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  homeFavouriteOrder: jsonb("home_favourite_order").$type<string[]>().default([]),
+  activeBookmarkTabId: uuid("active_bookmark_tab_id"),
+  bookmarksLayoutMode: text("bookmarks_layout_mode").notNull().default("grid"),
+  bookmarksGlobalLayoutLocked: boolean("bookmarks_global_layout_locked")
+    .notNull()
+    .default(false),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const bookmarkTabs = pgTable("bookmark_tabs", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull(),
@@ -104,9 +129,13 @@ export const bookmarkGroups = pgTable("bookmark_groups", {
     .notNull()
     .references(() => bookmarkTabs.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
+  description: text("description"),
+  icon: text("icon"),
   collapsed: boolean("collapsed").notNull().default(false),
   sortOrder: integer("sort_order").notNull().default(0),
 });
+
+export type BookmarkIconType = "lucide" | "emoji" | "image" | "text";
 
 export const bookmarkCards = pgTable("bookmark_cards", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -117,10 +146,50 @@ export const bookmarkCards = pgTable("bookmark_cards", {
   description: text("description"),
   url: text("url").notNull(),
   icon: text("icon"),
+  iconType: text("icon_type").$type<BookmarkIconType>().notNull().default("text"),
+  iconValue: text("icon_value"),
+  accentColor: text("accent_color").notNull().default("#6366f1"),
+  openInIframe: boolean("open_in_iframe").notNull().default(false),
   enabled: boolean("enabled").notNull().default(true),
   favourite: boolean("favourite").notNull().default(false),
+  archivedAt: timestamp("archived_at"),
   sortOrder: integer("sort_order").notNull().default(0),
 });
+
+export const userBookmarkFavourites = pgTable(
+  "user_bookmark_favourites",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    cardId: uuid("card_id")
+      .notNull()
+      .references(() => bookmarkCards.id, { onDelete: "cascade" }),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.cardId] }),
+    index("user_bookmark_favourites_user_idx").on(table.userId),
+  ]
+);
+
+export const bookmarkLaunches = pgTable(
+  "bookmark_launches",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    cardId: uuid("card_id").references(() => bookmarkCards.id, { onDelete: "set null" }),
+    source: text("source").notNull(),
+    launchedAt: timestamp("launched_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("bookmark_launches_user_idx").on(table.userId),
+    index("bookmark_launches_card_idx").on(table.cardId),
+  ]
+);
 
 export const projects = pgTable("projects", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -262,3 +331,7 @@ export type MonitorDevice = typeof monitorDevices.$inferSelect;
 export type MonitorCheck = typeof monitorChecks.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
 export type AuditLog = typeof auditLogs.$inferSelect;
+export type SystemSettings = typeof systemSettings.$inferSelect;
+export type UserPreferences = typeof userPreferences.$inferSelect;
+export type UserBookmarkFavourite = typeof userBookmarkFavourites.$inferSelect;
+export type BookmarkLaunch = typeof bookmarkLaunches.$inferSelect;

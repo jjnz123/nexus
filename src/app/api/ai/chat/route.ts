@@ -1,10 +1,14 @@
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/permissions";
 import { NextRequest } from "next/server";
+import { getAiModel } from "@/server/settings";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
-  if (!session?.user || !hasPermission(session.user.role, "ai:use")) {
+  if (
+    !session?.user ||
+    !hasPermission(session.user.role, "ai:use", session.user.permissions)
+  ) {
     return new Response("Unauthorized", { status: 401 });
   }
 
@@ -17,6 +21,8 @@ export async function POST(req: NextRequest) {
     messages: { role: string; content: string }[];
   };
 
+  const model = await getAiModel();
+
   const response = await fetch("https://api.x.ai/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -24,7 +30,7 @@ export async function POST(req: NextRequest) {
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: "grok-2-latest",
+      model,
       messages,
       stream: true,
     }),

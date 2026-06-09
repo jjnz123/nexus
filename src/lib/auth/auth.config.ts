@@ -1,5 +1,6 @@
 import type { NextAuthConfig } from "next-auth";
 import type { UserRole } from "@/lib/db/schema";
+import type { UserPermissionOverrides } from "@/lib/permissions";
 import { canAccessRoute } from "@/lib/permissions";
 
 declare module "next-auth" {
@@ -10,12 +11,14 @@ declare module "next-auth" {
       name: string;
       role: UserRole;
       avatarPath: string | null;
+      permissions: UserPermissionOverrides | null;
     };
   }
 
   interface User {
     role: UserRole;
     avatarPath: string | null;
+    permissions: UserPermissionOverrides | null;
   }
 }
 
@@ -24,6 +27,7 @@ declare module "@auth/core/jwt" {
     id: string;
     role: UserRole;
     avatarPath: string | null;
+    permissions: UserPermissionOverrides | null;
   }
 }
 
@@ -42,7 +46,11 @@ export const authConfig = {
       if (isPublic) return true;
       if (!isLoggedIn && !isLoginPage) return false;
       if (isLoggedIn && isLoginPage) return Response.redirect(new URL("/", request.nextUrl));
-      if (isLoggedIn && auth?.user?.role && !canAccessRoute(auth.user.role, pathname)) {
+      if (
+        isLoggedIn &&
+        auth?.user?.role &&
+        !canAccessRoute(auth.user.role, pathname, auth.user.permissions)
+      ) {
         return Response.redirect(new URL("/", request.nextUrl));
       }
       return true;
@@ -52,6 +60,7 @@ export const authConfig = {
         token.id = user.id!;
         token.role = user.role;
         token.avatarPath = user.avatarPath;
+        token.permissions = user.permissions ?? null;
       }
       return token;
     },
@@ -59,6 +68,7 @@ export const authConfig = {
       session.user.id = token.id;
       session.user.role = token.role;
       session.user.avatarPath = token.avatarPath ?? null;
+      session.user.permissions = token.permissions ?? null;
       return session;
     },
   },

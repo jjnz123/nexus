@@ -5,20 +5,20 @@ import { eq, desc, and, gte } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { monitorDevices, monitorChecks } from "@/lib/db/schema";
 import { requireAuth } from "@/lib/auth";
-import { requirePermission } from "@/lib/permissions";
+import { requireSessionPermission, hasPermission } from "@/lib/permissions";
 import { deviceSchema, updateDeviceSchema } from "@/lib/validators/monitoring";
 import { forceCheckDevice } from "@/server/jobs/monitor-runner";
 import { logAudit } from "@/server/audit";
 
 export async function getMonitorDevices() {
   const session = await requireAuth();
-  requirePermission(session.user.role, "monitoring:view");
+  requireSessionPermission(session, "monitoring:view");
   return db.select().from(monitorDevices).orderBy(monitorDevices.name);
 }
 
 export async function getMonitorDevice(id: string) {
   const session = await requireAuth();
-  requirePermission(session.user.role, "monitoring:view");
+  requireSessionPermission(session, "monitoring:view");
   const [device] = await db
     .select()
     .from(monitorDevices)
@@ -29,7 +29,7 @@ export async function getMonitorDevice(id: string) {
 
 export async function getDeviceChecks(deviceId: string, hours = 24) {
   const session = await requireAuth();
-  requirePermission(session.user.role, "monitoring:view");
+  requireSessionPermission(session, "monitoring:view");
   const since = new Date(Date.now() - hours * 60 * 60 * 1000);
   return db
     .select()
@@ -46,7 +46,7 @@ export async function getDeviceChecks(deviceId: string, hours = 24) {
 
 export async function getDevicesWithRecentChecks() {
   const session = await requireAuth();
-  requirePermission(session.user.role, "monitoring:view");
+  requireSessionPermission(session, "monitoring:view");
 
   const devices = await db.select().from(monitorDevices).orderBy(monitorDevices.name);
   const enriched = await Promise.all(
@@ -65,7 +65,7 @@ export async function getDevicesWithRecentChecks() {
 
 export async function createMonitorDevice(input: unknown) {
   const session = await requireAuth();
-  requirePermission(session.user.role, "monitoring:configure");
+  requireSessionPermission(session, "monitoring:configure");
   const data = deviceSchema.parse(input);
   const [device] = await db.insert(monitorDevices).values(data).returning();
   revalidatePath("/monitoring");
@@ -81,7 +81,7 @@ export async function createMonitorDevice(input: unknown) {
 
 export async function updateMonitorDevice(input: unknown) {
   const session = await requireAuth();
-  requirePermission(session.user.role, "monitoring:configure");
+  requireSessionPermission(session, "monitoring:configure");
   const data = updateDeviceSchema.parse(input);
   const { id, ...updates } = data;
   const [device] = await db
@@ -101,7 +101,7 @@ export async function updateMonitorDevice(input: unknown) {
 
 export async function deleteMonitorDevice(id: string) {
   const session = await requireAuth();
-  requirePermission(session.user.role, "monitoring:configure");
+  requireSessionPermission(session, "monitoring:configure");
   await db.delete(monitorDevices).where(eq(monitorDevices.id, id));
   revalidatePath("/monitoring");
   await logAudit({
@@ -115,7 +115,7 @@ export async function deleteMonitorDevice(id: string) {
 
 export async function forceDeviceCheck(id: string) {
   const session = await requireAuth();
-  requirePermission(session.user.role, "monitoring:view");
+  requireSessionPermission(session, "monitoring:view");
   const check = await forceCheckDevice(db, id);
   revalidatePath("/monitoring");
   revalidatePath(`/monitoring/${id}`);
@@ -131,7 +131,7 @@ export async function forceDeviceCheck(id: string) {
 
 export async function getMonitoringStats() {
   const session = await requireAuth();
-  requirePermission(session.user.role, "monitoring:view");
+  requireSessionPermission(session, "monitoring:view");
   const devices = await db.select().from(monitorDevices);
   return {
     total: devices.length,

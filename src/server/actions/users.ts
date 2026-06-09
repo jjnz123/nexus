@@ -6,7 +6,7 @@ import { eq, and, isNull, isNotNull, desc, count, lt } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users, notifications } from "@/lib/db/schema";
 import { requireAuth } from "@/lib/auth";
-import { requirePermission } from "@/lib/permissions";
+import { requireSessionPermission } from "@/lib/permissions";
 import {
   createUserSchema,
   updateUserSchema,
@@ -16,13 +16,13 @@ import { logAudit } from "@/server/audit";
 
 export async function getUsers() {
   const session = await requireAuth();
-  requirePermission(session.user.role, "users:manage");
+  requireSessionPermission(session, "users:manage");
   return db.select().from(users).orderBy(users.name);
 }
 
 export async function createUser(input: unknown) {
   const session = await requireAuth();
-  requirePermission(session.user.role, "users:manage");
+  requireSessionPermission(session, "users:manage");
   const data = createUserSchema.parse(input);
   const passwordHash = await bcrypt.hash(data.password, 12);
   const [user] = await db
@@ -32,6 +32,7 @@ export async function createUser(input: unknown) {
       name: data.name,
       passwordHash,
       role: data.role,
+      permissions: data.permissions ?? {},
     })
     .returning({
       id: users.id,
@@ -55,13 +56,14 @@ export async function createUser(input: unknown) {
 
 export async function updateUser(input: unknown) {
   const session = await requireAuth();
-  requirePermission(session.user.role, "users:manage");
+  requireSessionPermission(session, "users:manage");
   const data = updateUserSchema.parse(input);
   const updates: Partial<typeof users.$inferInsert> = {};
   if (data.email) updates.email = data.email.toLowerCase();
   if (data.name) updates.name = data.name;
   if (data.role) updates.role = data.role;
   if (data.disabled !== undefined) updates.disabled = data.disabled;
+  if (data.permissions) updates.permissions = data.permissions;
   if (data.password) updates.passwordHash = await bcrypt.hash(data.password, 12);
   updates.updatedAt = new Date();
 

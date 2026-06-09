@@ -11,7 +11,7 @@ import {
   Activity,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { hasPermission } from "@/lib/permissions";
+import { hasPermission, type UserPermissionOverrides } from "@/lib/permissions";
 import type { UserRole } from "@/lib/db/schema";
 import { ProfileMenu } from "./ProfileMenu";
 
@@ -25,14 +25,24 @@ const navItems = [
 export function AppShell({
   children,
   user,
+  portalSubtitle,
+  portalSubtitleEnabled,
 }: {
   children: React.ReactNode;
-  user: { name: string; email: string; role: UserRole; avatarPath: string | null };
+  user: {
+    name: string;
+    email: string;
+    role: UserRole;
+    avatarPath: string | null;
+    permissions: UserPermissionOverrides | null;
+  };
+  portalSubtitle: string;
+  portalSubtitleEnabled: boolean;
 }) {
   const pathname = usePathname();
 
   const visibleNav = navItems.filter(
-    (item) => !item.perm || hasPermission(user.role, item.perm)
+    (item) => !item.perm || hasPermission(user.role, item.perm, user.permissions)
   );
 
   return (
@@ -74,9 +84,13 @@ export function AppShell({
             <LayoutDashboard className="h-5 w-5 text-primary" />
             <span className="font-semibold">Nexus</span>
           </div>
-          <div className="hidden text-sm text-muted-foreground md:block">
-            Internal Operations Portal
-          </div>
+          {portalSubtitleEnabled && portalSubtitle ? (
+            <div className="hidden text-sm text-muted-foreground md:block">
+              {portalSubtitle}
+            </div>
+          ) : (
+            <div className="hidden md:block" />
+          )}
           <ProfileMenu user={user} />
         </header>
 

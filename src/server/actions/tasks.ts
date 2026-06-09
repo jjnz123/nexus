@@ -15,7 +15,7 @@ import {
   users,
 } from "@/lib/db/schema";
 import { requireAuth } from "@/lib/auth";
-import { requirePermission, hasPermission } from "@/lib/permissions";
+import { requireSessionPermission, hasPermission } from "@/lib/permissions";
 import {
   projectSchema,
   columnSchema,
@@ -30,13 +30,13 @@ import { logAudit } from "@/server/audit";
 
 export async function getProjects() {
   const session = await requireAuth();
-  requirePermission(session.user.role, "tasks:view");
+  requireSessionPermission(session, "tasks:view");
   return db.select().from(projects).orderBy(asc(projects.name));
 }
 
 export async function createProject(input: unknown) {
   const session = await requireAuth();
-  requirePermission(session.user.role, "tasks:edit");
+  requireSessionPermission(session, "tasks:edit");
   const data = projectSchema.parse(input);
 
   const [project] = await db
@@ -67,7 +67,7 @@ export async function createProject(input: unknown) {
 
 export async function getProjectBoard(projectId: string) {
   const session = await requireAuth();
-  requirePermission(session.user.role, "tasks:view");
+  requireSessionPermission(session, "tasks:view");
 
   const [project] = await db
     .select()
@@ -115,7 +115,7 @@ export async function getProjectBoard(projectId: string) {
 
 export async function getTaskByKey(taskKey: string) {
   const session = await requireAuth();
-  requirePermission(session.user.role, "tasks:view");
+  requireSessionPermission(session, "tasks:view");
 
   const match = taskKey.match(/^([A-Z][A-Z0-9]*)-(\d+)$/);
   if (!match) return null;
@@ -174,7 +174,7 @@ export async function getTaskByKey(taskKey: string) {
 
 export async function createTask(input: unknown) {
   const session = await requireAuth();
-  requirePermission(session.user.role, "tasks:edit");
+  requireSessionPermission(session, "tasks:edit");
   const data = taskSchema.parse(input);
 
   const [maxNum] = await db
@@ -230,7 +230,7 @@ export async function createTask(input: unknown) {
 
 export async function updateTask(input: unknown) {
   const session = await requireAuth();
-  if (!hasPermission(session.user.role, "tasks:edit")) {
+  if (!hasPermission(session.user.role, "tasks:edit", session.user.permissions)) {
     throw new Error("Forbidden");
   }
   const data = updateTaskSchema.parse(input);
@@ -278,7 +278,7 @@ export async function updateTask(input: unknown) {
 
 export async function deleteTask(id: string) {
   const session = await requireAuth();
-  requirePermission(session.user.role, "tasks:edit");
+  requireSessionPermission(session, "tasks:edit");
   await db.delete(tasks).where(eq(tasks.id, id));
   revalidatePath("/tasks");
   await logAudit({
@@ -294,7 +294,7 @@ export async function reorderTasks(
   items: { id: string; columnId: string; sortOrder: number }[]
 ) {
   const session = await requireAuth();
-  requirePermission(session.user.role, "tasks:edit");
+  requireSessionPermission(session, "tasks:edit");
 
   for (const item of items) {
     await db
@@ -309,7 +309,7 @@ export async function reorderTasks(
 
 export async function createColumn(input: unknown) {
   const session = await requireAuth();
-  requirePermission(session.user.role, "tasks:edit");
+  requireSessionPermission(session, "tasks:edit");
   const data = columnSchema.parse(input);
   const cols = await db
     .select()
@@ -328,7 +328,7 @@ export async function updateColumn(
   input: Partial<{ name: string; color: string; wipLimit: number | null; sortOrder: number }>
 ) {
   const session = await requireAuth();
-  requirePermission(session.user.role, "tasks:edit");
+  requireSessionPermission(session, "tasks:edit");
   const [column] = await db
     .update(taskColumns)
     .set(input)
@@ -340,7 +340,7 @@ export async function updateColumn(
 
 export async function deleteColumn(id: string) {
   const session = await requireAuth();
-  requirePermission(session.user.role, "tasks:edit");
+  requireSessionPermission(session, "tasks:edit");
   await db.delete(taskColumns).where(eq(taskColumns.id, id));
   revalidatePath("/tasks");
   return { success: true };
@@ -348,7 +348,7 @@ export async function deleteColumn(id: string) {
 
 export async function createLabel(input: unknown) {
   const session = await requireAuth();
-  requirePermission(session.user.role, "tasks:edit");
+  requireSessionPermission(session, "tasks:edit");
   const data = labelSchema.parse(input);
   const [label] = await db.insert(taskLabels).values(data).returning();
   revalidatePath("/tasks");
@@ -357,7 +357,7 @@ export async function createLabel(input: unknown) {
 
 export async function setTaskLabels(taskId: string, labelIds: string[]) {
   const session = await requireAuth();
-  requirePermission(session.user.role, "tasks:edit");
+  requireSessionPermission(session, "tasks:edit");
   await db.delete(taskLabelMap).where(eq(taskLabelMap.taskId, taskId));
   if (labelIds.length > 0) {
     await db.insert(taskLabelMap).values(
@@ -370,7 +370,7 @@ export async function setTaskLabels(taskId: string, labelIds: string[]) {
 
 export async function createSubtask(input: unknown) {
   const session = await requireAuth();
-  requirePermission(session.user.role, "tasks:edit");
+  requireSessionPermission(session, "tasks:edit");
   const data = subtaskSchema.parse(input);
   const existing = await db
     .select()
@@ -386,7 +386,7 @@ export async function createSubtask(input: unknown) {
 
 export async function toggleSubtask(id: string, completed: boolean) {
   const session = await requireAuth();
-  requirePermission(session.user.role, "tasks:edit");
+  requireSessionPermission(session, "tasks:edit");
   const [subtask] = await db
     .update(taskSubtasks)
     .set({ completed })
@@ -398,7 +398,7 @@ export async function toggleSubtask(id: string, completed: boolean) {
 
 export async function addComment(input: unknown) {
   const session = await requireAuth();
-  requirePermission(session.user.role, "tasks:edit");
+  requireSessionPermission(session, "tasks:edit");
   const data = commentSchema.parse(input);
 
   const [comment] = await db
@@ -428,7 +428,7 @@ export async function addComment(input: unknown) {
 
 export async function getProjectUsers() {
   const session = await requireAuth();
-  requirePermission(session.user.role, "tasks:view");
+  requireSessionPermission(session, "tasks:view");
   return db
     .select({ id: users.id, name: users.name, email: users.email })
     .from(users)
@@ -437,7 +437,7 @@ export async function getProjectUsers() {
 
 export async function exportProject(projectId: string) {
   const session = await requireAuth();
-  requirePermission(session.user.role, "tasks:view");
+  requireSessionPermission(session, "tasks:view");
   const board = await getProjectBoard(projectId);
   return board;
 }

@@ -1,5 +1,16 @@
 import { z } from "zod";
 
+export const userPermissionsSchema = z.object({
+  useCustom: z.boolean().optional(),
+  ai: z.boolean().optional(),
+  bookmarksView: z.boolean().optional(),
+  bookmarksEdit: z.boolean().optional(),
+  tasksView: z.boolean().optional(),
+  tasksEdit: z.boolean().optional(),
+  monitoringView: z.boolean().optional(),
+  monitoringConfigure: z.boolean().optional(),
+});
+
 export const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
@@ -10,6 +21,7 @@ export const createUserSchema = z.object({
   name: z.string().min(1).max(100),
   password: z.string().min(8),
   role: z.enum(["admin", "editor", "user", "viewer"]),
+  permissions: userPermissionsSchema.optional(),
 });
 
 export const updateUserSchema = z.object({
@@ -19,6 +31,7 @@ export const updateUserSchema = z.object({
   password: z.string().min(8).optional(),
   role: z.enum(["admin", "editor", "user", "viewer"]).optional(),
   disabled: z.boolean().optional(),
+  permissions: userPermissionsSchema.optional(),
 });
 
 export const updateProfileSchema = z.object({

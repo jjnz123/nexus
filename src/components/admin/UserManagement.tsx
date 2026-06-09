@@ -6,6 +6,10 @@ import { PlusCircle } from "lucide-react";
 import { toast } from "sonner";
 import { createUser, updateUser } from "@/server/actions/users";
 import type { UserRole } from "@/lib/db/schema";
+import {
+  getDefaultPermissionsForRole,
+  type UserPermissionOverrides,
+} from "@/lib/permissions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,6 +33,7 @@ type UserRow = {
   role: UserRole;
   disabled: boolean;
   avatarPath: string | null;
+  permissions: UserPermissionOverrides | null;
   createdAt: Date;
 };
 
@@ -38,9 +43,28 @@ type UserFormState = {
   role: UserRole;
   disabled: boolean;
   password: string;
+  permissions: UserPermissionOverrides;
 };
 
 const roleOptions: UserRole[] = ["admin", "editor", "user", "viewer"];
+
+const permissionFields: {
+  key: keyof UserPermissionOverrides;
+  label: string;
+  description: string;
+}[] = [
+  { key: "ai", label: "AI assistant", description: "Ask AI on home and audit analysis" },
+  { key: "bookmarksView", label: "View bookmarks", description: "See bookmarks page and home favourites" },
+  { key: "bookmarksEdit", label: "Edit bookmarks", description: "Create, import, export, and bulk edit" },
+  { key: "tasksView", label: "View tasks", description: "See tasks and home overdue widget" },
+  { key: "tasksEdit", label: "Edit tasks", description: "Create and update tasks" },
+  { key: "monitoringView", label: "View monitoring", description: "See monitoring and home status widget" },
+  {
+    key: "monitoringConfigure",
+    label: "Configure monitoring",
+    description: "Add or edit monitors and alerts",
+  },
+];
 
 function roleBadge(role: UserRole) {
   if (role === "admin") return "destructive";
@@ -48,13 +72,34 @@ function roleBadge(role: UserRole) {
   return "secondary";
 }
 
+function resolvePermissions(
+  role: UserRole,
+  stored?: UserPermissionOverrides | null
+): UserPermissionOverrides {
+  if (stored?.useCustom) {
+    return {
+      useCustom: true,
+      ai: stored.ai ?? false,
+      bookmarksView: stored.bookmarksView ?? false,
+      bookmarksEdit: stored.bookmarksEdit ?? false,
+      tasksView: stored.tasksView ?? false,
+      tasksEdit: stored.tasksEdit ?? false,
+      monitoringView: stored.monitoringView ?? false,
+      monitoringConfigure: stored.monitoringConfigure ?? false,
+    };
+  }
+  return getDefaultPermissionsForRole(role);
+}
+
 function initialState(user?: UserRow): UserFormState {
+  const role = user?.role ?? "user";
   return {
     email: user?.email ?? "",
     name: user?.name ?? "",
-    role: user?.role ?? "user",
+    role,
     disabled: user?.disabled ?? false,
     password: "",
+    permissions: resolvePermissions(role, user?.permissions),
   };
 }
 
@@ -85,6 +130,32 @@ export function UserManagement({ users }: { users: UserRow[] }) {
     setOpen(true);
   };
 
+  const setRole = (role: UserRole) => {
+    setState((prev) => ({
+      ...prev,
+      role,
+      permissions: prev.permissions.useCustom
+        ? prev.permissions
+        : getDefaultPermissionsForRole(role),
+    }));
+  };
+
+  const setUseCustomPermissions = (useCustom: boolean) => {
+    setState((prev) => ({
+      ...prev,
+      permissions: useCustom
+        ? { ...prev.permissions, useCustom: true }
+        : getDefaultPermissionsForRole(prev.role),
+    }));
+  };
+
+  const setPermission = (key: keyof UserPermissionOverrides, value: boolean) => {
+    setState((prev) => ({
+      ...prev,
+      permissions: { ...prev.permissions, [key]: value },
+    }));
+  };
+
   const onSubmit = () => {
     if (!state.email.trim() || !state.name.trim()) {
       toast.error("Name and email are required");
@@ -95,6 +166,10 @@ export function UserManagement({ users }: { users: UserRow[] }) {
       return;
     }
 
+    const permissions = state.permissions.useCustom
+      ? state.permissions
+      : { useCustom: false };
+
     startTransition(async () => {
       try {
         if (editing) {
@@ -104,6 +179,7 @@ export function UserManagement({ users }: { users: UserRow[] }) {
             name: state.name.trim(),
             role: state.role,
             disabled: state.disabled,
+            permissions,
             ...(state.password ? { password: state.password } : {}),
           });
           toast.success("User updated");
@@ -113,6 +189,7 @@ export function UserManagement({ users }: { users: UserRow[] }) {
             name: state.name.trim(),
             role: state.role,
             password: state.password,
+            permissions,
           });
           toast.success("User created");
         }
@@ -128,8 +205,10 @@ export function UserManagement({ users }: { users: UserRow[] }) {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Admin Panel</h1>
-          <p className="text-sm text-muted-foreground">Manage users, roles, and account access.</p>
+          <h2 className="text-xl font-semibold tracking-tight">Users</h2>
+          <p className="text-sm text-muted-foreground">
+            Manage accounts, roles, and per-user feature access.
+          </p>
         </div>
         <Dialog open={open} onOpenChange={(nextOpen) => (nextOpen ? setOpen(true) : closeAndReset())}>
           <DialogTrigger asChild>
@@ -138,11 +217,13 @@ export function UserManagement({ users }: { users: UserRow[] }) {
               Add User
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
             <DialogHeader>
               <DialogTitle>{title}</DialogTitle>
               <DialogDescription>
-                {editing ? "Update user details and access role." : "Create a new user account."}
+                {editing
+                  ? "Update user details, role, and optional custom permissions."
+                  : "Create a new user account."}
               </DialogDescription>
             </DialogHeader>
 
@@ -166,10 +247,7 @@ export function UserManagement({ users }: { users: UserRow[] }) {
               </div>
               <div className="space-y-2">
                 <Label>Role</Label>
-                <Select
-                  value={state.role}
-                  onValueChange={(value: UserRole) => setState((prev) => ({ ...prev, role: value }))}
-                >
+                <Select value={state.role} onValueChange={(value: UserRole) => setRole(value)}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -181,6 +259,9 @@ export function UserManagement({ users }: { users: UserRow[] }) {
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">
+                  Role defaults apply unless custom permissions are enabled below.
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="user-password">
@@ -205,6 +286,42 @@ export function UserManagement({ users }: { users: UserRow[] }) {
                   />
                 </div>
               )}
+
+              <div className="space-y-3 rounded-md border p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium">Custom permissions</p>
+                    <p className="text-xs text-muted-foreground">
+                      Override role defaults for this user only.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={Boolean(state.permissions.useCustom)}
+                    onCheckedChange={setUseCustomPermissions}
+                  />
+                </div>
+
+                {state.permissions.useCustom && (
+                  <div className="space-y-2 border-t pt-3">
+                    {permissionFields.map((field) => (
+                      <div
+                        key={field.key}
+                        className="flex items-center justify-between gap-3 rounded-md bg-muted/40 px-3 py-2"
+                      >
+                        <div>
+                          <p className="text-sm font-medium">{field.label}</p>
+                          <p className="text-xs text-muted-foreground">{field.description}</p>
+                        </div>
+                        <Switch
+                          checked={Boolean(state.permissions[field.key])}
+                          onCheckedChange={(checked) => setPermission(field.key, checked)}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <div className="flex justify-end">
                 <Button onClick={onSubmit} disabled={isPending}>
                   {isPending ? "Saving..." : editing ? "Save Changes" : "Create User"}
@@ -217,7 +334,7 @@ export function UserManagement({ users }: { users: UserRow[] }) {
 
       <Card>
         <CardHeader>
-          <CardTitle>User Management</CardTitle>
+          <CardTitle>User accounts</CardTitle>
           <CardDescription>{users.length} user accounts</CardDescription>
         </CardHeader>
         <CardContent>
@@ -228,6 +345,7 @@ export function UserManagement({ users }: { users: UserRow[] }) {
                   <th className="py-2 pr-3 font-medium">Name</th>
                   <th className="py-2 pr-3 font-medium">Email</th>
                   <th className="py-2 pr-3 font-medium">Role</th>
+                  <th className="py-2 pr-3 font-medium">Access</th>
                   <th className="py-2 pr-3 font-medium">Status</th>
                   <th className="py-2 font-medium">Actions</th>
                 </tr>
@@ -239,6 +357,11 @@ export function UserManagement({ users }: { users: UserRow[] }) {
                     <td className="py-3 pr-3">{user.email}</td>
                     <td className="py-3 pr-3">
                       <Badge variant={roleBadge(user.role)}>{user.role}</Badge>
+                    </td>
+                    <td className="py-3 pr-3">
+                      <Badge variant={user.permissions?.useCustom ? "default" : "outline"}>
+                        {user.permissions?.useCustom ? "Custom" : "Role default"}
+                      </Badge>
                     </td>
                     <td className="py-3 pr-3">
                       <Badge variant={user.disabled ? "destructive" : "secondary"}>
@@ -254,7 +377,7 @@ export function UserManagement({ users }: { users: UserRow[] }) {
                 ))}
                 {users.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="py-6 text-center text-muted-foreground">
+                    <td colSpan={6} className="py-6 text-center text-muted-foreground">
                       No users found.
                     </td>
                   </tr>

@@ -4,7 +4,7 @@ import { and, desc, eq, gte, ilike, lte, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { auditLogs } from "@/lib/db/schema";
 import { requireAuth } from "@/lib/auth";
-import { requirePermission } from "@/lib/permissions";
+import { requireSessionPermission, hasPermission } from "@/lib/permissions";
 import { z } from "zod";
 
 const auditFilterSchema = z.object({
@@ -19,7 +19,7 @@ const auditFilterSchema = z.object({
 
 export async function getAuditLogs(input: unknown = {}) {
   const session = await requireAuth();
-  requirePermission(session.user.role, "admin:access");
+  requireSessionPermission(session, "admin:access");
 
   const filters = auditFilterSchema.parse(input);
   const conditions = [];
@@ -70,7 +70,7 @@ export async function getAuditLogs(input: unknown = {}) {
 
 export async function getAuditActions() {
   const session = await requireAuth();
-  requirePermission(session.user.role, "admin:access");
+  requireSessionPermission(session, "admin:access");
 
   const rows = await db
     .selectDistinct({ action: auditLogs.action })
@@ -82,7 +82,7 @@ export async function getAuditActions() {
 
 export async function exportAuditLogs(input: unknown = {}) {
   const session = await requireAuth();
-  requirePermission(session.user.role, "admin:access");
+  requireSessionPermission(session, "admin:access");
 
   const { logs } = await getAuditLogs({
     ...(typeof input === "object" && input ? input : {}),

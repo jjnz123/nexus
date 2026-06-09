@@ -15,6 +15,20 @@
       "when": 1780986001002,
       "tag": "0001_fresh_gorilla_man",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1780988438017,
+      "tag": "0002_clear_deathstrike",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1780989251137,
+      "tag": "0003_nostalgic_moondragon",
+      "breakpoints": true
     }
   ]
 }

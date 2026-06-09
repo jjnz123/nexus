@@ -15,7 +15,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { hasPermission } from "@/lib/permissions";
+import { hasPermission, type UserPermissionOverrides } from "@/lib/permissions";
 import type { UserRole } from "@/lib/db/schema";
 import {
   getNotifications,
@@ -36,9 +36,15 @@ function initials(name: string) {
 export function ProfileMenu({
   user,
 }: {
-  user: { name: string; email: string; role: UserRole; avatarPath: string | null };
+  user: {
+    name: string;
+    email: string;
+    role: UserRole;
+    avatarPath: string | null;
+    permissions?: UserPermissionOverrides | null;
+  };
 }) {
-  const isAdmin = hasPermission(user.role, "admin:access");
+  const isAdmin = hasPermission(user.role, "admin:access", user.permissions);
 
   const { data: unread = 0 } = useQuery({
     queryKey: ["notifications-unread"],
@@ -136,7 +142,7 @@ export function ProfileMenu({
           {isAdmin && (
             <>
               <DropdownMenuItem asChild>
-                <Link href="/settings">
+                <Link href="/admin?tab=settings">
                   <Settings className="mr-2 h-4 w-4" />
                   Settings
                 </Link>
