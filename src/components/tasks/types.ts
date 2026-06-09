@@ -1,4 +1,5 @@
 export type TaskPriority = "low" | "medium" | "high" | "urgent";
+export type TaskType = "epic" | "feature" | "story" | "task";
 
 export type ProjectSummary = {
   id: string;
@@ -43,6 +44,9 @@ export type BoardTask = {
   priority: TaskPriority;
   dueDate: string | Date | null;
   assigneeId: string | null;
+  type: TaskType;
+  parentId: string | null;
+  parentTitle: string | null;
   sortOrder: number;
   createdAt: string | Date;
   updatedAt: string | Date;
@@ -62,7 +66,7 @@ export type TaskComment = {
 
 export type TaskDetails = {
   project: ProjectSummary;
-  task: Omit<BoardTask, "assigneeName" | "labelIds" | "subtasks">;
+  task: Omit<BoardTask, "assigneeName" | "labelIds" | "subtasks" | "parentTitle">;
   comments: TaskComment[];
   subtasks: TaskSubtask[];
   attachments: { id: string; filename: string; path: string; size: number }[];

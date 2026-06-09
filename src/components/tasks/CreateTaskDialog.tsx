@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { createTask } from "@/server/actions/tasks";
 import { Button } from "@/components/ui/button";
@@ -21,13 +21,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { TaskColumn, TaskPriority } from "./types";
+import type { TaskColumn, TaskPriority, TaskType } from "./types";
 
 export function CreateTaskDialog({
   open,
   onOpenChange,
   projectId,
   columns,
+  projectUsers,
+  parentCandidates,
   defaultColumnId,
   onCreated,
 }: {
@@ -35,6 +37,8 @@ export function CreateTaskDialog({
   onOpenChange: (open: boolean) => void;
   projectId: string;
   columns: TaskColumn[];
+  projectUsers: { id: string; name: string }[];
+  parentCandidates: { id: string; title: string; type: TaskType }[];
   defaultColumnId?: string;
   onCreated: () => Promise<void> | void;
 }) {
@@ -42,13 +46,27 @@ export function CreateTaskDialog({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<TaskPriority>("medium");
+  const [taskType, setTaskType] = useState<TaskType>("task");
   const [columnId, setColumnId] = useState(defaultColumnId ?? columns[0]?.id ?? "");
+  const [assigneeId, setAssigneeId] = useState("none");
+  const [parentId, setParentId] = useState("none");
+
+  const boardColumns = columns.filter((c) => !c.isBacklog);
+
+  useEffect(() => {
+    if (open) {
+      setColumnId(defaultColumnId ?? boardColumns[0]?.id ?? "");
+    }
+  }, [open, defaultColumnId, boardColumns]);
 
   function resetForm() {
     setTitle("");
     setDescription("");
     setPriority("medium");
-    setColumnId(defaultColumnId ?? columns[0]?.id ?? "");
+    setTaskType("task");
+    setColumnId(defaultColumnId ?? boardColumns[0]?.id ?? "");
+    setAssigneeId("none");
+    setParentId("none");
   }
 
   function handleCreate() {
@@ -61,6 +79,9 @@ export function CreateTaskDialog({
           title: title.trim(),
           description: description.trim() || undefined,
           priority,
+          type: taskType,
+          assigneeId: assigneeId === "none" ? null : assigneeId,
+          parentId: parentId === "none" ? null : parentId,
         });
         toast.success("Task created");
         resetForm();
@@ -83,7 +104,7 @@ export function CreateTaskDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Create task</DialogTitle>
-          <DialogDescription>Add a new task to your board.</DialogDescription>
+          <DialogDescription>Add a new task to the board.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">
@@ -114,7 +135,7 @@ export function CreateTaskDialog({
                   <SelectValue placeholder="Select column" />
                 </SelectTrigger>
                 <SelectContent>
-                  {columns.map((column) => (
+                  {boardColumns.map((column) => (
                     <SelectItem key={column.id} value={column.id}>
                       {column.name}
                     </SelectItem>
@@ -136,6 +157,52 @@ export function CreateTaskDialog({
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-2">
+              <Label>Type</Label>
+              <Select value={taskType} onValueChange={(v) => setTaskType(v as TaskType)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="epic">Epic</SelectItem>
+                  <SelectItem value="feature">Feature</SelectItem>
+                  <SelectItem value="story">Story</SelectItem>
+                  <SelectItem value="task">Task</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Assignee</Label>
+              <Select value={assigneeId} onValueChange={setAssigneeId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Unassigned" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Unassigned</SelectItem>
+                  {projectUsers.map((user) => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Parent</Label>
+            <Select value={parentId} onValueChange={setParentId}>
+              <SelectTrigger>
+                <SelectValue placeholder="None" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                {parentCandidates.map((candidate) => (
+                  <SelectItem key={candidate.id} value={candidate.id}>
+                    {candidate.type} · {candidate.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => onOpenChange(false)}>

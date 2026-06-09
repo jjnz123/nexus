@@ -19,7 +19,7 @@ Nexus helps your team find things faster, stay on top of work, and spot problems
 
 ### Bookmarks
 
-Organise internal tools, dashboards, docs, and URLs in a structured library:
+Organise internal tools, dashboards, docs, and URLs in a structured library. Admins can share restricted tabs with specific users.
 
 - **Tabs, groups, and cards** — like folders within folders, with drag-and-drop ordering.
 - **Launch links** in a new tab or inside the portal (iframe).
@@ -32,13 +32,13 @@ Editors can create and manage the library; viewers can browse and launch.
 
 ### Tasks
 
-A lightweight **kanban board** for team work:
+A lightweight **kanban board** for team work with assignees, backlog panel, task hierarchy (Epic/Feature/Story), Issues and Roadmap views:
 
 - Multiple **projects**, each with its own board and task keys (e.g. `OPS-001`).
-- **Kanban and backlog** views with drag-and-drop between columns.
-- **Task details** — priority, due date, labels, subtasks, and comments.
-- **Shareable links** — open a task directly via its URL.
-- **Board settings** — custom columns (with optional WIP limits) and coloured labels.
+- **Kanban board** (horizontal columns) plus **backlog panel** for planning.
+- **Assignees**, task hierarchy (Epic/Feature/Story), Issues table, and Roadmap views.
+- **Task details** — priority, due date, labels, subtasks, comments, and shareable links.
+- **Project settings** — drag-to-reorder columns, WIP limits, and coloured labels.
 
 ### Monitoring
 

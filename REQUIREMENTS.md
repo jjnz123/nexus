@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v1.5.0
+**Current release:** v1.6.0
 
 ## 1. Overview
 
@@ -72,6 +72,7 @@ Available on all authenticated app routes.
 - Active route highlighting
 - **Collapsible sidebar** — icon-only mode with hover expand (same behaviour as `/chat` sidebar)
 - Manual collapse/expand toggle; state persisted in user preferences (`app_sidebar_collapsed`)
+- Full viewport height rail with CSS width transitions (no flicker)
 - Mobile-responsive header with product branding
 - **Mobile navigation drawer** — hamburger menu exposes permission-filtered nav links on small screens
 
@@ -300,19 +301,29 @@ Requires `bookmarks:edit`.
 Requires `bookmarks:edit`.
 
 - **Export:** current tab, all tabs, or selected cards as JSON
-- **Import:** JSON file upload with preview (tab/group/card counts)
+- **Import:** JSON file upload with preview (tab/group/card counts); preview loads when dialog opens
 - Import modes: merge or replace
+- Create Tab and Import work from empty-state (no tabs) as well as main toolbar
 
-### 5.8 Launch Analytics
+### 5.8 Admin Bookmark Sharing
+
+Requires `admin:access`.
+
+- Share tabs with selected users (`bookmark_shares` table)
+- Tab visibility: **everyone** (default) or **restricted** (only admins + shared users)
+- Share dialog on active tab toolbar
+- Shares on groups/cards resolve to parent tab visibility for recipients
+
+### 5.9 Launch Analytics
 
 - Record bookmark launches with source (`bookmarks`, `landing`, `search`, `suggestions`) and referrer
 - Per-user click counts for sorting and smart suggestions
 
-### 5.9 Smart Suggestions
+### 5.10 Smart Suggestions
 
 - Same frequent/stale suggestion sections as home page
 
-### 5.10 Empty States
+### 5.11 Empty States
 
 - Guided empty states for: no tabs, no groups, no cards
 
@@ -326,43 +337,62 @@ Requires `tasks:view`. Edit operations require `tasks:edit`.
 - Create project with key (e.g. `OPS`) and display name
 - Empty state when no projects exist
 
-### 6.2 Board Views
+### 6.2 Layout & Views
 
-- **Kanban** — columns with task cards, drag-and-drop between columns
-- **Backlog** — list of tasks in the backlog column
+- **Collapsible Tasks sidebar** — Board, Issues, Roadmap, Project settings (icon-only + hover expand)
+- **Kanban board** — non-backlog columns only, single horizontal scroll row (no wrapping)
+- **Backlog panel** — slide-out panel (top-right button); create/manage backlog items; move to board (To Do)
 - WIP limit display per column with visual warning when exceeded
 
-### 6.3 Filtering
+### 6.3 Task Hierarchy
 
-- Search tasks by title and description
+- Task types: **Epic**, **Feature**, **Story**, **Task**
+- Optional **parent** link for hierarchy (Epic → Feature → Story/Task)
+- Type and parent editable in task modal and backlog create form
+
+### 6.4 Filtering
+
+- Search tasks by title, description, and key
 - Filter by priority: all, low, medium, high, urgent
+- Filter by assignee: all, unassigned, or specific user
 
-### 6.4 Board Settings
+### 6.5 Issues View
+
+- Jira-style table of all project tasks with key, type, title, assignee, priority, parent
+- Same search/priority/assignee filters as board
+
+### 6.6 Roadmap View
+
+- Epic cards with linked child counts
+- Timeline grouped by due date month
+
+### 6.7 Project Settings
 
 Requires `tasks:edit`.
 
-- **Columns:** create, edit (name, color, WIP limit), delete (non-backlog columns)
+- **Columns:** drag-to-reorder, create, edit (name, color, WIP limit), delete (non-backlog columns)
+- Backlog column managed here but hidden from kanban
 - **Labels:** create with name and color
 
-### 6.5 Create Task
+### 6.8 Create Task
 
 Requires `tasks:edit`.
 
-- **New task** toolbar button opens create-task dialog
+- **New task** toolbar button opens create-task dialog (board columns only)
 - Per-column **+** button pre-selects target column
-- Fields: title, description, priority, column
-- Defaults to first column when opened from toolbar
+- Fields: title, description, priority, column, type, assignee, parent
+- Backlog items created via backlog panel
 
-### 6.6 Task Cards
+### 6.9 Task Cards
 
-- Display task key, title, priority badge, due date, labels
+- Display task key, title, type, priority badge, assignee, due date, labels
 - Draggable on kanban board
 - Click to open task detail modal
 
-### 6.7 Task Detail Modal
+### 6.10 Task Detail Modal
 
 - Deep-linkable via `/tasks/[KEY]` (e.g. `/tasks/OPS-001`)
-- Edit: title, description, priority, due date, column
+- Edit: title, description, priority, due date, column, type, assignee, parent
 - Assign/remove labels
 - **Subtasks:** add, toggle complete, progress indicator
 - **Comments:** add, view with author and timestamp
@@ -370,7 +400,7 @@ Requires `tasks:edit`.
 - Save changes
 - **Delete task** with confirmation
 
-### 6.8 Server Actions (No UI Yet)
+### 6.11 Server Actions (No UI Yet)
 
 The following task operations exist at the server layer but are not exposed in the UI:
 
@@ -543,8 +573,8 @@ Requires `monitoring:configure` to enable; `monitoring:view` to display status.
 
 ## 15. Out of Scope / Known Gaps
 
-- Task assignee picker in task modal (server supports `assigneeId`)
 - Task attachment upload/view UI (schema exists)
 - Project export UI (server action exists, no front-end)
+- Bookmark share UI for individual groups/cards (server supports tab/group/card resource types)
 - Message list virtualization for very long `/chat` conversations (may be added later)
 - Network autodiscovery beyond bookmark URL scanning

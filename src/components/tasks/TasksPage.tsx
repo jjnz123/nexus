@@ -13,18 +13,15 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { Settings2, Plus, Search } from "lucide-react";
+import { Plus, Search, Inbox } from "lucide-react";
 import { toast } from "sonner";
 import {
-  createColumn,
-  createLabel,
   createProject,
-  deleteColumn,
   getProjectBoard,
+  getProjectUsers,
   getProjects,
   getTaskByKey,
   reorderTasks,
-  updateColumn,
 } from "@/server/actions/tasks";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -44,13 +41,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TaskCard } from "./TaskCard";
 import { TaskModal } from "./TaskModal";
 import { CreateTaskDialog } from "./CreateTaskDialog";
+import { TasksSidebar, type TasksSidebarView } from "./TasksSidebar";
+import { TasksBacklogPanel } from "./TasksBacklogPanel";
+import { TasksIssuesView } from "./TasksIssuesView";
+import { TasksRoadmapView } from "./TasksRoadmapView";
+import { TasksProjectSettings } from "./TasksProjectSettings";
 import type { BoardTask, ProjectBoard, ProjectSummary, TaskDetails, TaskPriority } from "./types";
-
-type ViewMode = "kanban" | "backlog";
 
 function makeTaskKey(projectKey: string, taskNumber: number) {
   return `${projectKey}-${String(taskNumber).padStart(3, "0")}`;
@@ -153,21 +152,20 @@ export function TasksPage({
 
   const [projects, setProjects] = useState(initialProjects);
   const [board, setBoard] = useState<ProjectBoard | null>(initialBoard);
-  const [viewMode, setViewMode] = useState<ViewMode>("kanban");
+  const [sidebarView, setSidebarView] = useState<TasksSidebarView>("board");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [backlogPanelOpen, setBacklogPanelOpen] = useState(false);
+  const [projectUsers, setProjectUsers] = useState<{ id: string; name: string; email: string }[]>(
+    []
+  );
   const [search, setSearch] = useState("");
   const [priorityFilter, setPriorityFilter] = useState<"all" | TaskPriority>("all");
+  const [assigneeFilter, setAssigneeFilter] = useState("all");
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
 
   const [projectDialogOpen, setProjectDialogOpen] = useState(false);
   const [newProjectKey, setNewProjectKey] = useState("");
   const [newProjectName, setNewProjectName] = useState("");
-
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [newColumnName, setNewColumnName] = useState("");
-  const [newColumnColor, setNewColumnColor] = useState("#6366f1");
-  const [newColumnWip, setNewColumnWip] = useState("");
-  const [newLabelName, setNewLabelName] = useState("");
-  const [newLabelColor, setNewLabelColor] = useState("#22c55e");
 
   const [modalOpen, setModalOpen] = useState(Boolean(initialTask));
   const [modalTaskKey, setModalTaskKey] = useState<string | null>(initialTaskKey);
@@ -179,6 +177,40 @@ export function TasksPage({
     () => [...(board?.columns ?? [])].sort((a, b) => a.sortOrder - b.sortOrder),
     [board?.columns]
   );
+
+  const kanbanColumns = useMemo(
+    () => sortedColumns.filter((column) => !column.isBacklog),
+    [sortedColumns]
+  );
+
+  const backlogColumn = useMemo(
+    () => sortedColumns.find((column) => column.isBacklog) ?? null,
+    [sortedColumns]
+  );
+
+  const backlogTasks = useMemo(() => {
+    if (!board || !backlogColumn) return [];
+    return (board.tasks ?? [])
+      .filter((task) => task.columnId === backlogColumn.id)
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+  }, [board, backlogColumn]);
+
+  const parentCandidates = useMemo(
+    () =>
+      (board?.tasks ?? []).map((task) => ({
+        id: task.id,
+        title: task.title,
+        type: task.type,
+        number: task.number,
+      })),
+    [board?.tasks]
+  );
+
+  useEffect(() => {
+    void getProjectUsers()
+      .then(setProjectUsers)
+      .catch(() => setProjectUsers([]));
+  }, []);
 
   const labelsById = useMemo(
     () => new Map((board?.labels ?? []).map((label) => [label.id, label])),
@@ -194,9 +226,12 @@ export function TasksPage({
         task.title.toLowerCase().includes(searchTerm) ||
         (task.description ?? "").toLowerCase().includes(searchTerm);
       const matchesPriority = priorityFilter === "all" || task.priority === priorityFilter;
-      return matchesSearch && matchesPriority;
+      const matchesAssignee =
+        assigneeFilter === "all" ||
+        (assigneeFilter === "unassigned" ? !task.assigneeId : task.assigneeId === assigneeFilter);
+      return matchesSearch && matchesPriority && matchesAssignee;
     });
-  }, [board?.tasks, search, priorityFilter]);
+  }, [board?.tasks, search, priorityFilter, assigneeFilter]);
 
   const groupedFiltered = useMemo(
     () =>
@@ -317,75 +352,6 @@ export function TasksPage({
     });
   };
 
-  const createColumnNow = () => {
-    if (!board || !newColumnName.trim()) return;
-    startTransition(async () => {
-      try {
-        await createColumn({
-          projectId: board.project.id,
-          name: newColumnName.trim(),
-          color: newColumnColor,
-          wipLimit: newColumnWip.trim() ? Number(newColumnWip) : null,
-        });
-        await refreshBoard();
-        setNewColumnName("");
-        setNewColumnWip("");
-        toast.success("Column created");
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Unable to create column");
-      }
-    });
-  };
-
-  const createLabelNow = () => {
-    if (!board || !newLabelName.trim()) return;
-    startTransition(async () => {
-      try {
-        await createLabel({
-          projectId: board.project.id,
-          name: newLabelName.trim(),
-          color: newLabelColor,
-        });
-        await refreshBoard();
-        setNewLabelName("");
-        toast.success("Label created");
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Unable to create label");
-      }
-    });
-  };
-
-  const saveColumn = (columnId: string, nextName: string, nextColor: string, nextWip: string) => {
-    startTransition(async () => {
-      try {
-        await updateColumn(columnId, {
-          name: nextName.trim(),
-          color: nextColor,
-          wipLimit: nextWip.trim() ? Number(nextWip) : null,
-        });
-        await refreshBoard();
-        toast.success("Column updated");
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Unable to update column");
-      }
-    });
-  };
-
-  const deleteColumnNow = (columnId: string, columnName: string) => {
-    if (!window.confirm(`Delete column "${columnName}"? Tasks in this column will be removed.`)) {
-      return;
-    }
-    startTransition(async () => {
-      try {
-        await deleteColumn(columnId);
-        await refreshBoard();
-        toast.success("Column deleted");
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Unable to delete column");
-      }
-    });
-  };
-
   const openCreateTask = (columnId?: string) => {
     setCreateTaskColumnId(columnId);
     setCreateTaskOpen(true);
@@ -445,195 +411,222 @@ export function TasksPage({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Select value={board.project.id} onValueChange={switchProject}>
-            <SelectTrigger className="w-64">
-              <SelectValue placeholder="Select project" />
-            </SelectTrigger>
-            <SelectContent>
-              {projects.map((project) => (
-                <SelectItem key={project.id} value={project.id}>
-                  {project.name} ({project.key})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button variant="outline" onClick={() => setProjectDialogOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Project
-          </Button>
+    <div className="-m-4 flex h-[calc(100vh-3.5rem)] min-h-[520px] md:-m-6">
+      <TasksSidebar
+        activeView={sidebarView}
+        onViewChange={setSidebarView}
+        collapsed={sidebarCollapsed}
+        onCollapsedChange={setSidebarCollapsed}
+      />
+
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
+          <div className="flex items-center gap-2">
+            <Select value={board.project.id} onValueChange={switchProject}>
+              <SelectTrigger className="w-64">
+                <SelectValue placeholder="Select project" />
+              </SelectTrigger>
+              <SelectContent>
+                {projects.map((project) => (
+                  <SelectItem key={project.id} value={project.id}>
+                    {project.name} ({project.key})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button variant="outline" onClick={() => setProjectDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Project
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button onClick={() => openCreateTask(kanbanColumns[0]?.id)}>
+              <Plus className="mr-2 h-4 w-4" />
+              New task
+            </Button>
+            <Button variant="outline" onClick={() => setBacklogPanelOpen(true)}>
+              <Inbox className="mr-2 h-4 w-4" />
+              Backlog
+              {backlogTasks.length ? (
+                <span className="ml-1 rounded-full bg-primary/15 px-1.5 text-xs">{backlogTasks.length}</span>
+              ) : null}
+            </Button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button onClick={() => openCreateTask()}>
-            <Plus className="mr-2 h-4 w-4" />
-            New task
-          </Button>
-          <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as ViewMode)}>
-            <TabsList>
-              <TabsTrigger value="kanban">Kanban</TabsTrigger>
-              <TabsTrigger value="backlog">Backlog</TabsTrigger>
-            </TabsList>
-          </Tabs>
-          <Button variant="outline" size="icon" onClick={() => setSettingsOpen(true)}>
-            <Settings2 className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
-      <div className="grid gap-2 md:grid-cols-[1fr_180px]">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search tasks"
-            className="pl-9"
-          />
-        </div>
-        <Select
-          value={priorityFilter}
-          onValueChange={(value) => setPriorityFilter(value as "all" | TaskPriority)}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Priority" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All priorities</SelectItem>
-            <SelectItem value="low">Low</SelectItem>
-            <SelectItem value="medium">Medium</SelectItem>
-            <SelectItem value="high">High</SelectItem>
-            <SelectItem value="urgent">Urgent</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {viewMode === "kanban" ? (
-        <DndContext
-          sensors={sensors}
-          onDragStart={(event) => setActiveDragId(String(event.active.id))}
-          onDragEnd={onDragEnd}
-          onDragCancel={() => setActiveDragId(null)}
-        >
-          <div className="grid gap-4 lg:grid-cols-4">
-            {sortedColumns.map((column) => {
-              const tasks = groupedFiltered[column.id] ?? [];
-              const wipExceeded = column.wipLimit != null && tasks.length > column.wipLimit;
-              return (
-                <KanbanColumn
-                  key={column.id}
-                  id={column.id}
-                  className="rounded-xl border bg-card/50 p-3"
+        <div className="min-h-0 flex-1 overflow-auto p-4 md:p-6">
+          {sidebarView === "board" ? (
+            <div className="space-y-4">
+              <div className="grid gap-2 md:grid-cols-[1fr_180px_180px]">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder="Search tasks"
+                    className="pl-9"
+                  />
+                </div>
+                <Select
+                  value={priorityFilter}
+                  onValueChange={(value) => setPriorityFilter(value as "all" | TaskPriority)}
                 >
-                  <div className="mb-3 flex items-center justify-between gap-2">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <span
-                        className="inline-flex h-2.5 w-2.5 rounded-full"
-                        style={{ backgroundColor: column.color }}
-                      />
-                      <h3 className="truncate text-sm font-semibold">{column.name}</h3>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Badge
-                        variant="outline"
-                        className={
-                          wipExceeded
-                            ? "border-rose-500/60 text-rose-400"
-                            : "border-muted-foreground/40 text-muted-foreground"
-                        }
-                      >
-                        {tasks.length}
-                        {column.wipLimit != null ? `/${column.wipLimit}` : ""}
-                      </Badge>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() => openCreateTask(column.id)}
-                        aria-label={`Add task to ${column.name}`}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All priorities</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="urgent">Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Assignee" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All assignees</SelectItem>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                    {projectUsers.map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-                  <SortableContext items={tasks.map((task) => task.id)} strategy={verticalListSortingStrategy}>
-                    <div className="space-y-2">
-                      <AnimatePresence>
-                        {tasks.length === 0 ? (
-                          <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground"
-                          >
-                            No tasks
-                          </motion.div>
-                        ) : (
-                          tasks.map((task) => (
-                            <TaskCard
-                              key={task.id}
-                              task={task}
-                              taskKey={makeTaskKey(board.project.key, task.number)}
-                              labelsById={labelsById}
-                              onClick={() => openTaskModal(task)}
+              <DndContext
+                sensors={sensors}
+                onDragStart={(event) => setActiveDragId(String(event.active.id))}
+                onDragEnd={onDragEnd}
+                onDragCancel={() => setActiveDragId(null)}
+              >
+                <div className="flex gap-4 overflow-x-auto pb-2">
+                  {kanbanColumns.map((column) => {
+                    const tasks = groupedFiltered[column.id] ?? [];
+                    const wipExceeded = column.wipLimit != null && tasks.length > column.wipLimit;
+                    return (
+                      <KanbanColumn
+                        key={column.id}
+                        id={column.id}
+                        className="w-[280px] shrink-0 rounded-xl border bg-card/50 p-3"
+                      >
+                        <div className="mb-3 flex items-center justify-between gap-2">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <span
+                              className="inline-flex h-2.5 w-2.5 rounded-full"
+                              style={{ backgroundColor: column.color }}
                             />
-                          ))
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  </SortableContext>
-                </KanbanColumn>
-              );
-            })}
-          </div>
+                            <h3 className="truncate text-sm font-semibold">{column.name}</h3>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Badge
+                              variant="outline"
+                              className={
+                                wipExceeded
+                                  ? "border-rose-500/60 text-rose-400"
+                                  : "border-muted-foreground/40 text-muted-foreground"
+                              }
+                            >
+                              {tasks.length}
+                              {column.wipLimit != null ? `/${column.wipLimit}` : ""}
+                            </Badge>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => openCreateTask(column.id)}
+                              aria-label={`Add task to ${column.name}`}
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
 
-          <DragOverlay>
-            {activeDragTask ? (
-              <TaskCard
-                task={activeDragTask}
-                taskKey={makeTaskKey(board.project.key, activeDragTask.number)}
-                labelsById={labelsById}
-                onClick={() => {}}
-              />
-            ) : null}
-          </DragOverlay>
-        </DndContext>
-      ) : (
-        <div className="rounded-xl border bg-card p-4">
-          <h3 className="mb-3 text-sm font-semibold">
-            Backlog ({(groupedFiltered[sortedColumns.find((column) => column.isBacklog)?.id ?? ""] ?? []).length})
-          </h3>
-          <div className="space-y-2">
-            {(groupedFiltered[sortedColumns.find((column) => column.isBacklog)?.id ?? ""] ?? []).length === 0 ? (
-              <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-                No backlog tasks match your filters.
-              </p>
-            ) : (
-              (groupedFiltered[sortedColumns.find((column) => column.isBacklog)?.id ?? ""] ?? []).map(
-                (task) => (
-                  <button
-                    key={task.id}
-                    onClick={() => openTaskModal(task)}
-                    className="flex w-full items-center justify-between rounded-md border p-3 text-left hover:bg-accent/40"
-                  >
-                    <div>
-                      <p className="text-xs text-muted-foreground">
-                        {makeTaskKey(board.project.key, task.number)}
-                      </p>
-                      <p className="font-medium">{task.title}</p>
-                    </div>
-                    <Badge variant="outline" className="capitalize">
-                      {task.priority}
-                    </Badge>
-                  </button>
-                )
-              )
-            )}
-          </div>
+                        <SortableContext
+                          items={tasks.map((task) => task.id)}
+                          strategy={verticalListSortingStrategy}
+                        >
+                          <div className="space-y-2">
+                            <AnimatePresence>
+                              {tasks.length === 0 ? (
+                                <motion.div
+                                  initial={{ opacity: 0 }}
+                                  animate={{ opacity: 1 }}
+                                  className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground"
+                                >
+                                  No tasks
+                                </motion.div>
+                              ) : (
+                                tasks.map((task) => (
+                                  <TaskCard
+                                    key={task.id}
+                                    task={task}
+                                    taskKey={makeTaskKey(board.project.key, task.number)}
+                                    labelsById={labelsById}
+                                    onClick={() => openTaskModal(task)}
+                                  />
+                                ))
+                              )}
+                            </AnimatePresence>
+                          </div>
+                        </SortableContext>
+                      </KanbanColumn>
+                    );
+                  })}
+                </div>
+
+                <DragOverlay>
+                  {activeDragTask ? (
+                    <TaskCard
+                      task={activeDragTask}
+                      taskKey={makeTaskKey(board.project.key, activeDragTask.number)}
+                      labelsById={labelsById}
+                      onClick={() => {}}
+                    />
+                  ) : null}
+                </DragOverlay>
+              </DndContext>
+            </div>
+          ) : null}
+
+          {sidebarView === "issues" ? (
+            <TasksIssuesView
+              board={board}
+              search={search}
+              onSearchChange={setSearch}
+              priorityFilter={priorityFilter}
+              onPriorityFilterChange={setPriorityFilter}
+              assigneeFilter={assigneeFilter}
+              onAssigneeFilterChange={setAssigneeFilter}
+              projectUsers={projectUsers}
+              onOpenTask={openTaskModal}
+            />
+          ) : null}
+
+          {sidebarView === "roadmap" ? (
+            <TasksRoadmapView board={board} onOpenTask={openTaskModal} />
+          ) : null}
+
+          {sidebarView === "settings" ? (
+            <TasksProjectSettings board={board} onRefresh={refreshBoard} />
+          ) : null}
         </div>
-      )}
+      </div>
+
+      <TasksBacklogPanel
+        open={backlogPanelOpen}
+        onOpenChange={setBacklogPanelOpen}
+        projectId={board.project.id}
+        projectKey={board.project.key}
+        backlogTasks={backlogTasks}
+        onRefresh={refreshBoard}
+        onOpenTask={openTaskModal}
+      />
 
       <Dialog open={projectDialogOpen} onOpenChange={setProjectDialogOpen}>
         <DialogContent>
@@ -671,86 +664,13 @@ export function TasksPage({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-        <DialogContent className="h-[85vh] overflow-y-auto sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Board settings</DialogTitle>
-            <DialogDescription>Manage columns, WIP limits, and labels.</DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-6">
-            <section className="space-y-3">
-              <h4 className="text-sm font-semibold">Columns</h4>
-              {sortedColumns.map((column) => (
-                <EditableColumnRow
-                  key={column.id}
-                  column={column}
-                  onSave={saveColumn}
-                  onDelete={deleteColumnNow}
-                />
-              ))}
-              <div className="grid gap-2 rounded-lg border p-3 md:grid-cols-[1fr_140px_120px_auto]">
-                <Input
-                  value={newColumnName}
-                  onChange={(event) => setNewColumnName(event.target.value)}
-                  placeholder="Column name"
-                />
-                <Input
-                  value={newColumnColor}
-                  onChange={(event) => setNewColumnColor(event.target.value)}
-                  placeholder="#6366f1"
-                />
-                <Input
-                  value={newColumnWip}
-                  onChange={(event) => setNewColumnWip(event.target.value)}
-                  placeholder="WIP"
-                  type="number"
-                />
-                <Button onClick={createColumnNow} disabled={!newColumnName.trim() || isPending}>
-                  Add
-                </Button>
-              </div>
-            </section>
-
-            <section className="space-y-3">
-              <h4 className="text-sm font-semibold">Labels</h4>
-              <div className="flex flex-wrap gap-2">
-                {board.labels.map((label) => (
-                  <Badge
-                    key={label.id}
-                    variant="outline"
-                    className="border-transparent"
-                    style={{ backgroundColor: `${label.color}30`, color: label.color }}
-                  >
-                    {label.name}
-                  </Badge>
-                ))}
-              </div>
-              <div className="grid gap-2 rounded-lg border p-3 md:grid-cols-[1fr_140px_auto]">
-                <Input
-                  value={newLabelName}
-                  onChange={(event) => setNewLabelName(event.target.value)}
-                  placeholder="Label name"
-                />
-                <Input
-                  value={newLabelColor}
-                  onChange={(event) => setNewLabelColor(event.target.value)}
-                  placeholder="#22c55e"
-                />
-                <Button onClick={createLabelNow} disabled={!newLabelName.trim() || isPending}>
-                  Add
-                </Button>
-              </div>
-            </section>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       <CreateTaskDialog
         open={createTaskOpen}
         onOpenChange={setCreateTaskOpen}
         projectId={board.project.id}
         columns={sortedColumns}
+        projectUsers={projectUsers}
+        parentCandidates={parentCandidates}
         defaultColumnId={createTaskColumnId}
         onCreated={refreshBoard}
       />
@@ -762,6 +682,8 @@ export function TasksPage({
         taskDetails={modalTaskDetails}
         columns={sortedColumns}
         labels={board.labels}
+        projectUsers={projectUsers}
+        parentCandidates={parentCandidates}
         onTaskSaved={async () => {
           await refreshBoard();
           if (modalTaskKey) {
@@ -777,51 +699,6 @@ export function TasksPage({
           void refreshBoard();
         }}
       />
-    </div>
-  );
-}
-
-function EditableColumnRow({
-  column,
-  onSave,
-  onDelete,
-}: {
-  column: ProjectBoard["columns"][number];
-  onSave: (columnId: string, name: string, color: string, wipLimit: string) => void;
-  onDelete: (columnId: string, columnName: string) => void;
-}) {
-  const [name, setName] = useState(column.name);
-  const [color, setColor] = useState(column.color);
-  const [wipLimit, setWipLimit] = useState(column.wipLimit?.toString() ?? "");
-
-  useEffect(() => {
-    setName(column.name);
-    setColor(column.color);
-    setWipLimit(column.wipLimit?.toString() ?? "");
-  }, [column]);
-
-  return (
-    <div className="grid gap-2 rounded-lg border p-3 md:grid-cols-[1fr_140px_120px_auto]">
-      <Input value={name} onChange={(event) => setName(event.target.value)} />
-      <Input value={color} onChange={(event) => setColor(event.target.value)} />
-      <Input
-        value={wipLimit}
-        onChange={(event) => setWipLimit(event.target.value)}
-        placeholder="WIP"
-        type="number"
-      />
-      <Button variant="outline" onClick={() => onSave(column.id, name, color, wipLimit)}>
-        Save
-      </Button>
-      {!column.isBacklog ? (
-        <Button
-          variant="ghost"
-          className="text-destructive"
-          onClick={() => onDelete(column.id, column.name)}
-        >
-          Delete
-        </Button>
-      ) : null}
     </div>
   );
 }

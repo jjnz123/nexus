@@ -77,10 +77,18 @@ export function TaskCard({
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">
+        <Badge variant="outline" className="text-[10px] capitalize">
+          {task.type}
+        </Badge>
         <Badge variant="outline" className={cn("capitalize", priorityTone[task.priority])}>
           <Flag className="mr-1 h-3 w-3" />
           {task.priority}
         </Badge>
+        {task.assigneeName ? (
+          <Badge variant="secondary" className="text-[10px]">
+            {task.assigneeName}
+          </Badge>
+        ) : null}
         {dueLabel && (
           <Badge variant="outline" className="border-muted-foreground/40 text-muted-foreground">
             <Calendar className="mr-1 h-3 w-3" />

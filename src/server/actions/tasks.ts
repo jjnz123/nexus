@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { eq, asc, and, max } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/lib/db";
 import {
   projects,
@@ -82,13 +83,17 @@ export async function getProjectBoard(projectId: string) {
     .where(eq(taskColumns.projectId, projectId))
     .orderBy(asc(taskColumns.sortOrder));
 
+  const parentTasks = alias(tasks, "parent_tasks");
+
   const projectTasks = await db
     .select({
       task: tasks,
       assignee: users,
+      parent: parentTasks,
     })
     .from(tasks)
     .leftJoin(users, eq(tasks.assigneeId, users.id))
+    .leftJoin(parentTasks, eq(tasks.parentId, parentTasks.id))
     .where(eq(tasks.projectId, projectId))
     .orderBy(asc(tasks.sortOrder));
 
@@ -103,9 +108,10 @@ export async function getProjectBoard(projectId: string) {
   return {
     project,
     columns,
-    tasks: projectTasks.map(({ task, assignee }) => ({
+    tasks: projectTasks.map(({ task, assignee, parent }) => ({
       ...task,
       assigneeName: assignee?.name ?? null,
+      parentTitle: parent?.title ?? null,
       labelIds: labelMaps.filter((m) => m.taskId === task.id).map((m) => m.labelId),
       subtasks: subtasks.filter((s) => s.taskId === task.id),
     })),
@@ -198,6 +204,8 @@ export async function createTask(input: unknown) {
       priority: data.priority,
       dueDate: data.dueDate ? new Date(data.dueDate) : null,
       assigneeId: data.assigneeId,
+      type: data.type ?? "task",
+      parentId: data.parentId ?? null,
       sortOrder: columnTasks.length,
     })
     .returning();
@@ -440,4 +448,83 @@ export async function exportProject(projectId: string) {
   requireSessionPermission(session, "tasks:view");
   const board = await getProjectBoard(projectId);
   return board;
+}
+
+export async function reorderColumns(items: { id: string; sortOrder: number }[]) {
+  const session = await requireAuth();
+  requireSessionPermission(session, "tasks:edit");
+
+  for (const item of items) {
+    await db
+      .update(taskColumns)
+      .set({ sortOrder: item.sortOrder })
+      .where(eq(taskColumns.id, item.id));
+  }
+
+  revalidatePath("/tasks");
+  return { success: true };
+}
+
+export async function moveTaskToBoard(taskId: string) {
+  const session = await requireAuth();
+  requireSessionPermission(session, "tasks:edit");
+
+  const [task] = await db.select().from(tasks).where(eq(tasks.id, taskId)).limit(1);
+  if (!task) throw new Error("Task not found");
+
+  const columns = await db
+    .select()
+    .from(taskColumns)
+    .where(eq(taskColumns.projectId, task.projectId))
+    .orderBy(asc(taskColumns.sortOrder));
+
+  const targetColumn = columns.find((c) => !c.isBacklog);
+  if (!targetColumn) throw new Error("No board column available");
+
+  const columnTasks = await db.select().from(tasks).where(eq(tasks.columnId, targetColumn.id));
+
+  await db
+    .update(tasks)
+    .set({
+      columnId: targetColumn.id,
+      sortOrder: columnTasks.length,
+      updatedAt: new Date(),
+    })
+    .where(eq(tasks.id, taskId));
+
+  revalidatePath("/tasks");
+  return { success: true };
+}
+
+export async function createBacklogTask(input: {
+  projectId: string;
+  title: string;
+  description?: string;
+  priority?: "low" | "medium" | "high" | "urgent";
+  type?: "epic" | "feature" | "story" | "task";
+  assigneeId?: string | null;
+  parentId?: string | null;
+}) {
+  const session = await requireAuth();
+  requireSessionPermission(session, "tasks:edit");
+
+  const backlogColumn = await db
+    .select()
+    .from(taskColumns)
+    .where(and(eq(taskColumns.projectId, input.projectId), eq(taskColumns.isBacklog, true)))
+    .limit(1);
+
+  const column = backlogColumn[0];
+  if (!column) throw new Error("Backlog column not found");
+
+  return createTask({
+    projectId: input.projectId,
+    columnId: column.id,
+    title: input.title,
+    description: input.description,
+    priority: input.priority,
+    type: input.type,
+    assigneeId: input.assigneeId,
+    parentId: input.parentId,
+  });
 }

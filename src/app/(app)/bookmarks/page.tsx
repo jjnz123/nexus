@@ -24,6 +24,7 @@ export default async function BookmarksRoutePage() {
       tabs={tabs}
       userId={userId}
       canEdit={hasPermission(role, "bookmarks:edit", permissions)}
+      isAdmin={hasPermission(role, "admin:access", permissions)}
       canUseAi={hasPermission(role, "ai:use", permissions)}
       canConfigureMonitoring={hasPermission(role, "monitoring:configure", permissions)}
       canViewMonitoring={hasPermission(role, "monitoring:view", permissions)}

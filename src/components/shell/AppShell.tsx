@@ -36,27 +36,27 @@ const navItems: {
 function NavLink({
   item,
   active,
-  compact,
+  showLabels,
 }: {
   item: (typeof navItems)[number];
   active: boolean;
-  compact?: boolean;
+  showLabels: boolean;
 }) {
   const Icon = item.icon;
   return (
     <Link
       href={item.href}
-      title={compact ? item.label : undefined}
+      title={showLabels ? undefined : item.label}
       className={cn(
         "flex items-center rounded-lg text-sm font-medium transition-colors",
-        compact ? "h-9 w-9 justify-center" : "gap-3 px-3 py-2",
+        showLabels ? "mx-2 gap-3 px-3 py-2" : "mx-auto h-9 w-9 justify-center",
         active
           ? "bg-primary/15 text-primary"
           : "text-muted-foreground hover:bg-accent hover:text-foreground"
       )}
     >
       <Icon className="h-4 w-4 shrink-0" />
-      {!compact ? item.label : null}
+      {showLabels ? <span className="truncate">{item.label}</span> : null}
     </Link>
   );
 }
@@ -93,41 +93,29 @@ export function AppShell({
   };
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex h-dvh overflow-hidden bg-background">
       <CollapsibleSideRail
         collapsed={sidebarCollapsed}
         onCollapsedChange={handleSidebarCollapsedChange}
         expandedWidth={256}
-        header={
-          <div className="flex items-center gap-2 px-1">
-            <LayoutDashboard className="h-6 w-6 text-primary" />
-            <span className="text-lg font-bold tracking-tight">Nexus</span>
-          </div>
-        }
-        compactContent={
-          <>
-            <div className="mb-2 flex h-9 w-9 items-center justify-center">
-              <LayoutDashboard className="h-5 w-5 text-primary" />
-            </div>
+        headerIcon={<LayoutDashboard className="h-5 w-5 text-primary" />}
+        headerLabel="Nexus"
+      >
+        {({ showLabels }) => (
+          <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto py-2">
             {visibleNav.map((item) => {
               const active =
                 item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
-              return <NavLink key={item.href} item={item} active={active} compact />;
+              return (
+                <NavLink key={item.href} item={item} active={active} showLabels={showLabels} />
+              );
             })}
-          </>
-        }
-      >
-        <nav className="space-y-1 p-3 pt-2">
-          {visibleNav.map((item) => {
-            const active =
-              item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
-            return <NavLink key={item.href} item={item} active={active} />;
-          })}
-        </nav>
+          </nav>
+        )}
       </CollapsibleSideRail>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b bg-background/80 px-4 backdrop-blur md:px-6">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center justify-between border-b bg-background/80 px-4 backdrop-blur md:px-6">
           <div className="flex items-center gap-2 md:hidden">
             <LayoutDashboard className="h-5 w-5 text-primary" />
             <span className="font-semibold">Nexus</span>
@@ -149,7 +137,7 @@ export function AppShell({
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.25 }}
-          className="flex-1 overflow-auto p-4 md:p-6"
+          className="min-h-0 flex-1 overflow-auto p-4 md:p-6"
         >
           {children}
         </motion.main>

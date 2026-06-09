@@ -75,6 +75,7 @@ import { BookmarkCardItem } from "./BookmarkCardItem";
 import { BookmarkEditDialog, type BookmarkFormInput } from "./BookmarkEditDialog";
 import { BookmarkDeleteDialog } from "./BookmarkDeleteDialog";
 import { BookmarkImportDialog } from "./BookmarkImportDialog";
+import { BookmarkShareDialog } from "./BookmarkShareDialog";
 import { BookmarksEmptyState } from "./BookmarksEmptyState";
 import { BookmarksSkeleton } from "./BookmarksSkeleton";
 import {
@@ -113,6 +114,7 @@ type SuggestionItem = {
 type BookmarksPageProps = {
   tabs: BookmarkTab[];
   canEdit: boolean;
+  isAdmin?: boolean;
   canUseAi?: boolean;
   canConfigureMonitoring?: boolean;
   canViewMonitoring?: boolean;
@@ -326,6 +328,7 @@ async function downloadExportJson(
 export function BookmarksPage({
   tabs: initialTabs,
   canEdit,
+  isAdmin = false,
   canUseAi = false,
   canConfigureMonitoring = false,
   canViewMonitoring = false,
@@ -383,6 +386,7 @@ export function BookmarksPage({
 
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importJson, setImportJson] = useState("");
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
 
   const importInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -1321,25 +1325,77 @@ export function BookmarksPage({
     setCardDialogOpen(true);
   }
 
-  if (!tabs.length) {
-    return (
-      <BookmarksEmptyState
-        variant="no-tabs"
-        canEdit={canEdit}
-        onAddTab={() => setCreateTabOpen(true)}
-        onImport={() => importInputRef.current?.click()}
-      />
-    );
-  }
-
   const showNoGroupsState =
-    !loadingData && activeTabId && groups.length === 0 && !search;
+    tabs.length > 0 && !loadingData && activeTabId && groups.length === 0 && !search;
   const showNoCardsState =
+    tabs.length > 0 &&
     !loadingData &&
     groups.length > 0 &&
     cards.length === 0 &&
     !search &&
     !showArchived;
+
+  const sharedDialogs = (
+    <>
+      <input
+        ref={importInputRef}
+        type="file"
+        accept="application/json"
+        className="hidden"
+        onChange={(event) => void handleImportFile(event.target.files?.[0])}
+      />
+
+      <Dialog open={createTabOpen} onOpenChange={setCreateTabOpen}>
+        <DialogContent className="border-zinc-800 bg-zinc-950 text-zinc-100">
+          <DialogHeader>
+            <DialogTitle>Create tab</DialogTitle>
+            <DialogDescription className="text-zinc-400">
+              Add a new bookmark tab.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="new-tab-name">Name</Label>
+            <Input
+              id="new-tab-name"
+              value={newTabName}
+              onChange={(event) => setNewTabName(event.target.value)}
+              placeholder="Engineering"
+              onKeyDown={(event) => {
+                if (event.key === "Enter") void handleCreateTab();
+              }}
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setCreateTabOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => void handleCreateTab()}>Create</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <BookmarkImportDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        json={importJson}
+        onComplete={() => void handleImportComplete()}
+      />
+    </>
+  );
+
+  if (!tabs.length) {
+    return (
+      <>
+        <BookmarksEmptyState
+          variant="no-tabs"
+          canEdit={canEdit}
+          onAddTab={() => setCreateTabOpen(true)}
+          onImport={() => importInputRef.current?.click()}
+        />
+        {sharedDialogs}
+      </>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -1387,11 +1443,13 @@ export function BookmarksPage({
           ) : null}
           <TabActions
             canEdit={canEdit}
+            isAdmin={isAdmin}
             onRename={() => {
               setRenameTabName(activeTab?.name ?? "");
               setRenameTabOpen(true);
             }}
             onDelete={() => void handleDeleteActiveTab()}
+            onShare={() => setShareDialogOpen(true)}
             disableDelete={tabs.length <= 1}
           />
         </div>
@@ -1701,12 +1759,15 @@ export function BookmarksPage({
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
-            <Label htmlFor="new-tab-name">Name</Label>
+            <Label htmlFor="new-tab-name-main">Name</Label>
             <Input
-              id="new-tab-name"
+              id="new-tab-name-main"
               value={newTabName}
               onChange={(event) => setNewTabName(event.target.value)}
               placeholder="Engineering"
+              onKeyDown={(event) => {
+                if (event.key === "Enter") void handleCreateTab();
+              }}
             />
           </div>
           <div className="flex justify-end gap-2">
@@ -1717,6 +1778,13 @@ export function BookmarksPage({
           </div>
         </DialogContent>
       </Dialog>
+
+      <BookmarkImportDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        json={importJson}
+        onComplete={() => void handleImportComplete()}
+      />
 
       <Dialog open={renameTabOpen} onOpenChange={setRenameTabOpen}>
         <DialogContent className="border-zinc-800 bg-zinc-950 text-zinc-100">
@@ -1814,13 +1882,6 @@ export function BookmarksPage({
         onConfirm={handleConfirmDelete}
       />
 
-      <BookmarkImportDialog
-        open={importDialogOpen}
-        onOpenChange={setImportDialogOpen}
-        json={importJson}
-        onComplete={() => void handleImportComplete()}
-      />
-
       {canEdit ? (
         <div className="flex justify-end">
           <Button
@@ -1835,6 +1896,14 @@ export function BookmarksPage({
       ) : null}
 
       {LaunchModal}
+
+      <BookmarkShareDialog
+        open={shareDialogOpen}
+        onOpenChange={setShareDialogOpen}
+        resourceType="tab"
+        resourceId={activeTabId}
+        resourceName={activeTab?.name ?? "Tab"}
+      />
 
       {activeDragId ? <div className="sr-only">{activeDragId}</div> : null}
     </div>

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { toast } from "sonner";
 import { importBookmarks, previewImportBookmarks } from "@/server/actions/bookmarks";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,23 +39,28 @@ export function BookmarkImportDialog({
   );
   const [isPending, startTransition] = useTransition();
 
-  async function loadPreview() {
-    try {
-      const stats = await previewImportBookmarks(json);
-      setPreview(stats);
-    } catch {
+  useEffect(() => {
+    if (!open || !json.trim()) {
       setPreview(null);
+      return;
     }
-  }
+
+    let cancelled = false;
+    void previewImportBookmarks(json)
+      .then((stats) => {
+        if (!cancelled) setPreview(stats);
+      })
+      .catch(() => {
+        if (!cancelled) setPreview(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, json]);
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        onOpenChange(next);
-        if (next) void loadPreview();
-      }}
-    >
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Import bookmarks</DialogTitle>
@@ -102,9 +108,14 @@ export function BookmarkImportDialog({
               disabled={isPending || !preview}
               onClick={() =>
                 startTransition(async () => {
-                  await importBookmarks({ json, mode });
-                  onOpenChange(false);
-                  onComplete();
+                  try {
+                    await importBookmarks({ json, mode });
+                    onOpenChange(false);
+                    onComplete();
+                    toast.success("Bookmarks imported");
+                  } catch (error) {
+                    toast.error(error instanceof Error ? error.message : "Import failed");
+                  }
                 })
               }
             >

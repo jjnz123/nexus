@@ -25,6 +25,7 @@ import {
   MAX_USER_FAVOURITES,
 } from "@/lib/validators/bookmarks";
 import { logAudit } from "@/server/audit";
+import { filterVisibleBookmarkTabs } from "@/server/actions/bookmark-shares";
 
 function cardInputFromData(data: ReturnType<typeof bookmarkCardSchema.parse>) {
   return {
@@ -50,7 +51,8 @@ function cardInputFromData(data: ReturnType<typeof bookmarkCardSchema.parse>) {
 export async function getBookmarkTabs() {
   const session = await requireAuth();
   requireSessionPermission(session, "bookmarks:view");
-  return db.select().from(bookmarkTabs).orderBy(asc(bookmarkTabs.sortOrder));
+  const tabs = await db.select().from(bookmarkTabs).orderBy(asc(bookmarkTabs.sortOrder));
+  return filterVisibleBookmarkTabs(tabs, session);
 }
 
 export async function getBookmarkTabData(tabId: string, includeArchived = false) {

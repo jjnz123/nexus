@@ -30,7 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import type { TaskColumn, TaskDetails, TaskLabel, TaskPriority } from "./types";
+import type { TaskColumn, TaskDetails, TaskLabel, TaskPriority, TaskType } from "./types";
 
 function asDateInput(value: string | Date | null) {
   if (!value) return "";
@@ -51,6 +51,8 @@ export function TaskModal({
   taskDetails,
   columns,
   labels,
+  projectUsers,
+  parentCandidates,
   onTaskSaved,
   onTaskDeleted,
 }: {
@@ -60,6 +62,8 @@ export function TaskModal({
   taskDetails: TaskDetails | null;
   columns: TaskColumn[];
   labels: TaskLabel[];
+  projectUsers: { id: string; name: string }[];
+  parentCandidates: { id: string; title: string; type: TaskType; number: number }[];
   onTaskSaved: () => Promise<void> | void;
   onTaskDeleted?: () => void;
 }) {
@@ -69,6 +73,9 @@ export function TaskModal({
   const [priority, setPriority] = useState<TaskPriority>("medium");
   const [dueDate, setDueDate] = useState("");
   const [columnId, setColumnId] = useState("");
+  const [assigneeId, setAssigneeId] = useState<string>("none");
+  const [taskType, setTaskType] = useState<TaskType>("task");
+  const [parentId, setParentId] = useState<string>("none");
   const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
   const [subtaskDraft, setSubtaskDraft] = useState("");
   const [commentDraft, setCommentDraft] = useState("");
@@ -82,6 +89,9 @@ export function TaskModal({
     setPriority(taskDetails.task.priority);
     setDueDate(asDateInput(taskDetails.task.dueDate));
     setColumnId(taskDetails.task.columnId);
+    setAssigneeId(taskDetails.task.assigneeId ?? "none");
+    setTaskType(taskDetails.task.type ?? "task");
+    setParentId(taskDetails.task.parentId ?? "none");
     setSelectedLabels(taskDetails.labelIds);
     setLocalSubtasks(taskDetails.subtasks);
     setLocalComments(taskDetails.comments);
@@ -110,6 +120,9 @@ export function TaskModal({
           priority,
           dueDate: asIsoDate(dueDate),
           columnId,
+          assigneeId: assigneeId === "none" ? null : assigneeId,
+          type: taskType,
+          parentId: parentId === "none" ? null : parentId,
         });
         await setTaskLabels(taskDetails.task.id, selectedLabels);
         await onTaskSaved();
@@ -271,6 +284,57 @@ export function TaskModal({
                         {column.name}
                       </SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="space-y-2">
+                <Label>Type</Label>
+                <Select value={taskType} onValueChange={(v) => setTaskType(v as TaskType)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="epic">Epic</SelectItem>
+                    <SelectItem value="feature">Feature</SelectItem>
+                    <SelectItem value="story">Story</SelectItem>
+                    <SelectItem value="task">Task</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Assignee</Label>
+                <Select value={assigneeId} onValueChange={setAssigneeId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Unassigned" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Unassigned</SelectItem>
+                    {projectUsers.map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Parent</Label>
+                <Select value={parentId} onValueChange={setParentId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="None" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {parentCandidates
+                      .filter((candidate) => candidate.id !== taskDetails.task.id)
+                      .map((candidate) => (
+                        <SelectItem key={candidate.id} value={candidate.id}>
+                          {candidate.type} · {candidate.title}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>

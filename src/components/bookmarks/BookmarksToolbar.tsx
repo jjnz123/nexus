@@ -342,26 +342,39 @@ export function BulkToolbar({
 
 export function TabActions({
   canEdit,
+  isAdmin,
   onRename,
   onDelete,
+  onShare,
   disableDelete,
 }: {
   canEdit: boolean;
+  isAdmin?: boolean;
   onRename: () => void;
   onDelete: () => void;
+  onShare?: () => void;
   disableDelete: boolean;
 }) {
-  if (!canEdit) return null;
+  if (!canEdit && !isAdmin) return null;
   return (
     <div className="flex items-center gap-2">
-      <Button variant="outline" size="sm" onClick={onRename}>
-        <Pencil className="h-4 w-4" />
-        Rename tab
-      </Button>
-      <Button variant="outline" size="sm" onClick={onDelete} disabled={disableDelete}>
-        <Trash2 className="h-4 w-4" />
-        Delete tab
-      </Button>
+      {isAdmin && onShare ? (
+        <Button variant="outline" size="sm" onClick={onShare}>
+          Share
+        </Button>
+      ) : null}
+      {canEdit ? (
+        <>
+          <Button variant="outline" size="sm" onClick={onRename}>
+            <Pencil className="h-4 w-4" />
+            Rename tab
+          </Button>
+          <Button variant="outline" size="sm" onClick={onDelete} disabled={disableDelete}>
+            <Trash2 className="h-4 w-4" />
+            Delete tab
+          </Button>
+        </>
+      ) : null}
     </div>
   );
 }

@@ -9,6 +9,7 @@ import {
   uuid,
   index,
   primaryKey,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
 export const userRoleEnum = pgEnum("user_role", [
@@ -31,6 +32,16 @@ export const taskPriorityEnum = pgEnum("task_priority", [
   "medium",
   "high",
   "urgent",
+]);
+
+export const taskTypeEnum = pgEnum("task_type", ["epic", "feature", "story", "task"]);
+
+export const bookmarkVisibilityEnum = pgEnum("bookmark_visibility", ["everyone", "restricted"]);
+
+export const bookmarkShareResourceEnum = pgEnum("bookmark_share_resource", [
+  "tab",
+  "group",
+  "card",
 ]);
 
 export const notificationTypeEnum = pgEnum("notification_type", [
@@ -124,9 +135,28 @@ export const bookmarkTabs = pgTable("bookmark_tabs", {
   name: text("name").notNull(),
   sortOrder: integer("sort_order").notNull().default(0),
   layoutLocked: boolean("layout_locked").notNull().default(false),
+  visibility: bookmarkVisibilityEnum("visibility").notNull().default("everyone"),
   createdBy: uuid("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+export const bookmarkShares = pgTable(
+  "bookmark_shares",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    resourceType: bookmarkShareResourceEnum("resource_type").notNull(),
+    resourceId: uuid("resource_id").notNull(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    sharedBy: uuid("shared_by").references(() => users.id),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("bookmark_shares_resource_idx").on(table.resourceType, table.resourceId),
+    index("bookmark_shares_user_idx").on(table.userId),
+  ]
+);
 
 export const bookmarkGroups = pgTable("bookmark_groups", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -376,6 +406,10 @@ export const tasks = pgTable(
     priority: taskPriorityEnum("priority").notNull().default("medium"),
     dueDate: timestamp("due_date"),
     assigneeId: uuid("assignee_id").references(() => users.id),
+    type: taskTypeEnum("type").notNull().default("task"),
+    parentId: uuid("parent_id").references((): AnyPgColumn => tasks.id, {
+      onDelete: "set null",
+    }),
     sortOrder: integer("sort_order").notNull().default(0),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -471,6 +505,8 @@ export const monitorChecks = pgTable(
 export type User = typeof users.$inferSelect;
 export type UserRole = User["role"];
 export type BookmarkTab = typeof bookmarkTabs.$inferSelect;
+export type BookmarkShare = typeof bookmarkShares.$inferSelect;
+export type BookmarkShareResource = "tab" | "group" | "card";
 export type BookmarkGroup = typeof bookmarkGroups.$inferSelect;
 export type BookmarkCard = typeof bookmarkCards.$inferSelect;
 export type Project = typeof projects.$inferSelect;

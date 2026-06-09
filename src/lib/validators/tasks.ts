@@ -25,6 +25,8 @@ export const taskSchema = z.object({
   priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
   dueDate: z.string().datetime().nullable().optional(),
   assigneeId: z.string().uuid().nullable().optional(),
+  type: z.enum(["epic", "feature", "story", "task"]).optional(),
+  parentId: z.string().uuid().nullable().optional(),
 });
 
 export const updateTaskSchema = taskSchema.partial().extend({
