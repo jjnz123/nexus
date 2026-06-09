@@ -26,6 +26,7 @@ import {
   labelSchema,
 } from "@/lib/validators/tasks";
 import { createNotification } from "./users";
+import { logAudit } from "@/server/audit";
 
 export async function getProjects() {
   const session = await requireAuth();
@@ -55,6 +56,12 @@ export async function createProject(input: unknown) {
   }
 
   revalidatePath("/tasks");
+  await logAudit({
+    action: "tasks.project.create",
+    resource: "project",
+    resourceId: project.id,
+    summary: `Created project ${project.key} — ${project.name}`,
+  });
   return project;
 }
 
@@ -211,6 +218,13 @@ export async function createTask(input: unknown) {
   }
 
   revalidatePath("/tasks");
+  await logAudit({
+    action: "tasks.create",
+    resource: "task",
+    resourceId: task.id,
+    summary: `Created task ${task.title}`,
+    details: { priority: task.priority },
+  });
   return task;
 }
 
@@ -253,6 +267,12 @@ export async function updateTask(input: unknown) {
   }
 
   revalidatePath("/tasks");
+  await logAudit({
+    action: "tasks.update",
+    resource: "task",
+    resourceId: task.id,
+    summary: `Updated task ${task.title}`,
+  });
   return task;
 }
 
@@ -261,6 +281,12 @@ export async function deleteTask(id: string) {
   requirePermission(session.user.role, "tasks:edit");
   await db.delete(tasks).where(eq(tasks.id, id));
   revalidatePath("/tasks");
+  await logAudit({
+    action: "tasks.delete",
+    resource: "task",
+    resourceId: id,
+    summary: `Deleted task ${id}`,
+  });
   return { success: true };
 }
 

@@ -8,6 +8,7 @@ import { requireAuth } from "@/lib/auth";
 import { requirePermission } from "@/lib/permissions";
 import { deviceSchema, updateDeviceSchema } from "@/lib/validators/monitoring";
 import { forceCheckDevice } from "@/server/jobs/monitor-runner";
+import { logAudit } from "@/server/audit";
 
 export async function getMonitorDevices() {
   const session = await requireAuth();
@@ -68,6 +69,13 @@ export async function createMonitorDevice(input: unknown) {
   const data = deviceSchema.parse(input);
   const [device] = await db.insert(monitorDevices).values(data).returning();
   revalidatePath("/monitoring");
+  await logAudit({
+    action: "monitoring.device.create",
+    resource: "monitor_device",
+    resourceId: device.id,
+    summary: `Created monitor device "${device.name}"`,
+    details: { target: device.target, checkType: device.checkType },
+  });
   return device;
 }
 
@@ -82,6 +90,12 @@ export async function updateMonitorDevice(input: unknown) {
     .where(eq(monitorDevices.id, id))
     .returning();
   revalidatePath("/monitoring");
+  await logAudit({
+    action: "monitoring.device.update",
+    resource: "monitor_device",
+    resourceId: device.id,
+    summary: `Updated monitor device "${device.name}"`,
+  });
   return device;
 }
 
@@ -90,6 +104,12 @@ export async function deleteMonitorDevice(id: string) {
   requirePermission(session.user.role, "monitoring:configure");
   await db.delete(monitorDevices).where(eq(monitorDevices.id, id));
   revalidatePath("/monitoring");
+  await logAudit({
+    action: "monitoring.device.delete",
+    resource: "monitor_device",
+    resourceId: id,
+    summary: `Deleted monitor device ${id}`,
+  });
   return { success: true };
 }
 
@@ -99,6 +119,13 @@ export async function forceDeviceCheck(id: string) {
   const check = await forceCheckDevice(db, id);
   revalidatePath("/monitoring");
   revalidatePath(`/monitoring/${id}`);
+  await logAudit({
+    action: "monitoring.device.force_check",
+    resource: "monitor_device",
+    resourceId: id,
+    summary: `Forced health check for device ${id}`,
+    details: { status: check.status },
+  });
   return check;
 }
 

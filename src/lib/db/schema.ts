@@ -67,6 +67,28 @@ export const notifications = pgTable(
   (table) => [index("notifications_user_idx").on(table.userId)]
 );
 
+export const auditLogs = pgTable(
+  "audit_logs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    userEmail: text("user_email"),
+    userName: text("user_name"),
+    action: text("action").notNull(),
+    resource: text("resource"),
+    resourceId: text("resource_id"),
+    summary: text("summary").notNull(),
+    details: jsonb("details").$type<Record<string, unknown>>().default({}),
+    ipAddress: text("ip_address"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("audit_logs_created_at_idx").on(table.createdAt),
+    index("audit_logs_user_id_idx").on(table.userId),
+    index("audit_logs_action_idx").on(table.action),
+  ]
+);
+
 export const bookmarkTabs = pgTable("bookmark_tabs", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull(),
@@ -239,3 +261,4 @@ export type Task = typeof tasks.$inferSelect;
 export type MonitorDevice = typeof monitorDevices.$inferSelect;
 export type MonitorCheck = typeof monitorChecks.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
+export type AuditLog = typeof auditLogs.$inferSelect;

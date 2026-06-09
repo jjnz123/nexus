@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { useQuery } from "@tanstack/react-query";
-import { Bell, LogOut, Shield, User } from "lucide-react";
+import { Bell, LogOut, ScrollText, Settings, Shield, User } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,6 +38,8 @@ export function ProfileMenu({
 }: {
   user: { name: string; email: string; role: UserRole; avatarPath: string | null };
 }) {
+  const isAdmin = hasPermission(user.role, "admin:access");
+
   const { data: unread = 0 } = useQuery({
     queryKey: ["notifications-unread"],
     queryFn: getUnreadNotificationCount,
@@ -131,21 +133,40 @@ export function ProfileMenu({
             <div className="text-xs font-normal text-muted-foreground">{user.email}</div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem asChild>
-            <Link href="/settings">
-              <User className="mr-2 h-4 w-4" />
-              Profile Settings
-            </Link>
-          </DropdownMenuItem>
-          {hasPermission(user.role, "admin:access") && (
-            <DropdownMenuItem asChild>
-              <Link href="/admin">
-                <Shield className="mr-2 h-4 w-4" />
-                Admin Panel
-              </Link>
-            </DropdownMenuItem>
+          {isAdmin && (
+            <>
+              <DropdownMenuItem asChild>
+                <Link href="/settings">
+                  <Settings className="mr-2 h-4 w-4" />
+                  Settings
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/admin">
+                  <Shield className="mr-2 h-4 w-4" />
+                  Admin Panel
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/admin?tab=audit">
+                  <ScrollText className="mr-2 h-4 w-4" />
+                  Audit Logs
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
           )}
-          <DropdownMenuSeparator />
+          {!isAdmin && (
+            <>
+              <DropdownMenuItem asChild>
+                <Link href="/settings">
+                  <User className="mr-2 h-4 w-4" />
+                  Profile Settings
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          )}
           <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/login" })}>
             <LogOut className="mr-2 h-4 w-4" />
             Log out

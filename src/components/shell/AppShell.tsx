@@ -8,8 +8,6 @@ import {
   CheckSquare,
   Home,
   LayoutDashboard,
-  Settings,
-  Shield,
   Activity,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -22,8 +20,6 @@ const navItems = [
   { href: "/bookmarks", label: "Bookmarks", icon: Bookmark, perm: "bookmarks:view" as const },
   { href: "/tasks", label: "Tasks", icon: CheckSquare, perm: "tasks:view" as const },
   { href: "/monitoring", label: "Monitoring", icon: Activity, perm: "monitoring:view" as const },
-  { href: "/admin", label: "Admin", icon: Shield, perm: "admin:access" as const },
-  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function AppShell({

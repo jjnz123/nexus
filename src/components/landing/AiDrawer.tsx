@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Loader2, Send, X } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { createId } from "@/lib/create-id";
 
 type Message = {
   id: string;
@@ -19,38 +21,51 @@ type AiDrawerProps = {
   promptNonce?: number;
 };
 
+async function readAiError(response: Response): Promise<string> {
+  const text = await response.text();
+  if (response.status === 401) return "You do not have permission to use AI.";
+  if (response.status === 503) return "AI is not configured. Set XAI_API_KEY on the server.";
+  return text || `AI request failed (${response.status})`;
+}
+
 export function AiDrawer({
   open,
   onOpenChange,
   initialPrompt,
-  promptNonce,
+  promptNonce = 0,
 }: AiDrawerProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
+  const messagesRef = useRef<Message[]>([]);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   const canSend = useMemo(
     () => input.trim().length > 0 && !isLoading,
     [input, isLoading]
   );
 
-  async function sendMessage(rawInput?: string) {
+  const sendMessage = useCallback(async (rawInput?: string) => {
     const value = (rawInput ?? input).trim();
     if (!value || isLoading) return;
 
     const userMessage: Message = {
-      id: crypto.randomUUID(),
+      id: createId(),
       role: "user",
       content: value,
     };
-    const assistantMessageId = crypto.randomUUID();
-
-    setMessages((prev) => [
-      ...prev,
+    const assistantMessageId = createId();
+    const nextMessages = [
+      ...messagesRef.current,
       userMessage,
-      { id: assistantMessageId, role: "assistant", content: "" },
-    ]);
+      { id: assistantMessageId, role: "assistant" as const, content: "" },
+    ];
+
+    setMessages(nextMessages);
     setInput("");
     setIsLoading(true);
     setIsThinking(true);
@@ -60,7 +75,7 @@ export function AiDrawer({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: [...messages, userMessage].map((message) => ({
+          messages: [...messagesRef.current, userMessage].map((message) => ({
             role: message.role,
             content: message.content,
           })),
@@ -68,7 +83,7 @@ export function AiDrawer({
       });
 
       if (!response.ok || !response.body) {
-        throw new Error("AI request failed");
+        throw new Error(await readAiError(response));
       }
 
       const reader = response.body.getReader();
@@ -115,20 +130,19 @@ export function AiDrawer({
               )
             );
           } catch {
-            // Ignore non-JSON chunks sent in the stream.
+            // Ignore non-JSON chunks in the stream.
           }
         }
       }
-    } catch {
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "I hit an issue while generating a response.";
+      toast.error(message);
       setMessages((prev) =>
-        prev.map((message) =>
-          message.id === assistantMessageId
-            ? {
-                ...message,
-                content:
-                  "I hit an issue while generating a response. Please try again.",
-              }
-            : message
+        prev.map((entry) =>
+          entry.id === assistantMessageId
+            ? { ...entry, content: message }
+            : entry
         )
       );
       setIsThinking(false);
@@ -136,16 +150,20 @@ export function AiDrawer({
       setIsLoading(false);
       setIsThinking(false);
     }
-  }
+  }, [input, isLoading]);
+
+  const sendMessageRef = useRef(sendMessage);
+  sendMessageRef.current = sendMessage;
 
   useEffect(() => {
-    if (!open || !initialPrompt?.trim()) return;
-    setInput(initialPrompt);
-    if (promptNonce !== undefined) {
-      void sendMessage(initialPrompt);
+    if (!open) return;
+    if (initialPrompt?.trim()) {
+      setInput(initialPrompt);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, promptNonce]);
+    if (promptNonce > 0 && initialPrompt?.trim()) {
+      void sendMessageRef.current(initialPrompt);
+    }
+  }, [open, promptNonce, initialPrompt]);
 
   return (
     <AnimatePresence>
@@ -197,7 +215,7 @@ export function AiDrawer({
                   {message.content || (isThinking ? "Thinking..." : "")}
                 </div>
               ))}
-              {isThinking && (
+              {isThinking && messages[messages.length - 1]?.content === "" && (
                 <div className="mr-auto flex w-fit items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Thinking...
@@ -219,7 +237,11 @@ export function AiDrawer({
                 disabled={isLoading}
               />
               <Button type="submit" disabled={!canSend}>
-                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
               </Button>
             </form>
           </motion.aside>

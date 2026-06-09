@@ -17,6 +17,7 @@ import {
   reorderSchema,
   bulkCardActionSchema,
 } from "@/lib/validators/bookmarks";
+import { logAudit } from "@/server/audit";
 
 export async function getBookmarkTabs() {
   const session = await requireAuth();
@@ -96,6 +97,12 @@ export async function createBookmarkTab(input: unknown) {
     })
     .returning();
   revalidatePath("/bookmarks");
+  await logAudit({
+    action: "bookmarks.tab.create",
+    resource: "bookmark_tab",
+    resourceId: tab.id,
+    summary: `Created bookmark tab "${tab.name}"`,
+  });
   return tab;
 }
 
@@ -175,6 +182,13 @@ export async function createBookmarkCard(input: unknown) {
     .returning();
   revalidatePath("/bookmarks");
   revalidatePath("/");
+  await logAudit({
+    action: "bookmarks.card.create",
+    resource: "bookmark_card",
+    resourceId: card.id,
+    summary: `Created bookmark "${card.title}"`,
+    details: { url: card.url },
+  });
   return card;
 }
 
@@ -280,6 +294,11 @@ export async function bulkBookmarkCardAction(input: unknown) {
 
   revalidatePath("/bookmarks");
   revalidatePath("/");
+  await logAudit({
+    action: "bookmarks.bulk",
+    summary: `Bulk bookmark action: ${data.action} on ${data.cardIds.length} cards`,
+    details: { action: data.action, count: data.cardIds.length },
+  });
   return { success: true };
 }
 
@@ -318,5 +337,10 @@ export async function importBookmarks(json: string) {
   }
 
   revalidatePath("/bookmarks");
+  await logAudit({
+    action: "bookmarks.import",
+    summary: `Imported ${data.tabs.length} tabs, ${data.cards.length} cards`,
+    details: { tabs: data.tabs.length, cards: data.cards.length },
+  });
   return { success: true };
 }

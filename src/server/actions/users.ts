@@ -12,6 +12,7 @@ import {
   updateUserSchema,
   updateProfileSchema,
 } from "@/lib/validators/auth";
+import { logAudit } from "@/server/audit";
 
 export async function getUsers() {
   const session = await requireAuth();
@@ -42,6 +43,13 @@ export async function createUser(input: unknown) {
       createdAt: users.createdAt,
     });
   revalidatePath("/admin");
+  await logAudit({
+    action: "users.create",
+    resource: "user",
+    resourceId: user.id,
+    summary: `Created user ${user.email} (${user.role})`,
+    details: { email: user.email, role: user.role },
+  });
   return user;
 }
 
@@ -70,6 +78,13 @@ export async function updateUser(input: unknown) {
       avatarPath: users.avatarPath,
     });
   revalidatePath("/admin");
+  await logAudit({
+    action: "users.update",
+    resource: "user",
+    resourceId: user.id,
+    summary: `Updated user ${user.email}`,
+    details: { email: user.email, role: user.role, disabled: user.disabled },
+  });
   return user;
 }
 
@@ -109,6 +124,12 @@ export async function updateProfile(input: unknown) {
     });
 
   revalidatePath("/settings");
+  await logAudit({
+    action: "profile.update",
+    resource: "user",
+    resourceId: user.id,
+    summary: `Updated profile for ${user.name}`,
+  });
   return user;
 }
 

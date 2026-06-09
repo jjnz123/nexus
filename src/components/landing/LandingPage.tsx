@@ -27,6 +27,11 @@ type LandingPageProps = {
   isLoading?: boolean;
 };
 
+function normalizePrompt(query: string): string {
+  const trimmed = query.trim();
+  return trimmed.startsWith("ai:") ? trimmed.slice(3).trim() : trimmed;
+}
+
 export function LandingPage({
   userName,
   favourites,
@@ -51,14 +56,23 @@ export function LandingPage({
     );
   }, [allBookmarks, query]);
 
-  function openAiFromSearch(triggerSend: boolean) {
-    const trimmed = query.trim();
-    const prompt = trimmed.startsWith("ai:") ? trimmed.slice(3).trim() : trimmed;
+  function openAi(options?: { prompt?: string; send?: boolean }) {
+    const prompt = normalizePrompt(options?.prompt ?? query);
     setAiPrompt(prompt);
-    if (triggerSend) {
+    if (options?.send && prompt) {
       setAiPromptNonce((current) => current + 1);
     }
     setAiOpen(true);
+  }
+
+  function handleSearchSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    const prompt = normalizePrompt(query);
+    if (prompt) {
+      openAi({ prompt, send: true });
+      return;
+    }
+    openAi({ send: false });
   }
 
   return (
@@ -87,34 +101,28 @@ export function LandingPage({
           <CardHeader>
             <CardTitle>How can I help you today?</CardTitle>
             <CardDescription>
-              Search bookmarks instantly, or start with <code>ai:</code> to chat with AI.
+              Type to filter bookmarks, press Enter to ask AI, or prefix with <code>ai:</code>.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {isLoading ? (
               <Skeleton className="h-10 w-full" />
             ) : (
-              <div className="flex flex-col gap-2 sm:flex-row">
+              <form className="flex flex-col gap-2 sm:flex-row" onSubmit={handleSearchSubmit}>
                 <div className="relative flex-1">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" && query.trim().toLowerCase().startsWith("ai:")) {
-                        event.preventDefault();
-                        openAiFromSearch(true);
-                      }
-                    }}
                     className="pl-9"
                     placeholder="How can I help you today?"
                   />
                 </div>
-                <Button type="button" onClick={() => openAiFromSearch(Boolean(query.trim()))}>
+                <Button type="submit">
                   <Bot className="mr-2 h-4 w-4" />
                   Ask AI
                 </Button>
-              </div>
+              </form>
             )}
 
             {!isLoading && query.trim() !== "" && !query.trim().toLowerCase().startsWith("ai:") && (
@@ -138,7 +146,9 @@ export function LandingPage({
                     </a>
                   ))}
                   {filteredBookmarks.length === 0 && (
-                    <p className="text-sm text-muted-foreground">No bookmark matches found.</p>
+                    <p className="text-sm text-muted-foreground">
+                      No bookmark matches. Press Enter to ask AI instead.
+                    </p>
                   )}
                 </div>
               </div>
