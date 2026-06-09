@@ -105,6 +105,11 @@ export function BookmarkCardItem({
         transform: CSS.Transform.toString(transform),
         transition,
       }}
+      className={cn(
+        "w-full",
+        layoutMode === "grid" && "max-w-[320px]",
+        layoutMode === "list" && "max-w-2xl"
+      )}
     >
       <Card
         className={cn(

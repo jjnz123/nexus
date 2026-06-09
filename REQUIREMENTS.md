@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v2.0.1
+**Current release:** v2.0.2
 
 ## 1. Overview
 
@@ -133,8 +133,8 @@ Requires `bookmarks:view`.
 
 Requires `bookmarks:view`.
 
-- Display user-favourited bookmarks
-- Drag-and-drop reorder (persisted per user)
+- Display user-favourited bookmarks (cards capped at ~320px width)
+- Drag-and-drop reorder **locked by default** — small unlock icon toggles rearrange mode (persisted order saved on drop)
 - Launch bookmarks (new tab or in-app iframe)
 - Link to full bookmarks page
 
@@ -289,6 +289,7 @@ All creation, editing, deletion, bulk actions, import/export, and view preferenc
 ### 5.2 Layout & Ordering
 
 - Grid or list layout (persisted per user)
+- Bookmark cards capped at ~320px width in grid mode (auto-fill layout within groups); list mode cards capped at `max-w-2xl`
 - Sort modes: custom, alphabetical, most used, most used (30d), recently used, health
 - Global layout lock (prevents drag-and-drop)
 - Per-tab layout lock
@@ -485,7 +486,7 @@ Requires `monitoring:configure`.
 - Create monitor device (single-device dialog)
 - **Discover devices** dialog with two workflows:
   - **Bookmark URLs** — enabled bookmark URLs not yet monitored; multi-select; bulk create
-  - **Network scan** — user-defined CIDR or IP range (max 254 hosts); TCP probe on common ports; review discovered hosts; bulk add (skips already-monitored targets)
+  - **Network scan** — user-defined CIDR or IP range (max 254 hosts); TCP probe on common ports; review discovered hosts; bulk add with **ping** check type and plain IP targets (no URL/port); skips already-monitored targets
 - Edit monitor device
 - Delete monitor device
 - Device fields:
@@ -506,6 +507,7 @@ Requires `monitoring:configure`.
 Requires `monitoring:view`.
 
 - Device name, target, current status
+- **Back to monitoring** link at top of page
 - **Force check now** — queue immediate check and refresh page
 - **Latency trend chart** — selectable ranges: 1h, 24h, 7d
 - **Recent checks table** — timestamp, status, latency, error (up to 100 rows)

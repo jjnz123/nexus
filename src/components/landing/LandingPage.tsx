@@ -243,7 +243,9 @@ export function LandingPage({
               <Heart className="h-4 w-4 text-rose-500" />
               Favourites
             </CardTitle>
-            <CardDescription>Drag to rearrange your pinned tools on the home screen.</CardDescription>
+            <CardDescription>
+              Pin up to 5 starred bookmarks. Unlock to rearrange.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading ? (

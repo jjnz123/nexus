@@ -144,6 +144,12 @@ export function DiscoverDevicesDialog({ onComplete }: { onComplete?: () => void 
       .finally(() => setLoading(false));
   }, [open, tab]);
 
+  useEffect(() => {
+    if (tab === "network") {
+      setCheckType("ping");
+    }
+  }, [tab]);
+
   function toggle(id: string) {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -159,6 +165,7 @@ export function DiscoverDevicesDialog({ onComplete }: { onComplete?: () => void 
       .then((items) => {
         setNetworkCandidates(items);
         setSelected(new Set(items.map((item) => item.id)));
+        setCheckType("ping");
         if (items.length === 0) toast.message("Scan complete — no new hosts with open ports");
         else toast.success(`Found ${items.length} host${items.length === 1 ? "" : "s"}`);
       })

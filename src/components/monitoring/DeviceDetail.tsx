@@ -2,9 +2,10 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { Activity, Gauge, PlayCircle } from "lucide-react";
+import { Activity, ArrowLeft, Gauge, PlayCircle } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -76,6 +77,13 @@ export function DeviceDetail({
 
   return (
     <div className="space-y-6">
+      <Button variant="ghost" size="sm" className="-ml-2 gap-1.5" asChild>
+        <Link href="/monitoring">
+          <ArrowLeft className="h-4 w-4" />
+          Back to monitoring
+        </Link>
+      </Button>
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">{device.name}</h1>

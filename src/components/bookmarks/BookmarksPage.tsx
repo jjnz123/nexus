@@ -1811,7 +1811,9 @@ export function BookmarksPage({
                               >
                                 <div
                                   className={cn(
-                                    layoutMode === "list" ? "space-y-2" : "space-y-2"
+                                    layoutMode === "list"
+                                      ? "mx-auto flex max-w-2xl flex-col gap-2"
+                                      : "grid gap-3 grid-cols-[repeat(auto-fill,minmax(240px,320px))]"
                                   )}
                                 >
                                   {groupCards.map((card) => (

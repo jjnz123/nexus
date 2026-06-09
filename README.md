@@ -13,7 +13,7 @@ Nexus helps your team find things faster, stay on top of work, and spot problems
 ### Home dashboard
 
 - Search bookmarks as you type, or ask the built-in AI assistant a question.
-- Pin favourite bookmarks and drag them into the order you prefer.
+- Pin favourite bookmarks — order is **locked by default**; click the unlock icon to drag and rearrange.
 - See smart suggestions based on what you use often—or what you have not opened in a while.
 - Jump straight to monitoring or tasks when something needs attention.
 
@@ -31,6 +31,7 @@ A personal **scratchpad** at `/notes` (VS Code / Code Runner style):
 Organise internal tools, dashboards, docs, and URLs in a structured library. The main view is **browse-first**: tabs, groups, and cards for launching links. A **Settings** cog opens a modal for all management (create, edit, bulk, import/export, view options). Admins can share restricted tabs with specific users.
 
 - **Tabs, groups, and cards** — hierarchical organisation with drag-and-drop when unlocked
+- **Compact cards** — bookmark cards are capped in width (auto-fill grid) so they do not stretch across the window
 - **Launch links** in a new tab or inside the portal (iframe)
 - **Search** across titles, URLs, tags, and descriptions
 - **Settings modal** — create tabs/groups/cards, rename/delete, bulk select, import/export, sort/filter/layout
@@ -57,9 +58,9 @@ A **Jira-inspired** task board with tickets, hierarchy, roadmap planning, and co
 Keep an eye on servers, services, and URLs:
 
 - **Overview** — see which targets are up, down, or unknown, with latency sparklines.
-- **Discover devices** — import unmonitored bookmark URLs or **scan a network range** (CIDR / IP range), review results, and bulk-add monitors.
+- **Discover devices** — import unmonitored bookmark URLs or **scan a network range** (CIDR / IP range); network scan defaults to **ping** checks with plain IP targets (no URL/port).
 - **Check types** — ping, TCP, or HTTP, on a schedule you configure.
-- **Device detail pages** — latency charts (1h / 24h / 7d) and a history of recent checks.
+- **Device detail pages** — back link to monitoring overview, latency charts (1h / 24h / 7d), and a history of recent checks.
 - **Force a check** when you need an immediate result.
 
 A background worker runs checks continuously so the dashboard stays current.

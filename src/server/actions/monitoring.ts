@@ -204,26 +204,15 @@ export async function scanNetworkForDevices(input: { range: string }) {
 
   return discovered
     .filter((host) => !monitored.has(host.ip))
-    .map((host) => {
-      const primaryPort = host.openPorts[0] ?? 80;
-      const scheme = primaryPort === 443 ? "https" : "http";
-      const target =
-        primaryPort === 80 || primaryPort === 443
-          ? `${scheme}://${host.ip}`
-          : `${scheme}://${host.ip}:${primaryPort}`;
-      const checkType =
-        host.openPorts.includes(443) || host.openPorts.includes(80) ? "http" : "tcp";
-
-      return {
-        id: host.ip,
-        name: `Host ${host.ip}`,
-        target,
-        ip: host.ip,
-        openPorts: host.openPorts,
-        suggestedCheckType: checkType as "http" | "ping" | "tcp",
-        latencyMs: host.latencyMs,
-      };
-    });
+    .map((host) => ({
+      id: host.ip,
+      name: `Host ${host.ip}`,
+      target: host.ip,
+      ip: host.ip,
+      openPorts: host.openPorts,
+      suggestedCheckType: "ping" as const,
+      latencyMs: host.latencyMs,
+    }));
 }
 
 export async function bulkCreateMonitorDevices(input: {
