@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import {
@@ -11,12 +10,12 @@ import {
   Home,
   LayoutDashboard,
   Activity,
+  StickyNote,
   type LucideIcon,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { hasPermission, type UserPermissionOverrides } from "@/lib/permissions";
 import type { UserRole } from "@/lib/db/schema";
-import { CollapsibleSideRail } from "@/components/ui/collapsible-side-rail";
+import { CollapsibleSideRail, SideNavLink } from "@/components/ui/collapsible-side-rail";
 import { ProfileMenu } from "./ProfileMenu";
 import { updateBookmarkPreferences } from "@/server/actions/preferences";
 
@@ -27,39 +26,12 @@ const navItems: {
   perm?: "ai:use" | "bookmarks:view" | "tasks:view" | "monitoring:view";
 }[] = [
   { href: "/", label: "Home", icon: Home },
+  { href: "/notes", label: "Notes", icon: StickyNote },
   { href: "/chat", label: "AI Chat", icon: Bot, perm: "ai:use" },
   { href: "/bookmarks", label: "Bookmarks", icon: Bookmark, perm: "bookmarks:view" },
   { href: "/tasks", label: "Tasks", icon: CheckSquare, perm: "tasks:view" },
   { href: "/monitoring", label: "Monitoring", icon: Activity, perm: "monitoring:view" },
 ];
-
-function NavLink({
-  item,
-  active,
-  showLabels,
-}: {
-  item: (typeof navItems)[number];
-  active: boolean;
-  showLabels: boolean;
-}) {
-  const Icon = item.icon;
-  return (
-    <Link
-      href={item.href}
-      title={showLabels ? undefined : item.label}
-      className={cn(
-        "flex items-center rounded-lg text-sm font-medium transition-colors",
-        showLabels ? "mx-2 gap-3 px-3 py-2" : "mx-auto h-9 w-9 justify-center",
-        active
-          ? "bg-primary/15 text-primary"
-          : "text-muted-foreground hover:bg-accent hover:text-foreground"
-      )}
-    >
-      <Icon className="h-4 w-4 shrink-0" />
-      {showLabels ? <span className="truncate">{item.label}</span> : null}
-    </Link>
-  );
-}
 
 export function AppShell({
   children,
@@ -107,7 +79,14 @@ export function AppShell({
               const active =
                 item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
               return (
-                <NavLink key={item.href} item={item} active={active} showLabels={showLabels} />
+                <SideNavLink
+                  key={item.href}
+                  href={item.href}
+                  icon={item.icon}
+                  label={item.label}
+                  active={active}
+                  showLabels={showLabels}
+                />
               );
             })}
           </nav>

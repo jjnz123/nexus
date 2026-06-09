@@ -180,6 +180,52 @@ export async function discoverUnmonitoredTargets() {
   return candidates.sort((a, b) => a.name.localeCompare(b.name));
 }
 
+export async function scanNetworkForDevices(input: { range: string }) {
+  const session = await requireAuth();
+  requireSessionPermission(session, "monitoring:configure");
+
+  const range = input.range.trim();
+  if (!range) throw new Error("Network range is required");
+
+  const { scanNetworkRange } = await import("@/lib/network-scan");
+  const discovered = await scanNetworkRange(range);
+
+  const devices = await db.select({ target: monitorDevices.target }).from(monitorDevices);
+  const monitored = new Set(
+    devices.map((d) => {
+      try {
+        const host = d.target.replace(/^https?:\/\//, "").split("/")[0].split(":")[0];
+        return host.toLowerCase();
+      } catch {
+        return d.target.toLowerCase();
+      }
+    })
+  );
+
+  return discovered
+    .filter((host) => !monitored.has(host.ip))
+    .map((host) => {
+      const primaryPort = host.openPorts[0] ?? 80;
+      const scheme = primaryPort === 443 ? "https" : "http";
+      const target =
+        primaryPort === 80 || primaryPort === 443
+          ? `${scheme}://${host.ip}`
+          : `${scheme}://${host.ip}:${primaryPort}`;
+      const checkType =
+        host.openPorts.includes(443) || host.openPorts.includes(80) ? "http" : "tcp";
+
+      return {
+        id: host.ip,
+        name: `Host ${host.ip}`,
+        target,
+        ip: host.ip,
+        openPorts: host.openPorts,
+        suggestedCheckType: checkType as "http" | "ping" | "tcp",
+        latencyMs: host.latencyMs,
+      };
+    });
+}
+
 export async function bulkCreateMonitorDevices(input: {
   targets: { name: string; target: string }[];
   checkType: "http" | "ping" | "tcp";

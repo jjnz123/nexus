@@ -11,6 +11,7 @@ import {
 import { hasPermission, type UserPermissionOverrides } from "@/lib/permissions";
 import type { UserRole } from "@/lib/db/schema";
 import { getSkillLabel } from "./definitions";
+import { runXaiSearchTool } from "@/lib/ai/xai-search";
 
 type SkillUser = {
   id: string;
@@ -228,6 +229,30 @@ async function executeSearchBookmarks(user: SkillUser, args: Record<string, unkn
   };
 }
 
+async function executeWebSearch(user: SkillUser, args: Record<string, unknown>) {
+  if (!hasPermission(user.role, "ai:use", user.permissions)) {
+    return forbidden("web_search");
+  }
+
+  const query = String(args.query ?? "").trim();
+  if (!query) return { error: "query is required" };
+
+  const maxResults = Math.min(Number(args.maxResults ?? 8) || 8, 20);
+  return runXaiSearchTool("web_search", query, { maxResults });
+}
+
+async function executeXSearch(user: SkillUser, args: Record<string, unknown>) {
+  if (!hasPermission(user.role, "ai:use", user.permissions)) {
+    return forbidden("x_search");
+  }
+
+  const query = String(args.query ?? "").trim();
+  if (!query) return { error: "query is required" };
+
+  const maxResults = Math.min(Number(args.maxResults ?? 8) || 8, 20);
+  return runXaiSearchTool("x_search", query, { maxResults });
+}
+
 export async function executeSkill(
   user: SkillUser,
   name: string,
@@ -242,6 +267,10 @@ export async function executeSkill(
       return executeCheckMonitor(user, args);
     case "search_bookmarks":
       return executeSearchBookmarks(user, args);
+    case "web_search":
+      return executeWebSearch(user, args);
+    case "x_search":
+      return executeXSearch(user, args);
     default:
       return { error: `Unknown skill: ${name}` };
   }

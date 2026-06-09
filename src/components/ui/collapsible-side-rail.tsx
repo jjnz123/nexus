@@ -5,10 +5,34 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+export const SIDE_RAIL_ICON_WIDTH = 56;
+
+export function SideRailLabel({
+  show,
+  children,
+  className,
+}: {
+  show: boolean;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <span
+      className={cn(
+        "min-w-0 truncate transition-[max-width,opacity] duration-200 ease-in-out",
+        show ? "max-w-[200px] opacity-100" : "max-w-0 opacity-0",
+        className
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
 export function CollapsibleSideRail({
   collapsed,
   onCollapsedChange,
-  compactWidth = 56,
+  compactWidth = SIDE_RAIL_ICON_WIDTH,
   expandedWidth = 256,
   headerIcon,
   headerLabel,
@@ -60,24 +84,22 @@ export function CollapsibleSideRail({
         className
       )}
     >
-      <div
-        className={cn(
-          "flex h-12 shrink-0 items-center border-b px-2",
-          showLabels ? "justify-between gap-2" : "justify-center"
-        )}
-      >
+      <div className="flex h-12 shrink-0 items-center border-b">
+        <div
+          className="flex shrink-0 items-center justify-center"
+          style={{ width: compactWidth }}
+        >
+          <span className="flex h-9 w-9 items-center justify-center">{headerIcon}</span>
+        </div>
         <div
           className={cn(
-            "flex min-w-0 items-center",
-            showLabels ? "gap-2 px-1" : "h-9 w-9 justify-center"
+            "flex min-w-0 flex-1 items-center justify-between gap-2 overflow-hidden pr-2 transition-[max-width,opacity] duration-200 ease-in-out",
+            showLabels ? "max-w-[200px] opacity-100" : "max-w-0 opacity-0"
           )}
         >
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center">{headerIcon}</span>
-          {showLabels && headerLabel ? (
+          {headerLabel ? (
             <span className="truncate text-lg font-bold tracking-tight">{headerLabel}</span>
           ) : null}
-        </div>
-        {showLabels ? (
           <Button
             size="icon"
             variant="ghost"
@@ -91,11 +113,14 @@ export function CollapsibleSideRail({
               <PanelLeftClose className="h-4 w-4" />
             )}
           </Button>
-        ) : null}
+        </div>
       </div>
 
       {!showLabels ? (
-        <div className="flex justify-center border-b py-1">
+        <div
+          className="flex shrink-0 items-center justify-center border-b py-1"
+          style={{ width: compactWidth }}
+        >
           <Button
             size="icon"
             variant="ghost"
@@ -121,27 +146,34 @@ export function SideNavLink({
   label,
   active,
   showLabels,
+  iconWidth = SIDE_RAIL_ICON_WIDTH,
 }: {
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   active: boolean;
   showLabels: boolean;
+  iconWidth?: number;
 }) {
   return (
     <a
       href={href}
       title={showLabels ? undefined : label}
       className={cn(
-        "flex items-center rounded-lg text-sm font-medium transition-colors",
-        showLabels ? "mx-2 gap-3 px-3 py-2" : "mx-auto h-9 w-9 justify-center",
+        "flex h-9 items-center rounded-lg text-sm font-medium transition-colors",
+        showLabels ? "mx-2" : "mx-1",
         active
           ? "bg-primary/15 text-primary"
           : "text-muted-foreground hover:bg-accent hover:text-foreground"
       )}
     >
-      <Icon className="h-4 w-4 shrink-0" />
-      {showLabels ? <span className="truncate">{label}</span> : null}
+      <span
+        className="flex shrink-0 items-center justify-center"
+        style={{ width: showLabels ? iconWidth - 16 : iconWidth - 8 }}
+      >
+        <Icon className="h-4 w-4 shrink-0" />
+      </span>
+      <SideRailLabel show={showLabels}>{label}</SideRailLabel>
     </a>
   );
 }

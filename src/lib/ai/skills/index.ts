@@ -16,6 +16,8 @@ const SKILL_PERMISSIONS: Record<string, Permission> = {
   update_task: "tasks:edit",
   check_monitor_status: "monitoring:view",
   search_bookmarks: "bookmarks:view",
+  web_search: "ai:use",
+  x_search: "ai:use",
 };
 
 export function getSkillPermission(name: string): Permission {

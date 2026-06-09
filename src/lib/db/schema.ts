@@ -112,6 +112,38 @@ export const systemSettings = pgTable("system_settings", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const userNotes = pgTable(
+  "user_notes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    title: text("title").notNull().default("Untitled"),
+    content: text("content").notNull().default(""),
+    language: text("language").notNull().default("plaintext"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [index("user_notes_user_idx").on(table.userId)]
+);
+
+export type NoteLanguage =
+  | "plaintext"
+  | "markdown"
+  | "shell"
+  | "javascript"
+  | "typescript"
+  | "python"
+  | "json"
+  | "yaml"
+  | "sql"
+  | "html"
+  | "css";
+
+export type UserNote = typeof userNotes.$inferSelect;
+
 export const userPreferences = pgTable("user_preferences", {
   userId: uuid("user_id")
     .primaryKey()
@@ -127,6 +159,19 @@ export const userPreferences = pgTable("user_preferences", {
   activeAiConversationId: uuid("active_ai_conversation_id"),
   chatSidebarCollapsed: boolean("chat_sidebar_collapsed").notNull().default(false),
   appSidebarCollapsed: boolean("app_sidebar_collapsed").notNull().default(false),
+  notesWorkspace: jsonb("notes_workspace")
+    .$type<{
+      openTabIds: string[];
+      activeTabId: string | null;
+      previewVisible: boolean;
+      explorerCollapsed: boolean;
+    }>()
+    .default({
+      openTabIds: [],
+      activeTabId: null,
+      previewVisible: true,
+      explorerCollapsed: false,
+    }),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 

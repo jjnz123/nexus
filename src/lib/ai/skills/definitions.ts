@@ -79,6 +79,34 @@ export const NEXUS_SKILLS: SkillDefinition[] = [
       required: ["query"],
     },
   },
+  {
+    name: "web_search",
+    label: "Web Search",
+    description:
+      "Search the public web for up-to-date information. Use when the user asks about current events, documentation, or facts outside Nexus.",
+    parameters: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Search query" },
+        maxResults: { type: "number", description: "Max citations to return, default 8" },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "x_search",
+    label: "X Search",
+    description:
+      "Search X (Twitter) for recent posts and discussions. Use for social sentiment, announcements, or trending topics on X.",
+    parameters: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Search query" },
+        maxResults: { type: "number", description: "Max citations to return, default 8" },
+      },
+      required: ["query"],
+    },
+  },
 ];
 
 export function skillDefinitionsForApi() {

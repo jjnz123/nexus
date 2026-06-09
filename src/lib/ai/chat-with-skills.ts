@@ -114,7 +114,7 @@ export async function runAiChatWithSkills({
 
   if (enableTools) {
     systemParts.push(
-      "You have access to Nexus skills for tasks, monitoring, and bookmarks. Use them when the user asks you to perform actions or fetch live data."
+      "You have access to Nexus skills for tasks, monitoring, bookmarks, web search, and X search. Use them when the user asks you to perform actions or fetch live data."
     );
   }
 

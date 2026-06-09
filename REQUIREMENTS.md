@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v1.6.0
+**Current release:** v1.7.0
 
 ## 1. Overview
 
@@ -59,6 +59,7 @@ Admin-only permissions (not overridable via custom flags):
 | `/tasks` | `tasks:view` |
 | `/monitoring` | `monitoring:view` |
 | `/settings` | All authenticated users |
+| `/notes` | All authenticated users |
 | `/` | All authenticated users |
 
 ## 3. Global Application Shell
@@ -67,10 +68,10 @@ Available on all authenticated app routes.
 
 ### 3.1 Navigation
 
-- Sidebar: Home, **AI Chat**, Bookmarks, Tasks, Monitoring
+- Sidebar: Home, **Notes**, **AI Chat**, Bookmarks, Tasks, Monitoring
 - Nav items hidden when the user lacks the required permission
 - Active route highlighting
-- **Collapsible sidebar** — icon-only mode with hover expand (same behaviour as `/chat` sidebar)
+- **Collapsible sidebar** — fixed icon column; labels collapse/expand with CSS transitions (icons do not shift). Icon-only mode with hover expand (same behaviour as `/chat` sidebar)
 - Manual collapse/expand toggle; state persisted in user preferences (`app_sidebar_collapsed`)
 - Full viewport height rail with CSS width transitions (no flicker)
 - Mobile-responsive header with product branding
@@ -170,12 +171,13 @@ Three-panel workspace (full-bleed within app shell):
 ### Collapsible Sidebar
 
 - Manual collapse/expand toggle; state persisted in user preferences (`chat_sidebar_collapsed`)
-- Collapsed mode shows project/conversation icons only
-- Hover over collapsed sidebar smoothly expands full labels and lists
+- Fixed **56px icon column** — icons stay aligned when collapsing; only labels animate out
+- Hover over collapsed sidebar smoothly expands full labels and lists (no DOM swap / flicker)
 - Quick access to file manager from sidebar header
 
 ### Projects & Conversations
 
+- Conversations belong to a parent **Project** (or **General** when no project is selected)
 - Create, rename, and delete **Projects** (user-owned; separate from kanban `projects`)
 - **General** pseudo-project for conversations without a project
 - Create, rename, delete, and **search** conversations within the active project
@@ -192,8 +194,9 @@ Three-panel workspace (full-bleed within app shell):
 
 ### File Management
 
-- **Project knowledge base** — upload, rename, delete files shared across all conversations in a project
-- **Conversation files** — upload, rename, delete files scoped to the current conversation
+- **Project-level files** — upload, rename, delete files shared across all conversations in a project (knowledge base)
+- **Conversation-level files** — upload, rename, delete files scoped to the current conversation only
+- File manager dialog labels scope clearly (**Project-wide** vs **This conversation** badges)
 - File manager dialog with search, image/document grouping, drag-and-drop upload, previews, and bulk upload
 - Text file content extracted for basic RAG-style context in AI responses
 - Message-level attachments remain supported in the composer
@@ -201,7 +204,8 @@ Three-panel workspace (full-bleed within app shell):
 ### AI Skills (Tool Use)
 
 - Grok can invoke Nexus **skills** during `/chat` conversations (permission-aware)
-- Built-in skills: **Create Task**, **Update Task**, **Check Monitoring**, **Search Bookmarks**
+- Built-in skills: **Create Task**, **Update Task**, **Check Monitoring**, **Search Bookmarks**, **Web Search**, **X Search**
+- Web Search and X Search use the xAI Responses API (`web_search` / `x_search` tools); require `ai:use`
 - **Per-conversation skill toggles** — Skills panel to enable/disable each skill; stored in `enabled_skills` on the conversation (`null` = all permitted skills; `[]` = none)
 - Active skills shown as chips above the composer; header **Skills** button opens management dialog
 - Skill usage shown inline in assistant messages with Grok-style result cards (status, structured results)
@@ -225,6 +229,30 @@ Three-panel workspace (full-bleed within app shell):
 - `ai_project_files` — project knowledge base files with text preview cache
 - `ai_conversation_files` — conversation-scoped files with text preview cache
 - User preferences: `active_ai_project_id`, `active_ai_conversation_id`, `chat_sidebar_collapsed`, `app_sidebar_collapsed`
+
+## 4.8 Notes (`/notes`)
+
+All authenticated users.
+
+### Layout
+
+- Full-bleed workspace within the app shell (similar to `/chat`)
+- **Left** — collapsible file explorer listing the user's notes
+- **Top** — tab bar for multiple open notes
+- **Center** — title, language/mode selector, editor textarea
+- **Bottom** — optional Markdown preview pane (toggleable; **Run** opens preview for Markdown)
+
+### Features
+
+- Create, rename (inline title), and delete notes
+- **Syntax modes:** Plain Text, Markdown, Shell Script, JavaScript, TypeScript, Python, JSON, YAML, SQL, HTML, CSS
+- **Autosave** on edit (debounced server persistence)
+- Workspace state persisted per user: open tabs, active tab, preview visibility, explorer collapsed
+
+### Data Model
+
+- `user_notes` — `id`, `user_id`, `title`, `content`, `language`, `sort_order`, timestamps
+- `user_preferences.notes_workspace` (jsonb) — open tab IDs, active tab, preview/explorer UI state
 
 ## 5. Bookmarks (`/bookmarks`)
 
@@ -424,7 +452,9 @@ Requires `monitoring:view`. Device configuration requires `monitoring:configure`
 Requires `monitoring:configure`.
 
 - Create monitor device (single-device dialog)
-- **Discover targets** — scan enabled bookmark URLs not yet monitored; multi-select with shared check settings; bulk create
+- **Discover devices** dialog with two workflows:
+  - **Bookmark URLs** — enabled bookmark URLs not yet monitored; multi-select; bulk create
+  - **Network scan** — user-defined CIDR or IP range (max 254 hosts); TCP probe on common ports; review discovered hosts; bulk add (skips already-monitored targets)
 - Edit monitor device
 - Delete monitor device
 - Device fields:
@@ -529,19 +559,25 @@ Requires `monitoring:configure` to enable; `monitoring:view` to display status.
 - Active AI project and conversation (`/chat`)
 - Chat sidebar collapsed state (`/chat`)
 - App sidebar collapsed state (global nav)
+- Notes workspace state (`/notes`)
 
-### 13.2 AI Chat Persistence
+### 13.2 Notes Persistence
+
+- Per-user notes in `user_notes`
+- Workspace UI state in `user_preferences.notes_workspace`
+
+### 13.3 AI Chat Persistence
 
 - Per-user projects, conversations, messages, project files, conversation files, and per-conversation enabled skills (see §4.7)
 - Attachments stored as jsonb on messages; knowledge-base files in dedicated tables
 - Skill execution metadata stored on assistant messages
 
-### 13.3 Audit Trail
+### 13.4 Audit Trail
 
 - Log user actions across the application
 - Filterable and exportable from admin panel
 
-### 13.4 Notifications
+### 13.5 Notifications
 
 - In-app notifications with title, body, optional link
 - Read/unread state per user
@@ -577,4 +613,3 @@ Requires `monitoring:configure` to enable; `monitoring:view` to display status.
 - Project export UI (server action exists, no front-end)
 - Bookmark share UI for individual groups/cards (server supports tab/group/card resource types)
 - Message list virtualization for very long `/chat` conversations (may be added later)
-- Network autodiscovery beyond bookmark URL scanning

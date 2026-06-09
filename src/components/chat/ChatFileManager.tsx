@@ -5,6 +5,7 @@ import { useMemo, useRef, useState, useTransition } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { FileText, FolderOpen, ImageIcon, MessageSquare, Pencil, Search, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -37,10 +38,12 @@ async function uploadRawFile(file: File) {
 
 function FileRow({
   file,
+  scope,
   onRename,
   onDelete,
 }: {
   file: AiProjectFile | AiConversationFile;
+  scope: "project" | "conversation";
   onRename: () => void;
   onDelete: () => void;
 }) {
@@ -66,7 +69,12 @@ function FileRow({
         )}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate font-medium">{file.displayName}</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="truncate font-medium">{file.displayName}</p>
+          <Badge variant={scope === "project" ? "default" : "secondary"} className="text-[10px]">
+            {scope === "project" ? "Project-wide" : "This conversation"}
+          </Badge>
+        </div>
         <p className="text-xs text-muted-foreground">
           {file.mimeType} · {(file.size / 1024).toFixed(1)} KB
         </p>
@@ -113,10 +121,12 @@ function groupFiles<T extends AiProjectFile | AiConversationFile>(files: T[]) {
 
 function FileList<T extends AiProjectFile | AiConversationFile>({
   files,
+  scope,
   onRename,
   onDelete,
 }: {
   files: T[];
+  scope: "project" | "conversation";
   onRename: (file: T) => void;
   onDelete: (file: T) => void;
 }) {
@@ -142,6 +152,7 @@ function FileList<T extends AiProjectFile | AiConversationFile>({
             <FileRow
               key={file.id}
               file={file}
+              scope={scope}
               onRename={() => onRename(file)}
               onDelete={() => onDelete(file)}
             />
@@ -158,6 +169,7 @@ function FileList<T extends AiProjectFile | AiConversationFile>({
             <FileRow
               key={file.id}
               file={file}
+              scope={scope}
               onRename={() => onRename(file)}
               onDelete={() => onDelete(file)}
             />
@@ -288,8 +300,9 @@ export function ChatFileManager({
         <DialogHeader>
           <DialogTitle>File manager</DialogTitle>
           <DialogDescription>
-            Project knowledge base files are shared across conversations. Conversation files apply to
-            this thread only. Uploaded text is indexed for AI context (RAG).
+            Files attached to a project are shared across every conversation in that project.
+            Conversation files apply to the active thread only. Uploaded text is indexed for AI
+            context.
           </DialogDescription>
         </DialogHeader>
 
@@ -306,14 +319,14 @@ export function ChatFileManager({
         <Tabs defaultValue={projectId ? "project" : "conversation"}>
           <TabsList>
             {projectId ? (
-              <TabsTrigger value="project">
-                <FolderOpen className="mr-1 h-4 w-4" />
-                Project
+              <TabsTrigger value="project" className="gap-1">
+                <FolderOpen className="h-4 w-4" />
+                Project files
               </TabsTrigger>
             ) : null}
-            <TabsTrigger value="conversation">
-              <MessageSquare className="mr-1 h-4 w-4" />
-              Conversation
+            <TabsTrigger value="conversation" className="gap-1">
+              <MessageSquare className="h-4 w-4" />
+              Conversation files
             </TabsTrigger>
           </TabsList>
 
@@ -321,7 +334,8 @@ export function ChatFileManager({
             <TabsContent value="project" className="space-y-3">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">
-                  Knowledge base · {projectFiles.length} file{projectFiles.length === 1 ? "" : "s"}
+                  Shared knowledge base · {projectFiles.length} file
+                  {projectFiles.length === 1 ? "" : "s"} · visible in all project conversations
                 </p>
                 <Button
                   size="sm"
@@ -350,6 +364,7 @@ export function ChatFileManager({
                   ) : (
                     <FileList
                       files={filteredProjectFiles}
+                      scope="project"
                       onRename={(file) => {
                         const name = window.prompt("Display name", file.displayName)?.trim();
                         if (!name || name === file.displayName) return;
@@ -375,8 +390,8 @@ export function ChatFileManager({
           <TabsContent value="conversation" className="space-y-3">
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
-                Conversation files · {conversationFiles.length} file
-                {conversationFiles.length === 1 ? "" : "s"}
+                Thread-only files · {conversationFiles.length} file
+                {conversationFiles.length === 1 ? "" : "s"} · not shared with other conversations
               </p>
               <Button
                 size="sm"
@@ -408,6 +423,7 @@ export function ChatFileManager({
                 ) : (
                   <FileList
                     files={filteredConversationFiles}
+                    scope="conversation"
                     onRename={(file) => {
                       const name = window.prompt("Display name", file.displayName)?.trim();
                       if (!name || name === file.displayName) return;

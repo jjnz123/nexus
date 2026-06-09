@@ -21,6 +21,14 @@ const bookmarkPrefsSchema = z.object({
   activeAiConversationId: z.string().uuid().nullable().optional(),
   chatSidebarCollapsed: z.boolean().optional(),
   appSidebarCollapsed: z.boolean().optional(),
+  notesWorkspace: z
+    .object({
+      openTabIds: z.array(z.string().uuid()),
+      activeTabId: z.string().uuid().nullable(),
+      previewVisible: z.boolean(),
+      explorerCollapsed: z.boolean(),
+    })
+    .optional(),
 });
 
 async function getOrCreatePrefs(userId: string) {

@@ -2,7 +2,7 @@
 
 **Nexus** is a self-hosted team portal that brings your everyday tools into one place: bookmarked apps and links, a task board, network monitoring, and an optional AI assistant. It is designed for internal teams who want a single home screen for operations—not another SaaS subscription.
 
-Sign in once, and everyone sees the tools and status relevant to their role. The main sidebar can collapse to icons (with hover expand) to maximize workspace—matching the `/chat` layout.
+Sign in once, and everyone sees the tools and status relevant to their role. The main sidebar collapses to a fixed icon column—labels slide away smoothly while icons stay put—with hover expand to peek at labels, matching the `/chat` workspace sidebar.
 
 ---
 
@@ -16,6 +16,15 @@ Nexus helps your team find things faster, stay on top of work, and spot problems
 - Pin favourite bookmarks and drag them into the order you prefer.
 - See smart suggestions based on what you use often—or what you have not opened in a while.
 - Jump straight to monitoring or tasks when something needs attention.
+
+### Notes
+
+A personal **scratchpad** at `/notes` (VS Code / Code Runner style):
+
+- **File explorer** on the left with multiple notes open as **tabs** across the top.
+- **Syntax modes** — Plain Text, Markdown, Shell, JavaScript, TypeScript, Python, JSON, YAML, SQL, HTML, CSS.
+- **Run / preview** for Markdown with a toggleable bottom preview pane.
+- **Autosave** — all notes are user-specific and persisted in PostgreSQL.
 
 ### Bookmarks
 
@@ -45,6 +54,7 @@ A lightweight **kanban board** for team work with assignees, backlog panel, task
 Keep an eye on servers, services, and URLs:
 
 - **Overview** — see which targets are up, down, or unknown, with latency sparklines.
+- **Discover devices** — import unmonitored bookmark URLs or **scan a network range** (CIDR / IP range), review results, and bulk-add monitors.
 - **Check types** — ping, TCP, or HTTP, on a schedule you configure.
 - **Device detail pages** — latency charts (1h / 24h / 7d) and a history of recent checks.
 - **Force a check** when you need an immediate result.
@@ -56,7 +66,7 @@ A background worker runs checks continuously so the dashboard stays current.
 When an xAI API key is configured, users with permission can:
 
 - Chat with **Grok** from the home page search bar or AI drawer.
-- Use the full **AI Chat** workspace at `/chat` with projects, conversations, file knowledge bases, per-conversation **Skills** toggles, and Grok-style tool results.
+- Use the full **AI Chat** workspace at `/chat` with projects, conversations, project- and conversation-level file knowledge bases, per-conversation **Skills** toggles (including **Web Search** and **X Search**), and Grok-style tool results.
 - Get **AI-suggested metadata** when creating bookmarks (title, description, tags, icon).
 - **Analyse audit logs** in the admin panel (summaries, anomalies, follow-ups).
 
