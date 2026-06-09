@@ -83,22 +83,45 @@ export async function verifyBackupCode(
 export function isTwoFactorRequired(user: {
   role: string;
   status: string;
-  totpEnabled: boolean;
+  totpEnabled?: boolean;
+  email2faEnabled?: boolean;
 }): boolean {
   if (user.role === "admin" || user.status === "administrator") return false;
   return true;
 }
 
-/** True when the user must enter a TOTP/backup code at sign-in (any role). */
-export function requiresTotpAtLogin(user: { totpEnabled: boolean }): boolean {
-  return user.totpEnabled;
+export function hasTwoFactorEnabled(user: {
+  totpEnabled: boolean;
+  email2faEnabled: boolean;
+}): boolean {
+  return user.totpEnabled || user.email2faEnabled;
+}
+
+/** True when the user must complete a second factor at sign-in. */
+export function requiresTwoFactorAtLogin(user: {
+  totpEnabled: boolean;
+  email2faEnabled: boolean;
+}): boolean {
+  return hasTwoFactorEnabled(user);
+}
+
+/** @deprecated Use requiresTwoFactorAtLogin */
+export function requiresTotpAtLogin(user: {
+  totpEnabled: boolean;
+  email2faEnabled?: boolean;
+}): boolean {
+  return requiresTwoFactorAtLogin({
+    totpEnabled: user.totpEnabled,
+    email2faEnabled: user.email2faEnabled ?? false,
+  });
 }
 
 export function isTwoFactorSatisfied(user: {
   role: string;
   status: string;
   totpEnabled: boolean;
+  email2faEnabled: boolean;
 }): boolean {
   if (!isTwoFactorRequired(user)) return true;
-  return user.totpEnabled;
+  return hasTwoFactorEnabled(user);
 }

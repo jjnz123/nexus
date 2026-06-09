@@ -75,6 +75,7 @@ export const users = pgTable("users", {
   disabled: boolean("disabled").notNull().default(false),
   totpSecret: text("totp_secret"),
   totpEnabled: boolean("totp_enabled").notNull().default(false),
+  email2faEnabled: boolean("email_2fa_enabled").notNull().default(false),
   totpBackupCodes: jsonb("totp_backup_codes").$type<string[]>().default([]),
   firstLoginAt: timestamp("first_login_at"),
   permissions: jsonb("permissions")

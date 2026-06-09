@@ -17,9 +17,11 @@ import { Badge } from "@/components/ui/badge";
 export function TwoFactorSettings({
   initialRequired,
   initialEnabled,
+  email2faEnabled = false,
 }: {
   initialRequired: boolean;
   initialEnabled: boolean;
+  email2faEnabled?: boolean;
 }) {
   const [required] = useState(initialRequired);
   const [enabled, setEnabled] = useState(initialEnabled);
@@ -108,10 +110,16 @@ export function TwoFactorSettings({
           </div>
         ) : null}
 
-        {!enabled && !qrDataUrl ? (
+        {!enabled && !qrDataUrl && !email2faEnabled ? (
           <Button onClick={startSetup} disabled={isPending}>
             Set up authenticator
           </Button>
+        ) : null}
+
+        {!enabled && email2faEnabled ? (
+          <p className="text-sm text-muted-foreground">
+            Email 2FA is enabled. Disable it first to switch to an authenticator app.
+          </p>
         ) : null}
 
         {qrDataUrl ? (

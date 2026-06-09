@@ -119,7 +119,7 @@ export function canAccessRoute(
   role: UserRole,
   path: string,
   overrides?: UserPermissionOverrides | null,
-  context?: Pick<SessionUserContext, "status" | "totpEnabled">
+  context?: Pick<SessionUserContext, "status" | "totpEnabled" | "email2faEnabled">
 ): boolean {
   if (context && isRestrictedToSettings({ role, ...context, permissions: overrides })) {
     return path.startsWith("/settings");

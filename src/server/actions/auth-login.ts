@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
-import { isTwoFactorRequired, requiresTotpAtLogin } from "@/lib/auth/totp";
+import { hasTwoFactorEnabled, isTwoFactorRequired } from "@/lib/auth/totp";
 import { isAdminUser } from "@/lib/auth/user-access";
 
 export async function checkLoginRequirements(email: string, password: string) {
@@ -23,24 +23,33 @@ export async function checkLoginRequirements(email: string, password: string) {
     return { ok: false as const, reason: "invalid" as const };
   }
 
-  const requiresTotp = requiresTotpAtLogin(user);
+  const requiresTwoFactor = hasTwoFactorEnabled(user);
 
   const requiresSetup =
     isTwoFactorRequired({
       role: user.role,
       status: user.status,
       totpEnabled: user.totpEnabled,
-    }) && !user.totpEnabled;
+      email2faEnabled: user.email2faEnabled,
+    }) && !hasTwoFactorEnabled(user);
 
   return {
     ok: true as const,
-    requiresTotp,
+    requiresTwoFactor,
+    twoFactorMethod: user.totpEnabled
+      ? ("totp" as const)
+      : user.email2faEnabled
+        ? ("email" as const)
+        : null,
+    requiresTotp: user.totpEnabled,
+    requiresEmail2fa: user.email2faEnabled,
     requiresSetup,
     isPending: user.status === "pending",
     isAdmin: isAdminUser({
       role: user.role,
       status: user.status,
       totpEnabled: user.totpEnabled,
+      email2faEnabled: user.email2faEnabled,
     }),
   };
 }

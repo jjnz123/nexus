@@ -7,6 +7,7 @@ export type SessionUserContext = {
   role: UserRole;
   status: UserStatus;
   totpEnabled: boolean;
+  email2faEnabled: boolean;
   permissions?: UserPermissionOverrides | null;
 };
 
@@ -20,7 +21,7 @@ export function isPendingUser(ctx: SessionUserContext): boolean {
 
 export function mustSetupTwoFactor(ctx: SessionUserContext): boolean {
   if (isAdminUser(ctx)) return false;
-  return !ctx.totpEnabled;
+  return !ctx.totpEnabled && !ctx.email2faEnabled;
 }
 
 export function isRestrictedToSettings(ctx: SessionUserContext): boolean {

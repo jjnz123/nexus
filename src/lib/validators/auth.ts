@@ -16,6 +16,7 @@ export const loginSchema = z.object({
   password: z.string().min(1),
   totpCode: z.string().optional(),
   backupCode: z.string().optional(),
+  emailCode: z.string().optional(),
 });
 
 export const createUserSchema = z.object({
@@ -55,6 +56,15 @@ export const totpDisableSchema = z.object({
 
 export const sendEmailTotpSchema = z.object({
   currentPassword: z.string().min(1),
+});
+
+export const email2faConfirmSchema = z.object({
+  code: z.string().min(6).max(8),
+});
+
+export const email2faDisableSchema = z.object({
+  currentPassword: z.string().min(1),
+  code: z.string().min(6).max(8),
 });
 
 export type LoginInput = z.infer<typeof loginSchema>;

@@ -93,8 +93,7 @@ At `/meetings` (requires `ai:use`):
 ### Security & user lifecycle
 
 - **Account status:** `pending`, `member`, or `administrator` — new users start as **pending** with access limited to Profile Settings until elevated.
-- **Two-factor authentication (TOTP):** mandatory for all non-administrator accounts; optional for administrators in Profile Settings (enforced at sign-in when enabled).
-- **Administrators** are not required to set up 2FA but may enable it voluntarily; seeded with `administrator` status.
+- **Two-factor authentication:** mandatory for non-administrators — choose **authenticator app (TOTP)** or **email codes** in Profile Settings (`/settings`). Optional for admins; enforced at sign-in when enabled. Only one method at a time.
 - **SMTP2go** integration for welcome/invite emails and admin alerts when pending users sign in for the first time (`SMTP2GO_*` env vars).
 
 ### Administration

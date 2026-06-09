@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v3.1.2
+**Current release:** v3.2.0
 
 ## 1. Overview
 
@@ -40,13 +40,15 @@ Internal operations portal for bookmarks, kanban tasks, network monitoring, and 
 - Admins elevate `pending` → `member` or `administrator` in Admin Panel
 - First login by a pending user emails all administrators (SMTP2go)
 
-### 2.1.2 Two-factor authentication (TOTP)
+### 2.1.2 Two-factor authentication (TOTP & email)
 
-- Mandatory for all users **except** administrators (admins may optionally enable 2FA in Profile Settings)
-- When enabled on any account (including administrators), TOTP or a backup code is required at sign-in
-- Setup in Profile Settings: QR code enrollment, backup codes (hashed, one-time use)
+- Mandatory for all users **except** administrators (admins may optionally enable either method in Profile Settings)
+- **Authenticator app (TOTP):** QR enrollment in Profile Settings, backup codes (hashed, one-time use)
+- **Email codes:** optional alternative via SMTP2go — enable in Profile Settings with password verification; code sent at sign-in
+- Only one method active at a time (authenticator or email)
+- When enabled on any account (including administrators), the second factor is required at sign-in
 - TOTP secrets encrypted at rest using `AUTH_SECRET`-derived key
-- Optional email verification codes via SMTP2go (password-gated send from settings)
+- Email verification codes expire after 10 minutes
 
 ### 2.1.3 Transactional email (SMTP2go)
 

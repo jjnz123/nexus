@@ -13,6 +13,7 @@ declare module "next-auth" {
       role: UserRole;
       status: UserStatus;
       totpEnabled: boolean;
+      email2faEnabled: boolean;
       avatarPath: string | null;
       permissions: UserPermissionOverrides | null;
     };
@@ -22,6 +23,7 @@ declare module "next-auth" {
     role: UserRole;
     status: UserStatus;
     totpEnabled: boolean;
+    email2faEnabled: boolean;
     avatarPath: string | null;
     permissions: UserPermissionOverrides | null;
   }
@@ -33,6 +35,7 @@ declare module "@auth/core/jwt" {
     role: UserRole;
     status: UserStatus;
     totpEnabled: boolean;
+    email2faEnabled: boolean;
     avatarPath: string | null;
     permissions: UserPermissionOverrides | null;
   }
@@ -53,9 +56,12 @@ export const authConfig = {
       if (isPublic) return true;
       if (!isLoggedIn && !isLoginPage) return false;
       if (isLoggedIn && isLoginPage) {
-        const dest = auth?.user?.status === "pending" || (!auth.user.totpEnabled && auth.user.role !== "admin" && auth.user.status !== "administrator")
-          ? "/settings"
-          : "/";
+        const needsTwoFactorSetup =
+          auth.user.role !== "admin" &&
+          auth.user.status !== "administrator" &&
+          !auth.user.totpEnabled &&
+          !auth.user.email2faEnabled;
+        const dest = auth?.user?.status === "pending" || needsTwoFactorSetup ? "/settings" : "/";
         // Use forwarded host/proto (Cloudflare Tunnel) instead of internal request origin.
         return Response.redirect(absoluteUrlFromRequest(dest, request));
       }
@@ -65,6 +71,7 @@ export const authConfig = {
         !canAccessRoute(auth.user.role, pathname, auth.user.permissions, {
           status: auth.user.status,
           totpEnabled: auth.user.totpEnabled,
+          email2faEnabled: auth.user.email2faEnabled,
         })
       ) {
         return Response.redirect(absoluteUrlFromRequest("/settings", request));
@@ -77,6 +84,7 @@ export const authConfig = {
         token.role = user.role;
         token.status = user.status;
         token.totpEnabled = user.totpEnabled;
+        token.email2faEnabled = user.email2faEnabled;
         token.avatarPath = user.avatarPath;
         token.permissions = user.permissions ?? null;
       }
@@ -87,6 +95,7 @@ export const authConfig = {
       session.user.role = token.role;
       session.user.status = token.status;
       session.user.totpEnabled = token.totpEnabled;
+      session.user.email2faEnabled = token.email2faEnabled;
       session.user.avatarPath = token.avatarPath ?? null;
       session.user.permissions = token.permissions ?? null;
       return session;
