@@ -13,6 +13,7 @@ type UserRow = {
   email: string;
   name: string;
   role: import("@/lib/db/schema").UserRole;
+  status: import("@/lib/db/schema").UserStatus;
   disabled: boolean;
   avatarPath: string | null;
   permissions: import("@/lib/permissions").UserPermissionOverrides | null;

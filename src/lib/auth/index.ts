@@ -5,7 +5,33 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { loginSchema } from "@/lib/validators/auth";
+import {
+  decryptTotpSecret,
+  isTwoFactorRequired,
+  verifyBackupCode,
+  verifyTotpCode,
+} from "@/lib/auth/totp";
+import { isRestrictedToSettings } from "@/lib/auth/user-access";
+import { sendPendingUserLoginAlert } from "@/lib/email";
 import { authConfig } from "./auth.config";
+
+async function notifyAdminsOfPendingFirstLogin(user: {
+  name: string;
+  email: string;
+}) {
+  const admins = await db
+    .select({ email: users.email })
+    .from(users)
+    .where(eq(users.role, "admin"));
+
+  const authUrl = process.env.AUTH_URL ?? "http://localhost:8374";
+  await sendPendingUserLoginAlert({
+    adminEmails: admins.map((a) => a.email),
+    userName: user.name,
+    userEmail: user.email,
+    adminUrl: `${authUrl}/admin`,
+  });
+}
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
@@ -15,6 +41,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
+        totpCode: { label: "TOTP Code", type: "text" },
+        backupCode: { label: "Backup Code", type: "text" },
       },
       authorize: async (credentials) => {
         const parsed = loginSchema.safeParse(credentials);
@@ -28,17 +56,62 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         if (!user || user.disabled) return null;
 
-        const valid = await bcrypt.compare(
-          parsed.data.password,
-          user.passwordHash
-        );
+        const valid = await bcrypt.compare(parsed.data.password, user.passwordHash);
         if (!valid) return null;
+
+        if (
+          isTwoFactorRequired({
+            role: user.role,
+            status: user.status,
+            totpEnabled: user.totpEnabled,
+          }) &&
+          user.totpEnabled
+        ) {
+          const totpCode = parsed.data.totpCode?.trim();
+          const backupCode = parsed.data.backupCode?.trim();
+          let verified = false;
+
+          if (totpCode && user.totpSecret) {
+            try {
+              const secret = decryptTotpSecret(user.totpSecret);
+              verified = verifyTotpCode(secret, totpCode);
+            } catch {
+              verified = false;
+            }
+          }
+
+          if (!verified && backupCode) {
+            const hashed = user.totpBackupCodes ?? [];
+            const index = await verifyBackupCode(backupCode, hashed);
+            if (index !== null) {
+              verified = true;
+              const nextCodes = [...hashed];
+              nextCodes.splice(index, 1);
+              await db
+                .update(users)
+                .set({ totpBackupCodes: nextCodes, updatedAt: new Date() })
+                .where(eq(users.id, user.id));
+            }
+          }
+
+          if (!verified) return null;
+        }
+
+        if (user.status === "pending" && !user.firstLoginAt) {
+          await db
+            .update(users)
+            .set({ firstLoginAt: new Date(), updatedAt: new Date() })
+            .where(eq(users.id, user.id));
+          void notifyAdminsOfPendingFirstLogin(user);
+        }
 
         return {
           id: user.id,
           email: user.email,
           name: user.name,
           role: user.role,
+          status: user.status,
+          totpEnabled: user.totpEnabled,
           avatarPath: user.avatarPath,
           permissions: user.permissions ?? null,
         };
@@ -51,6 +124,21 @@ export async function requireAuth() {
   const session = await auth();
   if (!session?.user) {
     throw new Error("Unauthorized");
+  }
+  return session;
+}
+
+export async function requireActiveMember() {
+  const session = await requireAuth();
+  if (
+    isRestrictedToSettings({
+      role: session.user.role,
+      status: session.user.status,
+      totpEnabled: session.user.totpEnabled,
+      permissions: session.user.permissions,
+    })
+  ) {
+    throw new Error("Account setup incomplete");
   }
   return session;
 }

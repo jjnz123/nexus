@@ -1,5 +1,5 @@
 import type { NextAuthConfig } from "next-auth";
-import type { UserRole } from "@/lib/db/schema";
+import type { UserRole, UserStatus } from "@/lib/db/schema";
 import type { UserPermissionOverrides } from "@/lib/permissions";
 import { canAccessRoute } from "@/lib/permissions";
 
@@ -10,6 +10,8 @@ declare module "next-auth" {
       email: string;
       name: string;
       role: UserRole;
+      status: UserStatus;
+      totpEnabled: boolean;
       avatarPath: string | null;
       permissions: UserPermissionOverrides | null;
     };
@@ -17,6 +19,8 @@ declare module "next-auth" {
 
   interface User {
     role: UserRole;
+    status: UserStatus;
+    totpEnabled: boolean;
     avatarPath: string | null;
     permissions: UserPermissionOverrides | null;
   }
@@ -26,6 +30,8 @@ declare module "@auth/core/jwt" {
   interface JWT {
     id: string;
     role: UserRole;
+    status: UserStatus;
+    totpEnabled: boolean;
     avatarPath: string | null;
     permissions: UserPermissionOverrides | null;
   }
@@ -45,13 +51,21 @@ export const authConfig = {
 
       if (isPublic) return true;
       if (!isLoggedIn && !isLoginPage) return false;
-      if (isLoggedIn && isLoginPage) return Response.redirect(new URL("/", request.nextUrl));
+      if (isLoggedIn && isLoginPage) {
+        const dest = auth?.user?.status === "pending" || (!auth.user.totpEnabled && auth.user.role !== "admin" && auth.user.status !== "administrator")
+          ? "/settings"
+          : "/";
+        return Response.redirect(new URL(dest, request.nextUrl));
+      }
       if (
         isLoggedIn &&
         auth?.user?.role &&
-        !canAccessRoute(auth.user.role, pathname, auth.user.permissions)
+        !canAccessRoute(auth.user.role, pathname, auth.user.permissions, {
+          status: auth.user.status,
+          totpEnabled: auth.user.totpEnabled,
+        })
       ) {
-        return Response.redirect(new URL("/", request.nextUrl));
+        return Response.redirect(new URL("/settings", request.nextUrl));
       }
       return true;
     },
@@ -59,6 +73,8 @@ export const authConfig = {
       if (user) {
         token.id = user.id!;
         token.role = user.role;
+        token.status = user.status;
+        token.totpEnabled = user.totpEnabled;
         token.avatarPath = user.avatarPath;
         token.permissions = user.permissions ?? null;
       }
@@ -67,6 +83,8 @@ export const authConfig = {
     session: async ({ session, token }) => {
       session.user.id = token.id;
       session.user.role = token.role;
+      session.user.status = token.status;
+      session.user.totpEnabled = token.totpEnabled;
       session.user.avatarPath = token.avatarPath ?? null;
       session.user.permissions = token.permissions ?? null;
       return session;

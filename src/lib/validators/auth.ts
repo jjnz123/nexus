@@ -14,6 +14,8 @@ export const userPermissionsSchema = z.object({
 export const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
+  totpCode: z.string().optional(),
+  backupCode: z.string().optional(),
 });
 
 export const createUserSchema = z.object({
@@ -22,6 +24,7 @@ export const createUserSchema = z.object({
   password: z.string().min(8),
   role: z.enum(["admin", "editor", "user", "viewer"]),
   permissions: userPermissionsSchema.optional(),
+  sendWelcomeEmail: z.boolean().optional(),
 });
 
 export const updateUserSchema = z.object({
@@ -30,6 +33,7 @@ export const updateUserSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   password: z.string().min(8).optional(),
   role: z.enum(["admin", "editor", "user", "viewer"]).optional(),
+  status: z.enum(["pending", "member", "administrator"]).optional(),
   disabled: z.boolean().optional(),
   permissions: userPermissionsSchema.optional(),
 });
@@ -38,6 +42,19 @@ export const updateProfileSchema = z.object({
   name: z.string().min(1).max(100),
   currentPassword: z.string().optional(),
   newPassword: z.string().min(8).optional(),
+});
+
+export const totpSetupVerifySchema = z.object({
+  code: z.string().min(6).max(8),
+});
+
+export const totpDisableSchema = z.object({
+  currentPassword: z.string().min(1),
+  code: z.string().min(6).max(20),
+});
+
+export const sendEmailTotpSchema = z.object({
+  currentPassword: z.string().min(1),
 });
 
 export type LoginInput = z.infer<typeof loginSchema>;

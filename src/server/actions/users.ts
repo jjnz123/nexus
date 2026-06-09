@@ -13,6 +13,7 @@ import {
   updateProfileSchema,
 } from "@/lib/validators/auth";
 import { logAudit } from "@/server/audit";
+import { sendWelcomeEmail } from "@/lib/email";
 
 export async function getUsers() {
   const session = await requireAuth();
@@ -32,6 +33,7 @@ export async function createUser(input: unknown) {
       name: data.name,
       passwordHash,
       role: data.role,
+      status: "pending",
       permissions: data.permissions ?? {},
     })
     .returning({
@@ -39,6 +41,7 @@ export async function createUser(input: unknown) {
       email: users.email,
       name: users.name,
       role: users.role,
+      status: users.status,
       disabled: users.disabled,
       avatarPath: users.avatarPath,
       createdAt: users.createdAt,
@@ -48,9 +51,20 @@ export async function createUser(input: unknown) {
     action: "users.create",
     resource: "user",
     resourceId: user.id,
-    summary: `Created user ${user.email} (${user.role})`,
-    details: { email: user.email, role: user.role },
+    summary: `Created pending user ${user.email} (${user.role})`,
+    details: { email: user.email, role: user.role, status: user.status },
   });
+
+  if (data.sendWelcomeEmail) {
+    const authUrl = process.env.AUTH_URL ?? "http://localhost:8374";
+    await sendWelcomeEmail({
+      to: user.email,
+      name: user.name,
+      temporaryPassword: data.password,
+      loginUrl: `${authUrl}/login`,
+    });
+  }
+
   return user;
 }
 
@@ -62,6 +76,14 @@ export async function updateUser(input: unknown) {
   if (data.email) updates.email = data.email.toLowerCase();
   if (data.name) updates.name = data.name;
   if (data.role) updates.role = data.role;
+  if (data.status) {
+    updates.status = data.status;
+    if (data.status === "administrator") {
+      updates.role = "admin";
+    } else if (data.status === "member" && !data.role) {
+      // keep existing role
+    }
+  }
   if (data.disabled !== undefined) updates.disabled = data.disabled;
   if (data.permissions) updates.permissions = data.permissions;
   if (data.password) updates.passwordHash = await bcrypt.hash(data.password, 12);
@@ -76,6 +98,7 @@ export async function updateUser(input: unknown) {
       email: users.email,
       name: users.name,
       role: users.role,
+      status: users.status,
       disabled: users.disabled,
       avatarPath: users.avatarPath,
     });
@@ -85,7 +108,12 @@ export async function updateUser(input: unknown) {
     resource: "user",
     resourceId: user.id,
     summary: `Updated user ${user.email}`,
-    details: { email: user.email, role: user.role, disabled: user.disabled },
+    details: {
+      email: user.email,
+      role: user.role,
+      status: user.status,
+      disabled: user.disabled,
+    },
   });
   return user;
 }

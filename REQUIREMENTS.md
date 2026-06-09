@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v2.0.3
+**Current release:** v3.0.0
 
 ## 1. Overview
 
@@ -10,7 +10,8 @@ Internal operations portal for bookmarks, kanban tasks, network monitoring, and 
 |------|--------|
 | Product name | Nexus |
 | Stack | Next.js 15 (App Router), Server Actions, Auth.js v5, PostgreSQL, Drizzle ORM |
-| AI provider | xAI Grok (optional; requires `XAI_API_KEY`) |
+| AI provider | xAI Grok (optional; `XAI_API_KEY`); OpenAI Whisper (optional; `OPENAI_API_KEY`) |
+| Email | SMTP2go REST API (optional; `SMTP2GO_*`) |
 | Background services | `monitor-worker` for scheduled network health checks |
 
 ## 2. Authentication & Authorization
@@ -18,10 +19,37 @@ Internal operations portal for bookmarks, kanban tasks, network monitoring, and 
 ### 2.1 Authentication
 
 - Email/password sign-in via credentials provider (`/login`)
-- JWT session strategy
+- Two-step login when TOTP is enabled (password, then authenticator or backup code)
+- JWT session strategy (includes `status`, `totpEnabled` on session user)
 - Redirect unauthenticated users to `/login`
-- Redirect authenticated users away from `/login` to `/`
+- Pending users and users without required 2FA are restricted to `/settings` only
 - Public routes: `/api/auth/*`, `/api/health`
+
+### 2.1.1 Account status
+
+| Status | Access |
+|--------|--------|
+| `pending` | Profile Settings only until elevated |
+| `member` | Full access per role (after 2FA setup if required) |
+| `administrator` | Admin access; role forced to `admin`; 2FA exempt |
+
+- New users created by admins start as **`pending`**
+- Admins elevate `pending` → `member` or `administrator` in Admin Panel
+- First login by a pending user emails all administrators (SMTP2go)
+
+### 2.1.2 Two-factor authentication (TOTP)
+
+- Mandatory for all users **except** administrators
+- Setup in Profile Settings: QR code enrollment, backup codes (hashed, one-time use)
+- TOTP secrets encrypted at rest using `AUTH_SECRET`-derived key
+- Optional email verification codes via SMTP2go (password-gated send from settings)
+
+### 2.1.3 Transactional email (SMTP2go)
+
+- Provider: `https://api.smtp2go.com/v3/email/send` with `X-Smtp2go-Api-Key` header
+- Env: `SMTP2GO_API_KEY`, `SMTP2GO_SENDER_EMAIL`, `SMTP2GO_SENDER_NAME`
+- Sends: welcome/invite emails on user creation; admin alert on pending user first login
+- Gracefully skips when not configured (logs warning)
 
 ### 2.2 Roles
 
@@ -54,6 +82,7 @@ Admin-only permissions (not overridable via custom flags):
 | Route prefix | Required permission |
 |--------------|---------------------|
 | `/chat` | `ai:use` |
+| `/meetings` | `ai:use` |
 | `/admin` | `admin:access` |
 | `/bookmarks` | `bookmarks:view` |
 | `/tasks` | `tasks:view` |
@@ -622,7 +651,7 @@ Requires `monitoring:configure` to enable; `monitoring:view` to display status.
 
 - Docker Compose: app, PostgreSQL, monitor-worker
 - Default host port: 8374
-- Environment: `DATABASE_URL`, `AUTH_SECRET`, `AUTH_URL`, `XAI_API_KEY` (optional), seed admin vars
+- Environment: `DATABASE_URL`, `AUTH_SECRET`, `AUTH_URL`, `XAI_API_KEY`, `OPENAI_API_KEY`, `SMTP2GO_*` (all optional except core auth/DB), seed admin vars
 
 ### 14.2 Security
 
@@ -641,7 +670,36 @@ Requires `monitoring:configure` to enable; `monitoring:view` to display status.
 - Page transitions via Framer Motion
 - Grok-like AI chat with markdown, streaming, and message actions (home drawer + `/chat` workspace)
 
-## 15. Out of Scope / Known Gaps
+## 15. Meeting Assistant (`/meetings`)
+
+Requires `ai:use`. Transcription requires `OPENAI_API_KEY`; summarization requires `XAI_API_KEY`.
+
+### 15.1 Core workflow
+
+- Create meeting with title and optional project link
+- **Record** in browser (MediaRecorder) or **upload** audio file
+- States: `recording` → `processing` → `ready` (or `failed`)
+- Background processing: Whisper transcription → Grok summary + action item extraction
+
+### 15.2 Meeting detail
+
+- Tabs: Summary (markdown), Transcript, Action items, Ask AI
+- Audio playback from uploaded recording
+- Scoped Q&A chat persisted in `meeting_messages`
+
+### 15.3 Action items → Tasks
+
+- Extracted action items stored in `meeting_action_items`
+- Convert to Tasks ticket in selected project (defaults to To Do column)
+- Tracks `convertedTaskId` to prevent duplicate conversion
+
+### 15.4 List & search
+
+- Meetings sorted by date descending
+- Search title, transcript, summary; filter by project
+- Labels stored as jsonb array on meeting record
+
+## 16. Out of Scope / Known Gaps
 
 - Project export UI (server action exists, no front-end)
 - Bookmark share UI for individual groups/cards (server supports tab/group/card resource types)

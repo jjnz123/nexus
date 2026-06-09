@@ -32,6 +32,7 @@ async function seed() {
     name,
     passwordHash,
     role: "admin",
+    status: "administrator",
   });
 
   console.log(`Seeded admin user: ${email}`);

@@ -1,4 +1,5 @@
 import type { UserRole } from "@/lib/db/schema";
+import { isRestrictedToSettings, type SessionUserContext } from "@/lib/auth/user-access";
 
 export type UserPermissionOverrides = {
   useCustom?: boolean;
@@ -117,8 +118,13 @@ export function requireSessionPermission(
 export function canAccessRoute(
   role: UserRole,
   path: string,
-  overrides?: UserPermissionOverrides | null
+  overrides?: UserPermissionOverrides | null,
+  context?: Pick<SessionUserContext, "status" | "totpEnabled">
 ): boolean {
+  if (context && isRestrictedToSettings({ role, ...context, permissions: overrides })) {
+    return path.startsWith("/settings");
+  }
+
   if (path.startsWith("/admin")) return hasPermission(role, "admin:access", overrides);
   if (path.startsWith("/bookmarks"))
     return hasPermission(role, "bookmarks:view", overrides);
@@ -126,7 +132,11 @@ export function canAccessRoute(
   if (path.startsWith("/monitoring"))
     return hasPermission(role, "monitoring:view", overrides);
   if (path.startsWith("/chat")) return hasPermission(role, "ai:use", overrides);
+  if (path.startsWith("/meetings")) return hasPermission(role, "ai:use", overrides);
   if (path.startsWith("/settings")) return true;
+  if (path === "/" && context && isRestrictedToSettings({ role, ...context, permissions: overrides })) {
+    return false;
+  }
   return true;
 }
 

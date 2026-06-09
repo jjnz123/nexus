@@ -76,11 +76,29 @@ When an xAI API key is configured, users with permission can:
 
 Leave the API key unset to run Nexus without AI features.
 
+### Meeting Assistant
+
+At `/meetings` (requires `ai:use`):
+
+- **Record** audio in the browser or **upload** an audio file.
+- **Transcribe** with OpenAI Whisper (`OPENAI_API_KEY`).
+- **Summarize** and extract **action items** with Grok.
+- **Ask questions** about the meeting in a scoped chat interface.
+- Link meetings to **Tasks projects**; convert action items into backlog/tickets.
+- Search and filter past meetings by title, transcript, project, and labels.
+
+### Security & user lifecycle
+
+- **Account status:** `pending`, `member`, or `administrator` — new users start as **pending** with access limited to Profile Settings until elevated.
+- **Two-factor authentication (TOTP):** mandatory for all non-administrator accounts; setup in Profile Settings with QR enrollment and one-time backup codes.
+- **Administrators** are exempt from 2FA and seeded with `administrator` status.
+- **SMTP2go** integration for welcome/invite emails and admin alerts when pending users sign in for the first time (`SMTP2GO_*` env vars).
+
 ### Administration
 
 Admins manage the portal itself:
 
-- **Users** — create accounts, assign roles, disable users, and override permissions per person.
+- **Users** — create pending accounts, assign roles, elevate status (`pending` → `member` / `administrator`), send welcome emails, disable users, and override permissions per person.
 - **System settings** — AI model choice and the subtitle shown in the header.
 - **Audit logs** — review who did what, filter, export, or ask AI to summarise activity.
 
@@ -147,6 +165,10 @@ npm run dev
 | `AUTH_SECRET` | Session signing secret (32+ chars) |
 | `AUTH_URL` | Public app URL (e.g. `http://localhost:8374`) |
 | `XAI_API_KEY` | xAI API key for Grok (optional) |
+| `OPENAI_API_KEY` | OpenAI API key for Whisper meeting transcription (optional) |
+| `SMTP2GO_API_KEY` | SMTP2go API key for transactional email (optional) |
+| `SMTP2GO_SENDER_EMAIL` | From address for SMTP2go emails |
+| `SMTP2GO_SENDER_NAME` | From name for SMTP2go emails (default: Nexus) |
 | `SEED_ADMIN_*` | First-run admin bootstrap |
 
 ### Backup & restore
@@ -188,6 +210,10 @@ Deploy from the GitHub repo with build enabled. Set these stack environment vari
 | `SEED_ADMIN_PASSWORD` | Recommended | Change before first deploy |
 | `SEED_ADMIN_NAME` | Optional | Default: `Admin` |
 | `XAI_API_KEY` | Optional | Grok AI; leave blank to disable |
+| `OPENAI_API_KEY` | Optional | Whisper transcription for Meeting Assistant |
+| `SMTP2GO_API_KEY` | Optional | Transactional email via SMTP2go REST API |
+| `SMTP2GO_SENDER_EMAIL` | Optional | Verified sender email in SMTP2go |
+| `SMTP2GO_SENDER_NAME` | Optional | Email sender display name |
 
 `DATABASE_URL` and `UPLOAD_DIR` are set automatically by compose — do not override unless you change the stack file.
 

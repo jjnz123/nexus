@@ -19,6 +19,19 @@ export const userRoleEnum = pgEnum("user_role", [
   "viewer",
 ]);
 
+export const userStatusEnum = pgEnum("user_status", [
+  "pending",
+  "member",
+  "administrator",
+]);
+
+export const meetingStatusEnum = pgEnum("meeting_status", [
+  "recording",
+  "processing",
+  "ready",
+  "failed",
+]);
+
 export const checkTypeEnum = pgEnum("check_type", ["ping", "tcp", "http"]);
 
 export const monitorStatusEnum = pgEnum("monitor_status", [
@@ -58,7 +71,12 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash").notNull(),
   avatarPath: text("avatar_path"),
   role: userRoleEnum("role").notNull().default("user"),
+  status: userStatusEnum("status").notNull().default("pending"),
   disabled: boolean("disabled").notNull().default(false),
+  totpSecret: text("totp_secret"),
+  totpEnabled: boolean("totp_enabled").notNull().default(false),
+  totpBackupCodes: jsonb("totp_backup_codes").$type<string[]>().default([]),
+  firstLoginAt: timestamp("first_login_at"),
   permissions: jsonb("permissions")
     .$type<import("@/lib/permissions").UserPermissionOverrides>()
     .default({}),
@@ -575,8 +593,71 @@ export const monitorChecks = pgTable(
   ]
 );
 
+export const meetings = pgTable(
+  "meetings",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
+    title: text("title").notNull(),
+    labels: jsonb("labels").$type<string[]>().default([]),
+    status: meetingStatusEnum("status").notNull().default("recording"),
+    audioPath: text("audio_path"),
+    audioFilename: text("audio_filename"),
+    audioMimeType: text("audio_mime_type"),
+    audioSize: integer("audio_size"),
+    transcript: text("transcript"),
+    summary: text("summary"),
+    errorMessage: text("error_message"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("meetings_user_idx").on(table.userId),
+    index("meetings_project_idx").on(table.projectId),
+    index("meetings_created_at_idx").on(table.createdAt),
+  ]
+);
+
+export const meetingActionItems = pgTable(
+  "meeting_action_items",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    meetingId: uuid("meeting_id")
+      .notNull()
+      .references(() => meetings.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    description: text("description"),
+    assigneeHint: text("assignee_hint"),
+    priority: taskPriorityEnum("priority").default("medium"),
+    convertedTaskId: uuid("converted_task_id").references(() => tasks.id, {
+      onDelete: "set null",
+    }),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("meeting_action_items_meeting_idx").on(table.meetingId)]
+);
+
+export const meetingMessages = pgTable(
+  "meeting_messages",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    meetingId: uuid("meeting_id")
+      .notNull()
+      .references(() => meetings.id, { onDelete: "cascade" }),
+    role: text("role").notNull(),
+    content: text("content").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("meeting_messages_meeting_idx").on(table.meetingId)]
+);
+
 export type User = typeof users.$inferSelect;
 export type UserRole = User["role"];
+export type UserStatus = User["status"];
 export type BookmarkTab = typeof bookmarkTabs.$inferSelect;
 export type BookmarkShare = typeof bookmarkShares.$inferSelect;
 export type BookmarkShareResource = "tab" | "group" | "card";
@@ -587,6 +668,9 @@ export type TaskColumn = typeof taskColumns.$inferSelect;
 export type Task = typeof tasks.$inferSelect;
 export type MonitorDevice = typeof monitorDevices.$inferSelect;
 export type MonitorCheck = typeof monitorChecks.$inferSelect;
+export type Meeting = typeof meetings.$inferSelect;
+export type MeetingActionItem = typeof meetingActionItems.$inferSelect;
+export type MeetingMessage = typeof meetingMessages.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type SystemSettings = typeof systemSettings.$inferSelect;

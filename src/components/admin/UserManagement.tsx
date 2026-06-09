@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { PlusCircle } from "lucide-react";
 import { toast } from "sonner";
 import { createUser, updateUser } from "@/server/actions/users";
-import type { UserRole } from "@/lib/db/schema";
+import type { UserRole, UserStatus } from "@/lib/db/schema";
 import {
   getDefaultPermissionsForRole,
   type UserPermissionOverrides,
@@ -31,6 +31,7 @@ type UserRow = {
   email: string;
   name: string;
   role: UserRole;
+  status: UserStatus;
   disabled: boolean;
   avatarPath: string | null;
   permissions: UserPermissionOverrides | null;
@@ -41,8 +42,10 @@ type UserFormState = {
   email: string;
   name: string;
   role: UserRole;
+  status: UserStatus;
   disabled: boolean;
   password: string;
+  sendWelcomeEmail: boolean;
   permissions: UserPermissionOverrides;
 };
 
@@ -65,6 +68,14 @@ const permissionFields: {
     description: "Add or edit monitors and alerts",
   },
 ];
+
+const statusOptions: UserStatus[] = ["pending", "member", "administrator"];
+
+function statusBadgeVariant(status: UserStatus) {
+  if (status === "administrator") return "destructive" as const;
+  if (status === "pending") return "outline" as const;
+  return "secondary" as const;
+}
 
 function roleBadge(role: UserRole) {
   if (role === "admin") return "destructive";
@@ -97,8 +108,10 @@ function initialState(user?: UserRow): UserFormState {
     email: user?.email ?? "",
     name: user?.name ?? "",
     role,
+    status: user?.status ?? "pending",
     disabled: user?.disabled ?? false,
     password: "",
+    sendWelcomeEmail: true,
     permissions: resolvePermissions(role, user?.permissions),
   };
 }
@@ -178,6 +191,7 @@ export function UserManagement({ users }: { users: UserRow[] }) {
             email: state.email.trim(),
             name: state.name.trim(),
             role: state.role,
+            status: state.status,
             disabled: state.disabled,
             permissions,
             ...(state.password ? { password: state.password } : {}),
@@ -190,6 +204,7 @@ export function UserManagement({ users }: { users: UserRow[] }) {
             role: state.role,
             password: state.password,
             permissions,
+            sendWelcomeEmail: state.sendWelcomeEmail,
           });
           toast.success("User created");
         }
@@ -263,6 +278,37 @@ export function UserManagement({ users }: { users: UserRow[] }) {
                   Role defaults apply unless custom permissions are enabled below.
                 </p>
               </div>
+              {editing ? (
+                <div className="space-y-2">
+                  <Label>Account status</Label>
+                  <Select
+                    value={state.status}
+                    onValueChange={(value: UserStatus) =>
+                      setState((prev) => ({
+                        ...prev,
+                        status: value,
+                        role: value === "administrator" ? "admin" : prev.role,
+                      }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {statusOptions.map((status) => (
+                        <SelectItem key={status} value={status}>
+                          {status}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <p className="rounded-md border px-3 py-2 text-xs text-muted-foreground">
+                  New users are created as <strong>pending</strong> until elevated by an
+                  administrator.
+                </p>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="user-password">
                   {editing ? "New Password (optional)" : "Password"}
@@ -274,6 +320,22 @@ export function UserManagement({ users }: { users: UserRow[] }) {
                   onChange={(event) => setState((prev) => ({ ...prev, password: event.target.value }))}
                 />
               </div>
+              {!editing && (
+                <div className="flex items-center justify-between rounded-md border px-3 py-2">
+                  <div>
+                    <p className="text-sm font-medium">Send welcome email</p>
+                    <p className="text-xs text-muted-foreground">
+                      Email login details via SMTP2go when configured
+                    </p>
+                  </div>
+                  <Switch
+                    checked={state.sendWelcomeEmail}
+                    onCheckedChange={(checked) =>
+                      setState((prev) => ({ ...prev, sendWelcomeEmail: checked }))
+                    }
+                  />
+                </div>
+              )}
               {editing && (
                 <div className="flex items-center justify-between rounded-md border px-3 py-2">
                   <div>
@@ -345,8 +407,9 @@ export function UserManagement({ users }: { users: UserRow[] }) {
                   <th className="py-2 pr-3 font-medium">Name</th>
                   <th className="py-2 pr-3 font-medium">Email</th>
                   <th className="py-2 pr-3 font-medium">Role</th>
-                  <th className="py-2 pr-3 font-medium">Access</th>
                   <th className="py-2 pr-3 font-medium">Status</th>
+                  <th className="py-2 pr-3 font-medium">Access</th>
+                  <th className="py-2 pr-3 font-medium">Login</th>
                   <th className="py-2 font-medium">Actions</th>
                 </tr>
               </thead>
@@ -357,6 +420,9 @@ export function UserManagement({ users }: { users: UserRow[] }) {
                     <td className="py-3 pr-3">{user.email}</td>
                     <td className="py-3 pr-3">
                       <Badge variant={roleBadge(user.role)}>{user.role}</Badge>
+                    </td>
+                    <td className="py-3 pr-3">
+                      <Badge variant={statusBadgeVariant(user.status)}>{user.status}</Badge>
                     </td>
                     <td className="py-3 pr-3">
                       <Badge variant={user.permissions?.useCustom ? "default" : "outline"}>

@@ -25,7 +25,15 @@ export async function GET(
             ? "image/gif"
             : ext === ".webp"
               ? "image/webp"
-              : "application/octet-stream";
+              : ext === ".webm"
+                ? "audio/webm"
+                : ext === ".mp3"
+                  ? "audio/mpeg"
+                  : ext === ".wav"
+                    ? "audio/wav"
+                    : ext === ".m4a"
+                      ? "audio/mp4"
+                      : "application/octet-stream";
     return new NextResponse(buffer, { headers: { "Content-Type": type } });
   } catch {
     return new NextResponse("Not found", { status: 404 });
