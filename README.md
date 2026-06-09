@@ -265,11 +265,22 @@ Static analysis runs automatically via **GitHub Actions** on every push to `main
 
 | Symptom | Likely cause |
 |---------|----------------|
-| `HTTP 403` / “check sonar.token or SONAR_TOKEN” | Wrong, expired, or missing GitHub secret — **not** a network failure. The runner reached SonarQube but the token was rejected. |
-| Works locally, fails in Actions | GitHub `SONAR_TOKEN` differs from your local token, or the secret has a trailing newline. Re-paste the token in GitHub secrets. |
+| HTML page “**Sorry, you have been blocked**” / Cloudflare Ray ID | **Cloudflare WAF/bot protection** is blocking GitHub Actions runner IPs (Azure, e.g. `40.x.x.x`) before traffic reaches SonarQube. Your token is fine — fix Cloudflare or use a self-hosted runner. |
+| `HTTP 403` on scanner with no Cloudflare HTML | Invalid or expired `SONAR_TOKEN`, or wrong project permissions. |
+| Works locally, fails in Actions | Local machine is allowlisted on Cloudflare; GitHub runners are not. Or GitHub secret differs from your local token. |
 | `sonar.login` in local tests | Deprecated on SonarQube 10+; use `SONAR_TOKEN` env or `-Dsonar.token=` (not `-Dsonar.login=`). |
 
-The workflow includes a **Verify SonarQube secrets and connectivity** step that checks `/api/system/status` (reachability) and `/api/authentication/validate` (token) before scanning. Use **Actions → SonarQube Analysis → Run workflow** to test after updating secrets.
+**Cloudflare fix (when Actions runners are blocked)**
+
+GitHub-hosted runners use public cloud IPs that Cloudflare often treats as bots. For `sonarqube.q1.co.nz`:
+
+1. **WAF custom rule (recommended):** Skip Bot Fight Mode / relevant managed rules when `http.host` equals `sonarqube.q1.co.nz` and `http.request.uri.path` starts with `/api/`.
+2. **IP Access Rules:** Allow [GitHub Actions IP ranges](https://api.github.com/meta) (`actions` key in the JSON) for the SonarQube hostname.
+3. **Self-hosted runner:** Register a runner on your LAN that reaches SonarQube directly (bypasses Cloudflare entirely) and set `runs-on: self-hosted` in the workflow.
+
+The workflow **Verify** step checks `/api/system/status` (no auth) first — if that returns Cloudflare HTML, the problem is network/WAF, not the token.
+
+The workflow includes a **Verify SonarQube secrets and connectivity** step that checks reachability and token validation before scanning. Use **Actions → SonarQube Analysis → Run workflow** to test after updating Cloudflare or secrets.
 
 **Never commit tokens** to the repository. If a token was pasted into a file, revoke it in SonarQube and create a new one.
 

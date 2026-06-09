@@ -36,22 +36,40 @@ jobs:
           echo "SONAR_HOST_URL length: ${#SONAR_HOST_URL}"
           echo "SONAR_TOKEN length: ${#SONAR_TOKEN}"
 
+          is_cloudflare_block() {
+            grep -qiE 'cloudflare|cf-error-details|you have been blocked' "$1"
+          }
+
           echo "Checking server reachability (no auth)..."
           STATUS_CODE=$(curl -sS -o /tmp/sonar-status.json -w "%{http_code}" "${URL}/api/system/status")
           echo "GET /api/system/status -> HTTP ${STATUS_CODE}"
+          if is_cloudflare_block /tmp/sonar-status.json; then
+            echo "::error::Cloudflare blocked this GitHub Actions runner before SonarQube was reached."
+            echo "::error::Allow GitHub Actions IPs in Cloudflare for sonarqube.q1.co.nz, skip bot/WAF rules on /api/*, or use a self-hosted runner. See README SonarQube troubleshooting."
+            exit 1
+          fi
           cat /tmp/sonar-status.json
           echo ""
+
+          if [ "$STATUS_CODE" != "200" ]; then
+            echo "::error::SonarQube /api/system/status returned HTTP ${STATUS_CODE} (expected 200)."
+            exit 1
+          fi
 
           echo "Validating token..."
           AUTH_CODE=$(curl -sS -o /tmp/sonar-auth.json -w "%{http_code}" \
             -u "${SONAR_TOKEN}:" \
             "${URL}/api/authentication/validate")
           echo "GET /api/authentication/validate -> HTTP ${AUTH_CODE}"
+          if is_cloudflare_block /tmp/sonar-auth.json; then
+            echo "::error::Cloudflare blocked token validation. Fix Cloudflare access for GitHub Actions runners (see README)."
+            exit 1
+          fi
           cat /tmp/sonar-auth.json
           echo ""
 
           if [ "$AUTH_CODE" != "200" ]; then
-            echo "::error::Token rejected (HTTP ${AUTH_CODE}). See README SonarQube troubleshooting."
+            echo "::error::SonarQube rejected the token (HTTP ${AUTH_CODE}). Regenerate SONAR_TOKEN for project key nexus."
             exit 1
           fi
 
