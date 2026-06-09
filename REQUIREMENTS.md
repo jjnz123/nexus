@@ -659,12 +659,12 @@ Requires `monitoring:configure` to enable; `monitoring:view` to display status.
 
 #### 14.1.1 Public access via Cloudflare Tunnel
 
-When users reach Nexus at a public domain (e.g. `https://ai.q1.co.nz`):
+When users reach Nexus at a public domain (e.g. `https://nexus.example.com`):
 
 | Variable | Value |
 |----------|-------|
-| `AUTH_URL` | `https://ai.q1.co.nz` |
-| `NEXT_PUBLIC_APP_URL` | `https://ai.q1.co.nz` |
+| `AUTH_URL` | `https://nexus.example.com` |
+| `NEXT_PUBLIC_APP_URL` | `https://nexus.example.com` |
 | `AUTH_TRUST_HOST` | `true` |
 
 - Do not set `AUTH_URL` to an internal IP or `:8374` address when the tunnel serves the public domain

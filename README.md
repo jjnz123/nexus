@@ -166,7 +166,7 @@ npm run dev
 |----------|-------------|
 | `DATABASE_URL` | PostgreSQL connection string |
 | `AUTH_SECRET` | Session signing secret (32+ chars) |
-| `AUTH_URL` | Public app URL users open in the browser (e.g. `https://ai.q1.co.nz`) |
+| `AUTH_URL` | Public app URL users open in the browser (e.g. `https://nexus.example.com`) |
 | `NEXT_PUBLIC_APP_URL` | Same as `AUTH_URL` — used for absolute links in emails and server-side URL generation |
 | `AUTH_TRUST_HOST` | Set to `true` when behind Cloudflare Tunnel or a reverse proxy (Auth.js `trustHost`) |
 | `XAI_API_KEY` | xAI API key for Grok (optional) |
@@ -204,12 +204,12 @@ Set `AUTH_URL` and `NEXT_PUBLIC_APP_URL` to your HTTPS URL.
 
 ### Cloudflare Tunnel (public access)
 
-When exposing Nexus via Cloudflare Tunnel (e.g. `https://ai.q1.co.nz` → internal `8374`):
+When exposing Nexus via Cloudflare Tunnel (e.g. `https://nexus.example.com` → internal `8374`):
 
 1. Set stack environment variables to the **public domain**, not the internal IP:
    ```
-   AUTH_URL=https://ai.q1.co.nz
-   NEXT_PUBLIC_APP_URL=https://ai.q1.co.nz
+   AUTH_URL=https://nexus.example.com
+   NEXT_PUBLIC_APP_URL=https://nexus.example.com
    AUTH_TRUST_HOST=true
    ```
 2. Auth.js runs with `trustHost: true` and middleware redirects use `X-Forwarded-Host` / `X-Forwarded-Proto` from Cloudflare.
@@ -225,7 +225,7 @@ Deploy from the GitHub repo with build enabled. Set these stack environment vari
 |----------|----------|-------|
 | `AUTH_SECRET` | Yes | 32+ char random string |
 | `POSTGRES_PASSWORD` | Recommended | Change from default |
-| `AUTH_URL` | Recommended | Public browser URL, e.g. `https://ai.q1.co.nz` (not internal IP) |
+| `AUTH_URL` | Recommended | Public browser URL, e.g. `https://nexus.example.com` (not internal IP) |
 | `NEXT_PUBLIC_APP_URL` | Recommended | Same as `AUTH_URL` |
 | `AUTH_TRUST_HOST` | Recommended | `true` when behind Cloudflare Tunnel or reverse proxy |
 | `SEED_ADMIN_EMAIL` | Recommended | First-run admin (only if DB empty) |

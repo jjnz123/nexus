@@ -174,7 +174,7 @@ export function AuditLogViewer({
                 id="audit-email"
                 value={userEmail}
                 onChange={(event) => setUserEmail(event.target.value)}
-                placeholder="joel@example.com"
+                placeholder="user@example.com"
               />
             </div>
             <div className="space-y-2">
