@@ -179,6 +179,23 @@ Deploy from the GitHub repo with build enabled. Set these stack environment vari
 
 Default host port: **8374** (maps to container port 3000).
 
+### Releasing a new version
+
+After merging changes to `main`:
+
+1. Bump `package.json` and `REQUIREMENTS.md` version markers.
+2. Commit, tag, and push:
+   ```bash
+   git tag v1.x.x
+   git push origin main
+   git push origin v1.x.x
+   ```
+3. **Publish a GitHub Release** from the tag (tags alone do not appear on the Releases page):
+   ```bash
+   gh release create v1.x.x --title "v1.x.x — Short title" --notes "Release notes…" --latest
+   ```
+4. Trigger the Portainer stack webhook to redeploy (migrations run on app startup).
+
 ### Architecture
 
 - **app** — Next.js 15 (App Router, Server Actions, Auth.js v5)
