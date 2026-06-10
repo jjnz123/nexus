@@ -31,6 +31,7 @@ export const taskSchema = z.object({
   assigneeId: z.string().uuid().nullable().optional(),
   type: z.enum(["epic", "feature", "story", "task"]).optional(),
   parentId: z.string().uuid().nullable().optional(),
+  sortOrder: z.number().int().optional(),
 });
 
 export const updateTaskSchema = taskSchema.partial().extend({
@@ -114,6 +115,22 @@ export const updateProjectFieldSettingsSchema = z.object({
   ),
 });
 
+export const boardCardFieldsSchema = z.object({
+  parent: z.boolean(),
+  dueDate: z.boolean(),
+  stale: z.boolean(),
+  subtasks: z.boolean(),
+});
+
+export const updateProjectBoardSettingsSchema = z.object({
+  projectId: z.string().uuid(),
+  boardSettings: z.object({
+    visibleTypes: z.array(z.enum(["epic", "feature", "story", "task"])).min(1),
+    cardFields: boardCardFieldsSchema,
+    staleDays: z.number().int().min(1).max(365),
+  }),
+});
+
 export const bulkUpdateTasksSchema = z.object({
   taskIds: z.array(z.string().uuid()).min(1),
   updates: z.object({
@@ -141,6 +158,7 @@ export const roadmapCommitSchema = z.object({
       storyPoints: z.number().int().min(0).max(999).nullable().optional(),
       columnId: z.string().uuid(),
       description: z.string().max(10000).nullable().optional(),
+      sortOrder: z.number().int().optional(),
     })
   ),
   updates: z.array(updateTaskSchema),

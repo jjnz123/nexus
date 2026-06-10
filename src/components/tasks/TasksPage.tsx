@@ -22,6 +22,7 @@ import {
   getProjects,
   getTaskByKey,
   reorderTasks,
+  moveTaskToBoard,
 } from "@/server/actions/tasks";
 import { updateBookmarkPreferences } from "@/server/actions/preferences";
 import { Badge } from "@/components/ui/badge";
@@ -46,7 +47,7 @@ import { TaskCard } from "./TaskCard";
 import { TaskModal } from "./TaskModal";
 import { CreateTaskDialog } from "./CreateTaskDialog";
 import { TasksSidebar, type TasksSidebarView } from "./TasksSidebar";
-import { TasksBacklogPanel } from "./TasksBacklogPanel";
+import { TasksBacklogModal } from "./TasksBacklogModal";
 import { TasksIssuesView } from "./TasksIssuesView";
 import { TasksRoadmapView } from "./TasksRoadmapView";
 import { TasksProjectSettings } from "./TasksProjectSettings";
@@ -56,6 +57,7 @@ import {
   parseProjectTicketFieldSettings,
 } from "@/lib/tasks/ticket-fields";
 import { parseProjectHierarchyRules } from "@/lib/tasks/hierarchy";
+import { parseProjectBoardSettings } from "@/lib/tasks/project-settings";
 
 function makeTaskKey(projectKey: string, taskNumber: number) {
   return `${projectKey}-${String(taskNumber).padStart(3, "0")}`;
@@ -123,18 +125,37 @@ function KanbanColumn({
   id,
   className,
   children,
+  onBacklogDrop,
 }: {
   id: string;
   className?: string;
   children: React.ReactNode;
+  onBacklogDrop?: (taskId: string, columnId: string) => void;
 }) {
-  const { setNodeRef } = useDroppable({
+  const { setNodeRef, isOver } = useDroppable({
     id: `column-${id}`,
     data: { type: "column", columnId: id },
   });
 
   return (
-    <div ref={setNodeRef} className={className}>
+    <div
+      ref={setNodeRef}
+      className={className}
+      onDragOver={(event) => {
+        if (event.dataTransfer.types.includes("application/x-nexus-backlog-task")) {
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "move";
+        }
+      }}
+      onDrop={(event) => {
+        const taskId = event.dataTransfer.getData("application/x-nexus-backlog-task");
+        if (taskId && onBacklogDrop) {
+          event.preventDefault();
+          onBacklogDrop(taskId, id);
+        }
+      }}
+      data-over={isOver ? "true" : undefined}
+    >
       {children}
     </div>
   );
@@ -211,6 +232,43 @@ export function TasksPage({
     [board?.project.settings]
   );
 
+  const boardSettings = useMemo(
+    () => parseProjectBoardSettings(board?.project.settings),
+    [board?.project.settings]
+  );
+
+  const columnsById = useMemo(
+    () => new Map((board?.columns ?? []).map((column) => [column.id, column])),
+    [board?.columns]
+  );
+
+  const childCountByParentId = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const task of board?.tasks ?? []) {
+      if (!task.parentId) continue;
+      counts.set(task.parentId, (counts.get(task.parentId) ?? 0) + 1);
+    }
+    return counts;
+  }, [board?.tasks]);
+
+  const parentKeyById = useMemo(() => {
+    const map = new Map<string, string>();
+    if (!board) return map;
+    for (const task of board.tasks) {
+      map.set(task.id, makeTaskKey(board.project.key, task.number));
+    }
+    return map;
+  }, [board]);
+
+  const columnWipCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const task of board?.tasks ?? []) {
+      if (backlogColumn && task.columnId === backlogColumn.id) continue;
+      counts[task.columnId] = (counts[task.columnId] ?? 0) + 1;
+    }
+    return counts;
+  }, [board?.tasks, backlogColumn]);
+
   const parentCandidates = useMemo(
     () =>
       (board?.tasks ?? []).map((task) => ({
@@ -233,7 +291,7 @@ export function TasksPage({
     [board?.labels]
   );
 
-  const filteredTasks = useMemo(() => {
+  const boardDisplayTasks = useMemo(() => {
     const tasks = board?.tasks ?? [];
     const searchTerm = search.trim().toLowerCase();
     return tasks.filter((task) => {
@@ -245,19 +303,20 @@ export function TasksPage({
       const matchesAssignee =
         assigneeFilter === "all" ||
         (assigneeFilter === "unassigned" ? !task.assigneeId : task.assigneeId === assigneeFilter);
-      return matchesSearch && matchesPriority && matchesAssignee;
+      const matchesType = boardSettings.visibleTypes.includes(task.type);
+      return matchesSearch && matchesPriority && matchesAssignee && matchesType;
     });
-  }, [board?.tasks, search, priorityFilter, assigneeFilter]);
+  }, [board?.tasks, search, priorityFilter, assigneeFilter, boardSettings.visibleTypes]);
 
   const groupedFiltered = useMemo(
     () =>
-      filteredTasks.reduce<Record<string, BoardTask[]>>((acc, task) => {
+      boardDisplayTasks.reduce<Record<string, BoardTask[]>>((acc, task) => {
         if (!acc[task.columnId]) acc[task.columnId] = [];
         acc[task.columnId].push(task);
         acc[task.columnId].sort((a, b) => a.sortOrder - b.sortOrder);
         return acc;
       }, {}),
-    [filteredTasks]
+    [boardDisplayTasks]
   );
 
   const refreshProjects = async () => {
@@ -350,6 +409,23 @@ export function TasksPage({
       return;
     }
 
+    const activeTask = board.tasks.find((task) => task.id === String(active.id));
+    const targetColumn = board.columns.find((column) => column.id === targetColumnId);
+
+    if (
+      activeTask &&
+      targetColumn?.wipLimit != null &&
+      activeTask.columnId !== targetColumnId &&
+      (columnWipCounts[targetColumnId] ?? 0) >= targetColumn.wipLimit
+    ) {
+      toast.warning(
+        `WIP limit reached for ${targetColumn.name} (${targetColumn.wipLimit}). Remove or move a ticket first.`
+      );
+      setActiveDragId(null);
+      return;
+    }
+
+    const previousTasks = board.tasks;
     const nextTasks = dropIntoColumn(board.tasks, String(active.id), targetColumnId, String(over.id));
     setBoard({ ...board, tasks: nextTasks });
     setActiveDragId(null);
@@ -364,7 +440,31 @@ export function TasksPage({
           }))
         );
       } catch (error) {
+        setBoard({ ...board, tasks: previousTasks });
         toast.error(error instanceof Error ? error.message : "Unable to reorder tasks");
+      }
+    });
+  };
+
+  const onBacklogDropToColumn = (taskId: string, columnId: string) => {
+    const targetColumn = board?.columns.find((column) => column.id === columnId);
+    if (
+      targetColumn?.wipLimit != null &&
+      (columnWipCounts[columnId] ?? 0) >= targetColumn.wipLimit
+    ) {
+      toast.warning(
+        `WIP limit reached for ${targetColumn.name} (${targetColumn.wipLimit}). Remove or move a ticket first.`
+      );
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        await moveTaskToBoard(taskId, columnId);
+        await refreshBoard();
+        toast.success("Moved to board");
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Unable to move task");
       }
     });
   };
@@ -528,11 +628,13 @@ export function TasksPage({
                 <div className="flex gap-4 overflow-x-auto pb-2">
                   {kanbanColumns.map((column) => {
                     const tasks = groupedFiltered[column.id] ?? [];
-                    const wipExceeded = column.wipLimit != null && tasks.length > column.wipLimit;
+                    const wipCount = columnWipCounts[column.id] ?? 0;
+                    const wipExceeded = column.wipLimit != null && wipCount > column.wipLimit;
                     return (
                       <KanbanColumn
                         key={column.id}
                         id={column.id}
+                        onBacklogDrop={backlogPanelOpen ? onBacklogDropToColumn : undefined}
                         className="w-[280px] shrink-0 rounded-xl border bg-card/50 p-3"
                       >
                         <div className="mb-3 flex items-center justify-between gap-2">
@@ -552,7 +654,7 @@ export function TasksPage({
                                   : "border-muted-foreground/40 text-muted-foreground"
                               }
                             >
-                              {tasks.length}
+                              {wipCount}
                               {column.wipLimit != null ? `/${column.wipLimit}` : ""}
                             </Badge>
                             <Button
@@ -588,6 +690,12 @@ export function TasksPage({
                                     task={task}
                                     taskKey={makeTaskKey(board.project.key, task.number)}
                                     labelsById={labelsById}
+                                    cardFields={boardSettings.cardFields}
+                                    staleDays={boardSettings.staleDays}
+                                    childTaskCount={childCountByParentId.get(task.id) ?? 0}
+                                    parentKey={
+                                      task.parentId ? parentKeyById.get(task.parentId) ?? null : null
+                                    }
                                     onClick={() => openTaskModal(task)}
                                   />
                                 ))
@@ -606,6 +714,14 @@ export function TasksPage({
                       task={activeDragTask}
                       taskKey={makeTaskKey(board.project.key, activeDragTask.number)}
                       labelsById={labelsById}
+                      cardFields={boardSettings.cardFields}
+                      staleDays={boardSettings.staleDays}
+                      childTaskCount={childCountByParentId.get(activeDragTask.id) ?? 0}
+                      parentKey={
+                        activeDragTask.parentId
+                          ? parentKeyById.get(activeDragTask.parentId) ?? null
+                          : null
+                      }
                       onClick={() => {}}
                     />
                   ) : null}
@@ -633,6 +749,7 @@ export function TasksPage({
             <TasksRoadmapView
               board={board}
               projectUsers={projectUsers}
+              hierarchyRules={hierarchyRules}
               onOpenTask={openTaskModal}
               onRefresh={refreshBoard}
             />
@@ -644,12 +761,14 @@ export function TasksPage({
         </div>
       </div>
 
-      <TasksBacklogPanel
+      <TasksBacklogModal
         open={backlogPanelOpen}
         onOpenChange={setBacklogPanelOpen}
         projectId={board.project.id}
         projectKey={board.project.key}
         backlogTasks={backlogTasks}
+        kanbanColumns={kanbanColumns}
+        columnsById={columnsById}
         projectUsers={projectUsers}
         parentCandidates={parentCandidates}
         fieldSettings={ticketFieldSettings}

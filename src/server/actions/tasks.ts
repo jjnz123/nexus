@@ -33,6 +33,7 @@ import {
   createChildTaskSchema,
   updateProjectHierarchySettingsSchema,
   updateProjectFieldSettingsSchema,
+  updateProjectBoardSettingsSchema,
   roadmapCommitSchema,
   bulkUpdateTasksSchema,
   bulkDeleteTasksSchema,
@@ -369,7 +370,7 @@ export async function createTask(input: unknown) {
       assigneeId: data.assigneeId,
       type: data.type ?? "task",
       parentId: data.parentId ?? null,
-      sortOrder: columnTasks.length,
+      sortOrder: data.sortOrder ?? columnTasks.length,
     })
     .returning();
 
@@ -656,7 +657,7 @@ export async function reorderColumns(items: { id: string; sortOrder: number }[])
   return { success: true };
 }
 
-export async function moveTaskToBoard(taskId: string) {
+export async function moveTaskToBoard(taskId: string, targetColumnId?: string) {
   const session = await requireAuth();
   requireSessionPermission(session, "tasks:edit");
 
@@ -669,7 +670,9 @@ export async function moveTaskToBoard(taskId: string) {
     .where(eq(taskColumns.projectId, task.projectId))
     .orderBy(asc(taskColumns.sortOrder));
 
-  const targetColumn = columns.find((c) => !c.isBacklog);
+  const targetColumn = targetColumnId
+    ? columns.find((c) => c.id === targetColumnId && !c.isBacklog)
+    : columns.find((c) => !c.isBacklog);
   if (!targetColumn) throw new Error("No board column available");
 
   const columnTasks = await db.select().from(tasks).where(eq(tasks.columnId, targetColumn.id));
@@ -684,7 +687,7 @@ export async function moveTaskToBoard(taskId: string) {
     .where(eq(tasks.id, taskId));
 
   revalidatePath("/tasks");
-  return { success: true };
+  return { success: true, columnId: targetColumn.id };
 }
 
 export async function createBacklogTask(input: {
@@ -1010,6 +1013,33 @@ export async function updateProjectFieldSettings(input: unknown) {
   return updated;
 }
 
+export async function updateProjectBoardSettings(input: unknown) {
+  const session = await requireAuth();
+  requireSessionPermission(session, "tasks:edit");
+  const data = updateProjectBoardSettingsSchema.parse(input);
+
+  const [project] = await db
+    .select()
+    .from(projects)
+    .where(eq(projects.id, data.projectId))
+    .limit(1);
+  if (!project) throw new Error("Project not found");
+
+  const nextSettings = {
+    ...(project.settings ?? {}),
+    boardSettings: data.boardSettings,
+  };
+
+  const [updated] = await db
+    .update(projects)
+    .set({ settings: nextSettings })
+    .where(eq(projects.id, data.projectId))
+    .returning();
+
+  revalidatePath("/tasks");
+  return updated;
+}
+
 export async function commitRoadmapChanges(input: unknown) {
   const session = await requireAuth();
   requireSessionPermission(session, "tasks:edit");
@@ -1029,9 +1059,8 @@ export async function commitRoadmapChanges(input: unknown) {
   }
 
   const createdMap: Record<string, string> = {};
-  const typeOrder = { epic: 0, feature: 1, story: 2, task: 3 };
   const sortedCreates = [...data.creates].sort(
-    (a, b) => typeOrder[a.type] - typeOrder[b.type]
+    (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
   );
 
   for (const item of sortedCreates) {
@@ -1051,6 +1080,7 @@ export async function commitRoadmapChanges(input: unknown) {
       parentId,
       dueDate: item.dueDate ?? undefined,
       storyPoints: item.storyPoints ?? undefined,
+      sortOrder: item.sortOrder,
     });
     createdMap[item.draftId] = created.id;
   }

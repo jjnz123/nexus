@@ -440,15 +440,6 @@ export function TaskModal({
           </div>
         </div>
       ) : null}
-
-      {taskDetails ? (
-        <TaskChildSubtasksPanel
-          parentTaskId={taskDetails.task.id}
-          childTasks={localChildTasks}
-          onOpenTask={onOpenLinkedTask}
-          onChange={refreshDetails}
-        />
-      ) : null}
     </aside>
   );
 
@@ -546,6 +537,14 @@ export function TaskModal({
                               placeholder="Summary of the work…"
                             />
                           </div>
+                        ) : null}
+                        {taskDetails ? (
+                          <TaskChildSubtasksPanel
+                            parentTaskId={taskDetails.task.id}
+                            childTasks={localChildTasks}
+                            onOpenTask={onOpenLinkedTask}
+                            onChange={refreshDetails}
+                          />
                         ) : null}
                         {discussionPanel}
                       </div>

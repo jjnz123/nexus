@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v3.8.0
+**Current release:** v3.9.0
 
 ## 1. Overview
 
@@ -424,9 +424,11 @@ Requires `tasks:view`. Edit operations require `tasks:edit`.
 
 - **Collapsible Tasks sidebar** — Board, Issues, Roadmap, Project settings (icon-only + hover expand)
 - **View switcher** in the page header — quick toggle between Board, Issues, and Roadmap (alongside sidebar navigation)
-- **Kanban board** — non-backlog columns only, single horizontal scroll row (no wrapping)
-- **Backlog panel** — slide-out panel (top-right button); create/manage backlog items; move to board (To Do)
-- WIP limit display per column with visual warning when exceeded
+- **Kanban board** — non-backlog columns only, single horizontal scroll row (no wrapping); cross-column drag-and-drop with optimistic UI and rollback on server failure; **WIP limits block drops** when a column is at capacity (toast warning)
+- **Board type filter** — configurable in Project Settings → Board (`projects.settings.boardSettings.visibleTypes`); defaults to Story + Task only on the kanban board
+- **Board card fields** — configurable per project: parent ticket, due date, stale indicator (days since last update), child subtask count
+- **Backlog modal** — full-screen dialog (top-right button); Jira-like table with search/filter; drag handle to rank; drag row onto board column or use column dropdown; quick-create row
+- WIP limit display per column (counts all tickets in column, not just filtered types) with visual warning when exceeded
 
 ### 6.3 Task Hierarchy & Ticket Fields
 
@@ -457,7 +459,10 @@ Requires `tasks:view`. Edit operations require `tasks:edit`.
 
 - **Draft/commit workflow** — inline edits stay local until **Commit changes**; **Discard** resets draft
 - **Add item** dropdown — create Epic, Feature, Story, or Task directly on the roadmap
+- **Insert between rows** — hover **Insert below** control between rows to add a sibling in context (Jira Advanced Roadmaps-style)
+- **Tree ordering** — children appear directly under their parent (depth-first by `sortOrder` / ticket number), not grouped by type
 - Editable table: key, title, type, parent, assignee, priority, due date, story points, status/column
+- **Parent picker** — shows `KEY – Title` (e.g. `VC-003 – Implement Authentication`); options filtered by project **hierarchy rules**; allowed parent types shown per row
 - Hierarchy visible via indent + collapse/expand on parent rows
 - Bulk create, update, and delete committed via `commitRoadmapChanges` server action
 
@@ -465,11 +470,13 @@ Requires `tasks:view`. Edit operations require `tasks:edit`.
 
 Requires `tasks:edit`.
 
-- **Columns:** drag-to-reorder, create, edit (name, color, WIP limit), delete (non-backlog columns)
-- Backlog column managed here but hidden from kanban
-- **Labels:** create with name and color
-- **Hierarchy rules:** matrix of allowed parent types per child type (stored in `projects.settings.hierarchyRules`); defaults match Epic → Feature → Story/Task
-- **Ticket fields by type:** per Epic/Feature/Story/Task — drag-to-reorder fields, show/hide toggles; stored in `projects.settings.ticketFields`; controls ticket modal, backlog create form visibility
+**Tabbed layout:** General · Board · Roadmap · Hierarchy · Fields & Display · Workflow (future)
+
+- **General:** project summary, labels (create with name and color)
+- **Board:** drag-to-reorder columns, create/edit/delete (name, color, WIP limit); backlog column managed here but hidden from kanban; **board settings** — default visible ticket types on kanban; card field toggles (parent, due date, stale indicator, child subtasks) and stale threshold days (`projects.settings.boardSettings`)
+- **Roadmap:** explanatory copy linking hierarchy rules to roadmap behaviour
+- **Hierarchy:** allowed parent types per child type with clearer matrix, default tree diagram, and impact notes for Board/Roadmap/modal; stored in `projects.settings.hierarchyRules`
+- **Fields & Display:** per Epic/Feature/Story/Task — drag-to-reorder fields, show/hide toggles; stored in `projects.settings.ticketFields`; controls ticket modal and backlog create form visibility
 
 ### 6.8 Create Ticket
 
@@ -477,13 +484,14 @@ Requires `tasks:edit`.
 
 - **New task** toolbar button opens create-task dialog (board columns only)
 - Per-column **+** button pre-selects target column
-- **Backlog panel** — expanded create form: title, description, type, priority, assignee, parent, story points (respects field settings)
-- Backlog items created via backlog panel; move to board defaults to To Do
+- **Backlog modal** — table view with search/filter; quick-create; rank via drag handle; move to any board column via dropdown or drag onto column (respects WIP limits)
+- Backlog items created in backlog modal; default move target is first non-backlog column when using legacy server action without column id
 
 ### 6.9 Task Cards
 
-- Display task key, title, type, priority badge, assignee, due date, labels
-- Draggable on kanban board
+- Display task key, title, type, priority badge, assignee, labels
+- Optional fields per project board settings: parent key, due date, stale badge, child subtask count
+- Draggable on kanban board (cross-column)
 - Click to open task detail modal
 
 ### 6.10 Ticket Detail Modal
@@ -495,7 +503,7 @@ Requires `tasks:edit`.
 - Field visibility/order driven by project ticket field settings for the ticket type
 - Edit all ticket fields (see §6.3)
 - **Links & files tab** — drag-and-drop zone (files + `.eml` emails); external URL links; file attachments with version history and per-version download; linked issues panel; image/PDF preview
-- **Overview tab** — two-column issue-tracker layout: **Description + Discussion** on the left; **right sidebar** for type, status, assignee, priority, due date, story points, parent (filtered by hierarchy rules), labels, checklist, and **child subtasks**
+- **Overview tab** — two-column issue-tracker layout: **Description, child subtasks, and Discussion** on the left; **right sidebar** for type, status, assignee, priority, due date, story points, parent (filtered by hierarchy rules), labels, and checklist
 - **Specification tab** — details, acceptance criteria, definition of done
 - **Discussion tab** — full-height threaded comments (same panel as Overview)
 - Copy shareable ticket URL

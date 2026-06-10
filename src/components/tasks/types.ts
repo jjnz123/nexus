@@ -137,6 +137,7 @@ export type RoadmapDraftCreate = {
   dueDate: string | null;
   storyPoints: number | null;
   columnId: string;
+  sortOrder: number;
   description?: string | null;
 };
 
@@ -150,6 +151,7 @@ export type RoadmapDraftUpdate = {
   dueDate?: string | null;
   storyPoints?: number | null;
   columnId?: string;
+  sortOrder?: number;
   description?: string | null;
   details?: string | null;
   acceptanceCriteria?: string | null;

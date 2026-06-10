@@ -28,7 +28,9 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ProjectBoard } from "./types";
+import { TasksProjectBoardSettings } from "./TasksProjectBoardSettings";
 import { TasksProjectFieldSettings } from "./TasksProjectFieldSettings";
 import { TasksProjectHierarchySettings } from "./TasksProjectHierarchySettings";
 
@@ -214,89 +216,147 @@ export function TasksProjectSettings({
   };
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8">
-      <section className="space-y-3">
-        <div>
-          <h3 className="text-lg font-semibold">Board columns</h3>
-          <p className="text-sm text-muted-foreground">
-            Drag to reorder columns. The backlog column stays in settings only — it does not appear
-            on the kanban board.
-          </p>
-        </div>
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onColumnDragEnd}>
-          <SortableContext items={columns.map((c) => c.id)} strategy={verticalListSortingStrategy}>
-            <div className="space-y-2">
-              {columns.map((column) => (
-                <SortableColumnRow
-                  key={column.id}
-                  column={column}
-                  onSave={saveColumn}
-                  onDelete={deleteColumnNow}
-                />
+    <div className="mx-auto max-w-4xl">
+      <div className="mb-6">
+        <h2 className="text-xl font-semibold">Project settings</h2>
+        <p className="text-sm text-muted-foreground">
+          Configure board behaviour, hierarchy, and ticket display for {board.project.name}.
+        </p>
+      </div>
+
+      <Tabs defaultValue="general" className="space-y-6">
+        <TabsList className="flex h-auto flex-wrap justify-start gap-1">
+          <TabsTrigger value="general">General</TabsTrigger>
+          <TabsTrigger value="board">Board</TabsTrigger>
+          <TabsTrigger value="roadmap">Roadmap</TabsTrigger>
+          <TabsTrigger value="hierarchy">Hierarchy</TabsTrigger>
+          <TabsTrigger value="fields">Fields &amp; Display</TabsTrigger>
+          <TabsTrigger value="workflow" disabled>
+            Workflow
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="general" className="space-y-8">
+          <section className="space-y-3">
+            <div>
+              <h3 className="text-lg font-semibold">Project</h3>
+              <p className="text-sm text-muted-foreground">
+                {board.project.key} · {board.project.name}
+              </p>
+            </div>
+          </section>
+
+          <section className="space-y-3">
+            <h3 className="text-lg font-semibold">Labels</h3>
+            <div className="flex flex-wrap gap-2">
+              {board.labels.map((label) => (
+                <Badge
+                  key={label.id}
+                  variant="outline"
+                  className="border-transparent"
+                  style={{ backgroundColor: `${label.color}30`, color: label.color }}
+                >
+                  {label.name}
+                </Badge>
               ))}
             </div>
-          </SortableContext>
-        </DndContext>
-        <div className="grid gap-2 rounded-lg border p-3 md:grid-cols-[1fr_140px_120px_auto]">
-          <Input
-            value={newColumnName}
-            onChange={(e) => setNewColumnName(e.target.value)}
-            placeholder="Column name"
-          />
-          <Input
-            value={newColumnColor}
-            onChange={(e) => setNewColumnColor(e.target.value)}
-            placeholder="#6366f1"
-          />
-          <Input
-            value={newColumnWip}
-            onChange={(e) => setNewColumnWip(e.target.value)}
-            placeholder="WIP"
-            type="number"
-          />
-          <Button onClick={createColumnNow} disabled={!newColumnName.trim() || isPending}>
-            Add column
-          </Button>
-        </div>
-      </section>
+            <div className="grid gap-2 rounded-lg border p-3 md:grid-cols-[1fr_140px_auto]">
+              <Input
+                value={newLabelName}
+                onChange={(e) => setNewLabelName(e.target.value)}
+                placeholder="Label name"
+              />
+              <Input
+                value={newLabelColor}
+                onChange={(e) => setNewLabelColor(e.target.value)}
+                placeholder="#22c55e"
+              />
+              <Button onClick={createLabelNow} disabled={!newLabelName.trim() || isPending}>
+                Add label
+              </Button>
+            </div>
+          </section>
+        </TabsContent>
 
-      <section className="space-y-3">
-        <h3 className="text-lg font-semibold">Labels</h3>
-        <div className="flex flex-wrap gap-2">
-          {board.labels.map((label) => (
-            <Badge
-              key={label.id}
-              variant="outline"
-              className="border-transparent"
-              style={{ backgroundColor: `${label.color}30`, color: label.color }}
+        <TabsContent value="board" className="space-y-8">
+          <section className="space-y-3">
+            <div>
+              <h3 className="text-lg font-semibold">Board columns</h3>
+              <p className="text-sm text-muted-foreground">
+                Drag to reorder columns. Set WIP limits to warn when a column is over capacity. The
+                backlog column is managed separately from the kanban board.
+              </p>
+            </div>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={onColumnDragEnd}
             >
-              {label.name}
-            </Badge>
-          ))}
-        </div>
-        <div className="grid gap-2 rounded-lg border p-3 md:grid-cols-[1fr_140px_auto]">
-          <Input
-            value={newLabelName}
-            onChange={(e) => setNewLabelName(e.target.value)}
-            placeholder="Label name"
-          />
-          <Input
-            value={newLabelColor}
-            onChange={(e) => setNewLabelColor(e.target.value)}
-            placeholder="#22c55e"
-          />
-          <Button onClick={createLabelNow} disabled={!newLabelName.trim() || isPending}>
-            Add label
-          </Button>
-        </div>
-      </section>
+              <SortableContext items={columns.map((c) => c.id)} strategy={verticalListSortingStrategy}>
+                <div className="space-y-2">
+                  {columns.map((column) => (
+                    <SortableColumnRow
+                      key={column.id}
+                      column={column}
+                      onSave={saveColumn}
+                      onDelete={deleteColumnNow}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+            <div className="grid gap-2 rounded-lg border p-3 md:grid-cols-[1fr_140px_120px_auto]">
+              <Input
+                value={newColumnName}
+                onChange={(e) => setNewColumnName(e.target.value)}
+                placeholder="Column name"
+              />
+              <Input
+                value={newColumnColor}
+                onChange={(e) => setNewColumnColor(e.target.value)}
+                placeholder="#6366f1"
+              />
+              <Input
+                value={newColumnWip}
+                onChange={(e) => setNewColumnWip(e.target.value)}
+                placeholder="WIP"
+                type="number"
+              />
+              <Button onClick={createColumnNow} disabled={!newColumnName.trim() || isPending}>
+                Add column
+              </Button>
+            </div>
+          </section>
 
-      <TasksProjectHierarchySettings
-        projectId={board.project.id}
-        settings={board.project.settings}
-      />
+          <TasksProjectBoardSettings board={board} onRefresh={onRefresh} />
+        </TabsContent>
 
-      <TasksProjectFieldSettings board={board} onRefresh={onRefresh} />
+        <TabsContent value="roadmap" className="space-y-4">
+          <div className="rounded-lg border p-4">
+            <h3 className="font-medium">Roadmap planning</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Roadmap hierarchy and parent rules follow the Hierarchy tab. Use the Roadmap view to
+              plan epics, features, stories, and tasks in tree order, insert rows between items, and
+              commit drafts when ready.
+            </p>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="hierarchy">
+          <TasksProjectHierarchySettings
+            projectId={board.project.id}
+            settings={board.project.settings}
+          />
+        </TabsContent>
+
+        <TabsContent value="fields">
+          <TasksProjectFieldSettings board={board} onRefresh={onRefresh} />
+        </TabsContent>
+
+        <TabsContent value="workflow">
+          <p className="text-sm text-muted-foreground">Workflow configuration coming soon.</p>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

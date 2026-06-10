@@ -48,12 +48,13 @@ Editors can create and manage the library; viewers can browse and launch.
 A **Jira-inspired** task board with tickets, hierarchy, roadmap planning, and configurable fields:
 
 - Multiple **projects**, each with ticket keys (e.g. `OPS-001`); **last selected project persists** across reloads
-- **Kanban board** (horizontal columns) plus **backlog panel** with expanded create form.
+- **Kanban board** (horizontal columns) with **cross-column drag-and-drop** (optimistic updates with rollback on failure), **WIP limit enforcement** when moving tickets, and configurable **default ticket types** (Story + Task by default).
+- **Backlog modal** — full-screen table (key, title, type, parent, assignee, priority, due date, points, status); search/filter; rank via drag handle; drag rows onto board columns or use **Move to board** dropdown.
 - **Issues view** — sortable columns, column visibility, quick filters, row selection, and bulk actions (assign, move, priority, delete).
 - **View switcher** — jump between Board, Issues, and Roadmap from the page header.
-- **Roadmap** — inline bulk editing with draft/commit workflow; add any ticket type; hierarchy, assignee, dates, story points, status.
-- **Tickets** — tabbed detail modal (Overview, Specification, Links & files, Discussion) with **top-anchored layout**; Overview shows **Description + Discussion** on the left and metadata in a **right sidebar**; **Links & files** supports drag-and-drop uploads, URL links, `.eml` emails, and **attachment versioning**; create **child subtasks** from the sidebar; **hierarchy rules** configurable per project
-- **Project settings** — columns, labels, and **per-type field configuration** (show/hide + drag reorder).
+- **Roadmap** — tree-ordered hierarchy (children directly under parents); inline bulk editing with draft/commit workflow; **insert rows between lines**; parent picker shows full ticket names and respects hierarchy rules.
+- **Tickets** — tabbed detail modal (Overview, Specification, Links & files, Discussion) with **top-anchored layout**; Overview shows **Description + child subtasks + Discussion** on the left and metadata in a **right sidebar**; **Links & files** supports drag-and-drop uploads, URL links, `.eml` emails, and **attachment versioning**; **hierarchy rules** configurable per project
+- **Project settings** — tabbed layout (General, Board, Roadmap, Hierarchy, Fields & Display); columns, labels, **board card fields** (parent, due date, stale indicator, child subtasks), **visible board types**, and clearer **hierarchy rules** UI.
 
 ### Monitoring
 

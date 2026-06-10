@@ -36,6 +36,12 @@ import type {
   TaskPriority,
   TaskType,
 } from "./types";
+import {
+  getAllowedParentTypes,
+  isParentTypeAllowed,
+  type HierarchyRules,
+} from "@/lib/tasks/hierarchy";
+import { hierarchyDepth, sortRoadmapRows } from "@/lib/tasks/roadmap-order";
 
 function makeTaskKey(projectKey: string, taskNumber: number) {
   return `${projectKey}-${String(taskNumber).padStart(3, "0")}`;
@@ -66,20 +72,25 @@ type RoadmapRow = {
   dueDate: string;
   storyPoints: string;
   columnId: string;
+  sortOrder: number;
 };
 
-const TYPE_ORDER: Record<TaskType, number> = { epic: 0, feature: 1, story: 2, task: 3 };
+function formatRowLabel(projectKey: string, row: RoadmapRow) {
+  if (row.isNew) return `Draft · ${row.title}`;
+  return `${makeTaskKey(projectKey, row.number ?? 0)} – ${row.title}`;
+}
 
-function hierarchyDepth(taskId: string, rows: RoadmapRow[], cache = new Map<string, number>()): number {
-  if (cache.has(taskId)) return cache.get(taskId)!;
-  const row = rows.find((entry) => entry.id === taskId);
-  if (!row?.parentId) {
-    cache.set(taskId, 0);
-    return 0;
+function isDescendant(
+  candidateId: string,
+  ancestorId: string,
+  rows: Pick<RoadmapRow, "id" | "parentId">[]
+): boolean {
+  let current = rows.find((row) => row.id === candidateId)?.parentId ?? null;
+  while (current) {
+    if (current === ancestorId) return true;
+    current = rows.find((row) => row.id === current)?.parentId ?? null;
   }
-  const depth = hierarchyDepth(row.parentId, rows, cache) + 1;
-  cache.set(taskId, depth);
-  return depth;
+  return false;
 }
 
 function isHiddenByCollapsedAncestor(
@@ -98,11 +109,13 @@ function isHiddenByCollapsedAncestor(
 export function TasksRoadmapView({
   board,
   projectUsers,
+  hierarchyRules,
   onOpenTask,
   onRefresh,
 }: {
   board: ProjectBoard;
   projectUsers: { id: string; name: string }[];
+  hierarchyRules: HierarchyRules;
   onOpenTask: (task: BoardTask) => void;
   onRefresh: () => Promise<void> | void;
 }) {
@@ -132,6 +145,7 @@ export function TasksRoadmapView({
       dueDate: item.dueDate ? asDateInput(item.dueDate) : "",
       storyPoints: item.storyPoints?.toString() ?? "",
       columnId: item.columnId,
+      sortOrder: item.sortOrder,
     }));
 
     const existingRows: RoadmapRow[] = board.tasks.map((task) => {
@@ -152,23 +166,60 @@ export function TasksRoadmapView({
             ? patch.storyPoints?.toString() ?? ""
             : task.storyPoints?.toString() ?? "",
         columnId: patch?.columnId ?? task.columnId,
+        sortOrder: patch?.sortOrder ?? task.sortOrder,
       };
     });
 
-    return [...existingRows, ...createRows].sort((a, b) => {
-      const depthDiff = hierarchyDepth(a.id, [...existingRows, ...createRows]) -
-        hierarchyDepth(b.id, [...existingRows, ...createRows]);
-      if (depthDiff !== 0) return depthDiff;
-      return TYPE_ORDER[a.type] - TYPE_ORDER[b.type];
-    });
+    return sortRoadmapRows([...existingRows, ...createRows]);
   }, [board.tasks, draftCreates, draftUpdates, draftDeletes]);
 
   const visibleRows = baseRows.filter((row) => !row.isDeleted);
 
+  const sortedVisibleRows = useMemo(
+    () => sortRoadmapRows(visibleRows),
+    [visibleRows]
+  );
+
   const pendingCount =
     draftCreates.length + Object.keys(draftUpdates).length + draftDeletes.size;
 
-  const parentOptions = visibleRows.filter((row) => row.id !== undefined);
+  function parentOptionsForRow(row: RoadmapRow) {
+    return visibleRows.filter(
+      (option) =>
+        option.id !== row.id &&
+        !isDescendant(option.id, row.id, visibleRows) &&
+        isParentTypeAllowed(row.type, option.type, hierarchyRules)
+    );
+  }
+
+  function nextSortOrder(parentId: string | null, afterSortOrder?: number) {
+    const siblings = visibleRows.filter((row) => row.parentId === parentId);
+    if (afterSortOrder != null) return afterSortOrder + 1;
+    if (!siblings.length) return 0;
+    return Math.max(...siblings.map((row) => row.sortOrder)) + 1;
+  }
+
+  function bumpSiblingSortOrders(parentId: string | null, fromOrder: number) {
+    setDraftCreates((prev) =>
+      prev.map((item) =>
+        item.parentId === parentId && item.sortOrder >= fromOrder
+          ? { ...item, sortOrder: item.sortOrder + 1 }
+          : item
+      )
+    );
+    setDraftUpdates((prev) => {
+      const next = { ...prev };
+      for (const row of visibleRows) {
+        if (row.isNew || row.parentId !== parentId || row.sortOrder < fromOrder) continue;
+        next[row.id] = {
+          ...next[row.id],
+          id: row.id,
+          sortOrder: row.sortOrder + 1,
+        };
+      }
+      return next;
+    });
+  }
 
   function patchRow(rowId: string, patch: Partial<RoadmapRow>) {
     const isDraft = draftCreates.some((item) => item.draftId === rowId);
@@ -192,6 +243,7 @@ export function TasksRoadmapView({
                       : null
                     : item.storyPoints,
                 columnId: patch.columnId ?? item.columnId,
+                sortOrder: patch.sortOrder ?? item.sortOrder,
               }
             : item
         )
@@ -219,24 +271,34 @@ export function TasksRoadmapView({
               : null
             : prev[rowId]?.storyPoints,
         columnId: patch.columnId ?? prev[rowId]?.columnId,
+        sortOrder: patch.sortOrder ?? prev[rowId]?.sortOrder,
       },
     }));
   }
 
-  function addRow(type: TaskType) {
+  function addRow(type: TaskType, afterRowId?: string | null) {
     const draftId = `draft-${createId()}`;
+    const afterRow = afterRowId ? visibleRows.find((row) => row.id === afterRowId) : null;
+    const parentId = afterRow?.parentId ?? null;
+    const sortOrder = afterRow
+      ? nextSortOrder(parentId, afterRow.sortOrder)
+      : nextSortOrder(null);
+
+    if (afterRow) bumpSiblingSortOrders(parentId, sortOrder);
+
     setDraftCreates((prev) => [
       ...prev,
       {
         draftId,
         title: `New ${type}`,
         type,
-        parentId: null,
+        parentId,
         assigneeId: null,
         priority: "medium",
         dueDate: null,
         storyPoints: null,
         columnId: defaultColumnId,
+        sortOrder,
       },
     ]);
   }
@@ -342,25 +404,60 @@ export function TasksRoadmapView({
             </tr>
           </thead>
           <tbody>
-            {visibleRows.length === 0 ? (
+            {sortedVisibleRows.length === 0 ? (
               <tr>
                 <td colSpan={10} className="px-3 py-8 text-center text-muted-foreground">
                   No roadmap items yet. Add an epic, feature, story, or task to get started.
                 </td>
               </tr>
             ) : (
-              visibleRows.map((row) => {
-                const depth = hierarchyDepth(row.id, visibleRows);
+              sortedVisibleRows.flatMap((row, index) => {
+                const depth = hierarchyDepth(row.id, sortedVisibleRows);
                 const hasChildren = childCount(row.id) > 0;
                 const isCollapsed = collapsed.has(row.id);
-                const hiddenByParent = isHiddenByCollapsedAncestor(row, visibleRows, collapsed);
+                const hiddenByParent = isHiddenByCollapsedAncestor(row, sortedVisibleRows, collapsed);
+                const rowParents = parentOptionsForRow(row);
+                const allowedParents = getAllowedParentTypes(row.type, hierarchyRules);
 
-                if (hiddenByParent) return null;
+                if (hiddenByParent) return [];
 
-                return (
+                const insertRow = (
+                  <tr key={`insert-after-${row.id}`} className="group/insert border-0">
+                    <td colSpan={10} className="relative h-0 p-0">
+                      <div className="absolute inset-x-0 -top-2 z-10 flex justify-center opacity-0 transition group-hover/insert:opacity-100">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-6 gap-1 rounded-full px-2 text-[10px] shadow-sm"
+                            >
+                              <Plus className="h-3 w-3" />
+                              Insert below
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="center">
+                            {(["epic", "feature", "story", "task"] as TaskType[]).map((type) => (
+                              <DropdownMenuItem
+                                key={type}
+                                className="capitalize"
+                                onClick={() => addRow(type, row.id)}
+                              >
+                                {type}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </td>
+                  </tr>
+                );
+
+                const dataRow = (
                   <tr
                     key={row.id}
-                    className="border-b last:border-b-0 hover:bg-accent/20"
+                    className="group/insert border-b last:border-b-0 hover:bg-accent/20"
                   >
                     <td className="px-3 py-2 align-top">
                       <div className="flex items-center gap-1" style={{ paddingLeft: depth * 12 }}>
@@ -424,22 +521,23 @@ export function TasksRoadmapView({
                           patchRow(row.id, { parentId: value === "none" ? null : value })
                         }
                       >
-                        <SelectTrigger className="w-[140px]">
+                        <SelectTrigger className="w-[220px]">
                           <SelectValue placeholder="None" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">None</SelectItem>
-                          {parentOptions
-                            .filter((option) => option.id !== row.id)
-                            .map((option) => (
-                              <SelectItem key={option.id} value={option.id}>
-                                {option.isNew
-                                  ? `Draft · ${option.title}`
-                                  : makeTaskKey(board.project.key, option.number ?? 0)}
-                              </SelectItem>
-                            ))}
+                          {rowParents.map((option) => (
+                            <SelectItem key={option.id} value={option.id}>
+                              {formatRowLabel(board.project.key, option)}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
+                      {allowedParents.length ? (
+                        <p className="mt-1 text-[10px] text-muted-foreground">
+                          Allowed: {allowedParents.join(", ")}
+                        </p>
+                      ) : null}
                     </td>
                     <td className="px-3 py-2 align-top">
                       <Select
@@ -527,6 +625,10 @@ export function TasksRoadmapView({
                     </td>
                   </tr>
                 );
+
+                return index === sortedVisibleRows.length - 1
+                  ? [dataRow, insertRow]
+                  : [dataRow, insertRow];
               })
             )}
           </tbody>
