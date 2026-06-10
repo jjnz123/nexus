@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v4.1.0
+**Current release:** v4.1.1
 
 ## 1. Overview
 
@@ -109,7 +109,7 @@ Available on all authenticated app routes.
 - Nav items hidden when the user lacks the required permission
 - Active route highlighting
 - **Collapsible sidebar** — fixed icon column; labels collapse/expand with CSS transitions (icons do not shift). Icon-only mode with hover expand (same behaviour as `/chat` sidebar)
-- Manual collapse/expand toggle; state persisted in user preferences (`app_sidebar_collapsed`)
+- Manual collapse/expand toggle (always visible; `PanelLeftOpen` when collapsed, `PanelLeftClose` when expanded); state persisted in user preferences (`app_sidebar_collapsed`)
 - Full viewport height rail with CSS width transitions (no flicker)
 - Mobile-responsive header with product branding
 - **Mobile navigation drawer** — hamburger menu exposes permission-filtered nav links on small screens
@@ -149,7 +149,7 @@ Available on all authenticated app routes.
 ### 4.1.1 App sidebar
 
 - Collapsible main navigation rail (56px collapsed / 256px expanded); state in `user_preferences.app_sidebar_collapsed`
-- Collapse control visible **only when expanded**; when collapsed, click the Nexus icon to expand (no floating toggle icon)
+- Collapse/expand toggle always visible in the icon column; icon reflects the **next action** (`PanelLeftOpen` when collapsed, `PanelLeftClose` when expanded); module branding icon + title shown in the header label area when expanded
 
 ### 4.2 Search & AI Entry
 
@@ -215,7 +215,7 @@ Three-panel workspace (full-bleed within app shell):
 
 ### Collapsible Sidebar
 
-- Manual collapse/expand toggle; state persisted in user preferences (`chat_sidebar_collapsed`)
+- Manual collapse/expand toggle (always visible; icon reflects next action); state persisted in user preferences (`chat_sidebar_collapsed`)
 - Fixed **56px icon column** — icons stay aligned when collapsing; only labels animate out
 - Hover over collapsed sidebar smoothly expands full labels and lists (no DOM swap / flicker)
 - Quick access to file manager from sidebar header

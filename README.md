@@ -2,7 +2,7 @@
 
 **Nexus** is a self-hosted team portal that brings your everyday tools into one place: bookmarked apps and links, a task board, network monitoring, and an optional AI assistant. It is designed for internal teams who want a single home screen for operations—not another SaaS subscription.
 
-Sign in once, and everyone sees the tools and status relevant to their role. The main sidebar collapses to a fixed icon column—labels slide away smoothly while icons stay put—with hover expand to peek at labels, matching the `/chat` workspace sidebar.
+Sign in once, and everyone sees the tools and status relevant to their role. The main sidebar collapses to a fixed icon column—labels slide away smoothly while icons stay put—with a persistent **expand/collapse toggle** (`PanelLeftOpen` / `PanelLeftClose`) that always reflects the next action, plus hover expand to peek at labels, matching the `/chat` workspace sidebar.
 
 ---
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { PanelLeftClose } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -89,39 +89,31 @@ export function CollapsibleSideRail({
           className="flex shrink-0 items-center justify-center"
           style={{ width: compactWidth }}
         >
-          <button
-            type="button"
-            className={cn(
-              "flex h-9 w-9 items-center justify-center rounded-md transition-colors",
-              collapsed && "cursor-pointer hover:bg-accent"
-            )}
-            onClick={() => {
-              if (collapsed) onCollapsedChange(false);
-            }}
-            title={collapsed ? "Expand sidebar" : undefined}
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-9 w-9 shrink-0"
+            onClick={() => onCollapsedChange(!collapsed)}
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
-            {headerIcon}
-          </button>
+            {collapsed ? (
+              <PanelLeftOpen className="h-4 w-4" />
+            ) : (
+              <PanelLeftClose className="h-4 w-4" />
+            )}
+          </Button>
         </div>
         <div
           className={cn(
-            "flex min-w-0 flex-1 items-center justify-between gap-2 overflow-hidden pr-2 transition-[max-width,opacity] duration-200 ease-in-out",
+            "flex min-w-0 flex-1 items-center gap-2 overflow-hidden pr-2 transition-[max-width,opacity] duration-200 ease-in-out",
             showLabels ? "max-w-[200px] opacity-100" : "max-w-0 opacity-0"
           )}
         >
+          {headerIcon ? (
+            <span className="flex shrink-0 items-center justify-center">{headerIcon}</span>
+          ) : null}
           {headerLabel ? (
             <span className="truncate text-lg font-bold tracking-tight">{headerLabel}</span>
-          ) : null}
-          {!isCompact ? (
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-8 w-8 shrink-0"
-              onClick={() => onCollapsedChange(true)}
-              title="Collapse sidebar"
-            >
-              <PanelLeftClose className="h-4 w-4" />
-            </Button>
           ) : null}
         </div>
       </div>
