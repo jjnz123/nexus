@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v4.0.0
+**Current release:** v4.1.0
 
 ## 1. Overview
 
@@ -433,15 +433,18 @@ Requires `tasks:view`. Edit operations require `tasks:edit`.
 - **Collapsible Tasks sidebar** — Board, Issues, Roadmap, Project settings (icon-only + hover expand)
 - **View switcher** in the page header — quick toggle between Board, Issues, and Roadmap (alongside sidebar navigation)
 - **Kanban board** — non-backlog columns only, single horizontal scroll row (no wrapping); cross-column drag-and-drop from anywhere on the card with optimistic UI, server persistence via `reorderTasks`, and rollback on failure; drops onto **empty columns** persist correctly; **WIP limits block drops** when a column is at capacity (toast warning); drop target falls back to highlighted column when pointer collision is ambiguous
-- **Board type filter** — configurable in Project Settings → Board (`projects.settings.boardSettings.visibleTypes`); defaults to Story + Task only on the kanban board
+- **Board type filter** — two layers:
+  - **Project default types** — configurable in Project Settings → Board (`projects.settings.boardSettings.visibleTypes`); defaults to Story + Task only on the kanban board
+  - **Bug visibility mode** — Project Settings → Board (`projects.settings.boardSettings.bugBoardMode`): `show_bugs` (default filter All), `hide_bugs` (default filter Other tickets), or `all_types` (always show all types regardless of user filter)
+  - **User board filter** — segmented control on the Board (All / Other tickets / Bugs only); persisted per user and project in `user_preferences.tasks_workspace.boardFilters[projectId]`
 - **Board card fields** — configurable per project: parent ticket, due date, stale indicator (days since last update), child subtask count
 - **Backlog modal** — full-screen dialog (top-right button); Jira-like table with search/filter; drag handle to rank; drag row onto board column or use column dropdown; quick-create row
 - WIP limit display per column (counts all tickets in column, not just filtered types) with visual warning when exceeded
 
 ### 6.3 Task Hierarchy & Ticket Fields
 
-- Ticket types: **Epic**, **Feature**, **Story**, **Task**
-- Optional **parent** link for hierarchy (Epic → Feature → Story/Task); **configurable hierarchy rules** per project in settings; parent dropdown filtered by allowed types; server-side validation prevents cycles and invalid parents
+- Ticket types: **Epic**, **Feature**, **Story**, **Task**, **Bug**
+- Optional **parent** link for hierarchy (Epic → Feature → Story/Task/Bug); **configurable hierarchy rules** per project in settings; Bug may be a child of Epic, Feature, Story, or Task (or stand alone); parent dropdown filtered by allowed types; server-side validation prevents cycles and invalid parents
 - Extended ticket fields stored on `tasks`:
   - Title, description, **details**, **acceptance criteria**, **definition of done**, **story points**
   - Priority, due date, assignee, column/status, type, parent, labels
@@ -481,7 +484,7 @@ Requires `tasks:edit`.
 **Tabbed layout:** General · Board · Roadmap · Hierarchy · Fields & Display · Workflow (future)
 
 - **General:** project summary, labels (create with name and color)
-- **Board:** drag-to-reorder columns, create/edit/delete (name, color, WIP limit); backlog column managed here but hidden from kanban; **board settings** — default visible ticket types on kanban; card field toggles (parent, due date, stale indicator, child subtasks) and stale threshold days (`projects.settings.boardSettings`)
+- **Board:** drag-to-reorder columns, create/edit/delete (name, color, WIP limit); backlog column managed here but hidden from kanban; **board settings** — default visible ticket types on kanban; **bug visibility mode** (`show_bugs`, `hide_bugs`, `all_types`); card field toggles (parent, due date, stale indicator, child subtasks) and stale threshold days (`projects.settings.boardSettings`)
 - **Roadmap:** explanatory copy linking hierarchy rules to roadmap behaviour
 - **Hierarchy:** allowed parent types per child type with clearer matrix, default tree diagram, and impact notes for Board/Roadmap/modal; stored in `projects.settings.hierarchyRules`
 - **Fields & Display:** per Epic/Feature/Story/Task — drag-to-reorder fields, show/hide toggles; stored in `projects.settings.ticketFields`; controls ticket modal and backlog create form visibility

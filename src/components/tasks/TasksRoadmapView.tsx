@@ -36,6 +36,7 @@ import type {
   TaskPriority,
   TaskType,
 } from "./types";
+import { TASK_TYPES, TASK_TYPE_LABELS } from "@/lib/tasks/task-types";
 import {
   getAllowedParentTypes,
   isParentTypeAllowed,
@@ -369,9 +370,9 @@ export function TasksRoadmapView({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              {(["epic", "feature", "story", "task"] as TaskType[]).map((type) => (
-                <DropdownMenuItem key={type} onClick={() => addRow(type)} className="capitalize">
-                  {type}
+              {TASK_TYPES.map((type) => (
+                <DropdownMenuItem key={type} onClick={() => addRow(type)}>
+                  {TASK_TYPE_LABELS[type]}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
@@ -407,7 +408,7 @@ export function TasksRoadmapView({
             {sortedVisibleRows.length === 0 ? (
               <tr>
                 <td colSpan={10} className="px-3 py-8 text-center text-muted-foreground">
-                  No roadmap items yet. Add an epic, feature, story, or task to get started.
+                  No roadmap items yet. Add an epic, feature, story, task, or bug to get started.
                 </td>
               </tr>
             ) : (
@@ -438,13 +439,12 @@ export function TasksRoadmapView({
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="center">
-                            {(["epic", "feature", "story", "task"] as TaskType[]).map((type) => (
+                            {TASK_TYPES.map((type) => (
                               <DropdownMenuItem
                                 key={type}
-                                className="capitalize"
                                 onClick={() => addRow(type, row.id)}
                               >
-                                {type}
+                                {TASK_TYPE_LABELS[type]}
                               </DropdownMenuItem>
                             ))}
                           </DropdownMenuContent>

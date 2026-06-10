@@ -141,6 +141,13 @@
       "when": 1781006000000,
       "tag": "0021_dashboard_tasks_workspace",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1781006800000,
+      "tag": "0022_add_bug_task_type",
+      "breakpoints": true
     }
   ]
 }

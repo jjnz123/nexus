@@ -1,5 +1,8 @@
+import type { BoardTypeFilter } from "@/lib/tasks/task-types";
+
 export type TasksWorkspacePrefs = {
   descriptionHeight?: number;
+  boardFilters?: Record<string, BoardTypeFilter>;
 };
 
 export const DEFAULT_TASKS_WORKSPACE: TasksWorkspacePrefs = {
@@ -47,9 +50,20 @@ export function parseTasksWorkspace(
 ): TasksWorkspacePrefs {
   if (!value || typeof value !== "object") return DEFAULT_TASKS_WORKSPACE;
   const height = value.descriptionHeight;
+  const boardFilters =
+    value.boardFilters && typeof value.boardFilters === "object"
+      ? Object.fromEntries(
+          Object.entries(value.boardFilters).filter(
+            (entry): entry is [string, BoardTypeFilter] =>
+              entry[1] === "all" || entry[1] === "bugs" || entry[1] === "others"
+          )
+        )
+      : undefined;
+
   return {
     descriptionHeight:
       typeof height === "number" && height >= 120 && height <= 800 ? height : 180,
+    boardFilters,
   };
 }
 

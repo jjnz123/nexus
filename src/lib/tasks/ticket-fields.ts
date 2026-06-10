@@ -1,4 +1,4 @@
-import type { TaskType } from "@/components/tasks/types";
+import { TASK_TYPES, type TaskType } from "@/lib/tasks/task-types";
 
 export type TicketFieldKey =
   | "title"
@@ -80,6 +80,7 @@ export const DEFAULT_TICKET_FIELD_SETTINGS: ProjectTicketFieldSettings = {
   feature: buildDefaults(["definitionOfDone"]),
   story: buildDefaults([]),
   task: buildDefaults(["details", "acceptanceCriteria", "definitionOfDone"]),
+  bug: buildDefaults(["details", "acceptanceCriteria", "definitionOfDone", "storyPoints"]),
 };
 
 export function parseProjectTicketFieldSettings(
@@ -89,7 +90,7 @@ export function parseProjectTicketFieldSettings(
   if (!raw || typeof raw !== "object") return DEFAULT_TICKET_FIELD_SETTINGS;
 
   const result = { ...DEFAULT_TICKET_FIELD_SETTINGS };
-  for (const type of ["epic", "feature", "story", "task"] as TaskType[]) {
+  for (const type of TASK_TYPES) {
     const saved = (raw as Record<string, unknown>)[type];
     if (!Array.isArray(saved)) continue;
     const defaults = DEFAULT_TICKET_FIELD_SETTINGS[type];

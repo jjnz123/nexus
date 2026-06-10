@@ -722,7 +722,7 @@ export async function createBacklogTask(input: {
   description?: string | null;
   details?: string | null;
   priority?: "low" | "medium" | "high" | "urgent";
-  type?: "epic" | "feature" | "story" | "task";
+  type?: TaskType;
   assigneeId?: string | null;
   parentId?: string | null;
   dueDate?: string | null;

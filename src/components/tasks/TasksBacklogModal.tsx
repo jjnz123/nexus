@@ -50,6 +50,7 @@ import {
   isTicketFieldVisible,
   type ProjectTicketFieldSettings,
 } from "@/lib/tasks/ticket-fields";
+import { TASK_TYPES, TASK_TYPE_LABELS } from "@/lib/tasks/task-types";
 import type { BoardTask, TaskColumn, TaskPriority, TaskType } from "./types";
 
 function makeTaskKey(projectKey: string, taskNumber: number) {
@@ -317,10 +318,11 @@ export function TasksBacklogModal({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All types</SelectItem>
-                <SelectItem value="epic">Epic</SelectItem>
-                <SelectItem value="feature">Feature</SelectItem>
-                <SelectItem value="story">Story</SelectItem>
-                <SelectItem value="task">Task</SelectItem>
+                {TASK_TYPES.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {TASK_TYPE_LABELS[type]}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Select
@@ -347,9 +349,9 @@ export function TasksBacklogModal({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {(["epic", "feature", "story", "task"] as TaskType[]).map((type) => (
-                    <SelectItem key={type} value={type} className="capitalize">
-                      {type}
+                  {TASK_TYPES.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {TASK_TYPE_LABELS[type]}
                     </SelectItem>
                   ))}
                 </SelectContent>

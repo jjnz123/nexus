@@ -1,5 +1,6 @@
 export type TaskPriority = "low" | "medium" | "high" | "urgent";
-export type TaskType = "epic" | "feature" | "story" | "task";
+import type { TaskType } from "@/lib/tasks/task-types";
+export type { TaskType };
 export type TaskLinkType = "relates_to" | "blocks" | "duplicates";
 
 export type ProjectSummary = {

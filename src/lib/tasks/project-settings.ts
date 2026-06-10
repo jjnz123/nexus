@@ -1,4 +1,8 @@
 import type { TaskType } from "@/components/tasks/types";
+import {
+  type BugBoardMode,
+  TASK_TYPES,
+} from "@/lib/tasks/task-types";
 
 export type BoardCardFieldKey = "parent" | "dueDate" | "stale" | "subtasks";
 
@@ -26,9 +30,9 @@ export type ProjectBoardSettings = {
   visibleTypes: TaskType[];
   cardFields: BoardCardFields;
   staleDays: number;
+  bugBoardMode: BugBoardMode;
 };
 
-const TASK_TYPES: TaskType[] = ["epic", "feature", "story", "task"];
 const CARD_FIELD_KEYS: BoardCardFieldKey[] = ["parent", "dueDate", "stale", "subtasks"];
 
 export function parseProjectBoardSettings(
@@ -40,6 +44,7 @@ export function parseProjectBoardSettings(
       visibleTypes: [...DEFAULT_BOARD_VISIBLE_TYPES],
       cardFields: { ...DEFAULT_BOARD_CARD_FIELDS },
       staleDays: DEFAULT_STALE_DAYS,
+      bugBoardMode: "hide_bugs",
     };
   }
 
@@ -65,10 +70,18 @@ export function parseProjectBoardSettings(
       ? Math.floor(obj.staleDays)
       : DEFAULT_STALE_DAYS;
 
+  const bugBoardMode: BugBoardMode =
+    obj.bugBoardMode === "show_bugs" ||
+    obj.bugBoardMode === "hide_bugs" ||
+    obj.bugBoardMode === "all_types"
+      ? obj.bugBoardMode
+      : "hide_bugs";
+
   return {
     visibleTypes: visibleTypes.length ? visibleTypes : [...DEFAULT_BOARD_VISIBLE_TYPES],
     cardFields,
     staleDays,
+    bugBoardMode,
   };
 }
 

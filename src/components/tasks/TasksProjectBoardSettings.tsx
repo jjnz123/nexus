@@ -8,6 +8,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   BOARD_CARD_FIELD_LABELS,
   DEFAULT_BOARD_CARD_FIELDS,
   DEFAULT_BOARD_VISIBLE_TYPES,
@@ -16,9 +23,14 @@ import {
   type BoardCardFieldKey,
   type ProjectBoardSettings,
 } from "@/lib/tasks/project-settings";
+import {
+  BUG_BOARD_MODE_LABELS,
+  TASK_TYPES,
+  TASK_TYPE_LABELS,
+  type BugBoardMode,
+} from "@/lib/tasks/task-types";
 import type { ProjectBoard, TaskType } from "./types";
 
-const TASK_TYPES: TaskType[] = ["epic", "feature", "story", "task"];
 const CARD_FIELDS: BoardCardFieldKey[] = ["parent", "dueDate", "stale", "subtasks"];
 
 export function TasksProjectBoardSettings({
@@ -61,6 +73,7 @@ export function TasksProjectBoardSettings({
       visibleTypes: [...DEFAULT_BOARD_VISIBLE_TYPES],
       cardFields: { ...DEFAULT_BOARD_CARD_FIELDS },
       staleDays: DEFAULT_STALE_DAYS,
+      bugBoardMode: "hide_bugs",
     });
   }
 
@@ -85,8 +98,8 @@ export function TasksProjectBoardSettings({
         <div>
           <h4 className="font-medium">Default ticket types on board</h4>
           <p className="text-sm text-muted-foreground">
-            Choose which ticket types appear on the kanban board by default. Roadmap and Issues
-            always show all types.
+            Choose which ticket types appear on the kanban board when the filter is set to All or
+            Other tickets. Roadmap and Issues always show all types.
           </p>
         </div>
         <div className="grid gap-2 sm:grid-cols-2">
@@ -96,10 +109,37 @@ export function TasksProjectBoardSettings({
                 checked={settings.visibleTypes.includes(type)}
                 onCheckedChange={(checked) => toggleVisibleType(type, checked === true)}
               />
-              <span className="capitalize">{type}</span>
+              <span>{TASK_TYPE_LABELS[type]}</span>
             </label>
           ))}
         </div>
+      </section>
+
+      <section className="space-y-3 rounded-lg border p-4">
+        <div>
+          <h4 className="font-medium">Bug visibility on board</h4>
+          <p className="text-sm text-muted-foreground">
+            Controls the default board filter for new sessions. Users can still switch between All,
+            Other tickets, and Bugs only on the board.
+          </p>
+        </div>
+        <Select
+          value={settings.bugBoardMode}
+          onValueChange={(value) =>
+            setSettings((prev) => ({ ...prev, bugBoardMode: value as BugBoardMode }))
+          }
+        >
+          <SelectTrigger className="max-w-md">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {(Object.keys(BUG_BOARD_MODE_LABELS) as BugBoardMode[]).map((mode) => (
+              <SelectItem key={mode} value={mode}>
+                {BUG_BOARD_MODE_LABELS[mode]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </section>
 
       <section className="space-y-3 rounded-lg border p-4">

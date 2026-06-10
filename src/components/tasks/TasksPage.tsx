@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -62,6 +62,15 @@ import {
 } from "@/lib/tasks/ticket-fields";
 import { parseProjectHierarchyRules } from "@/lib/tasks/hierarchy";
 import { parseProjectBoardSettings } from "@/lib/tasks/project-settings";
+import {
+  boardVisibleTypeMatches,
+  getDefaultBoardTypeFilter,
+  type BoardTypeFilter,
+} from "@/lib/tasks/task-types";
+import {
+  DEFAULT_TASKS_WORKSPACE,
+  type TasksWorkspacePrefs,
+} from "@/lib/preferences/workspace";
 import { cn } from "@/lib/utils";
 
 function makeTaskKey(projectKey: string, taskNumber: number) {
@@ -246,13 +255,13 @@ export function TasksPage({
   initialBoard,
   initialTask,
   initialTaskKey,
-  tasksWorkspace,
+  tasksWorkspace = DEFAULT_TASKS_WORKSPACE,
 }: {
   projects: ProjectSummary[];
   initialBoard: ProjectBoard | null;
   initialTask: TaskDetails | null;
   initialTaskKey: string | null;
-  tasksWorkspace?: import("@/lib/preferences/workspace").TasksWorkspacePrefs;
+  tasksWorkspace?: TasksWorkspacePrefs;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -270,6 +279,8 @@ export function TasksPage({
   const [search, setSearch] = useState("");
   const [priorityFilter, setPriorityFilter] = useState<"all" | TaskPriority>("all");
   const [assigneeFilter, setAssigneeFilter] = useState("all");
+  const [boardTypeFilter, setBoardTypeFilter] = useState<BoardTypeFilter>("all");
+  const boardFilterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null);
 
@@ -319,6 +330,42 @@ export function TasksPage({
     () => parseProjectBoardSettings(board?.project.settings),
     [board?.project.settings]
   );
+
+  useEffect(() => {
+    if (!board) return;
+    const saved = tasksWorkspace.boardFilters?.[board.project.id];
+    setBoardTypeFilter(saved ?? getDefaultBoardTypeFilter(boardSettings.bugBoardMode));
+  }, [board, boardSettings.bugBoardMode, tasksWorkspace.boardFilters]);
+
+  const persistBoardTypeFilter = useCallback(
+    (filter: BoardTypeFilter) => {
+      if (!board) return;
+      if (boardFilterTimerRef.current) clearTimeout(boardFilterTimerRef.current);
+      boardFilterTimerRef.current = setTimeout(() => {
+        void updateBookmarkPreferences({
+          tasksWorkspace: {
+            descriptionHeight: tasksWorkspace.descriptionHeight,
+            boardFilters: {
+              ...tasksWorkspace.boardFilters,
+              [board.project.id]: filter,
+            },
+          },
+        });
+      }, 300);
+    },
+    [board, tasksWorkspace.boardFilters, tasksWorkspace.descriptionHeight]
+  );
+
+  const handleBoardTypeFilterChange = (filter: BoardTypeFilter) => {
+    setBoardTypeFilter(filter);
+    persistBoardTypeFilter(filter);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (boardFilterTimerRef.current) clearTimeout(boardFilterTimerRef.current);
+    };
+  }, []);
 
   const columnsById = useMemo(
     () => new Map((board?.columns ?? []).map((column) => [column.id, column])),
@@ -386,10 +433,21 @@ export function TasksPage({
       const matchesAssignee =
         assigneeFilter === "all" ||
         (assigneeFilter === "unassigned" ? !task.assigneeId : task.assigneeId === assigneeFilter);
-      const matchesType = boardSettings.visibleTypes.includes(task.type);
+      const matchesType = boardVisibleTypeMatches(
+        task.type,
+        boardSettings.visibleTypes,
+        boardTypeFilter
+      );
       return matchesSearch && matchesPriority && matchesAssignee && matchesType;
     });
-  }, [board?.tasks, search, priorityFilter, assigneeFilter, boardSettings.visibleTypes]);
+  }, [
+    board?.tasks,
+    search,
+    priorityFilter,
+    assigneeFilter,
+    boardSettings.visibleTypes,
+    boardTypeFilter,
+  ]);
 
   const groupedFiltered = useMemo(
     () =>
@@ -732,6 +790,29 @@ export function TasksPage({
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Show
+                </span>
+                {(
+                  [
+                    { value: "all", label: "All" },
+                    { value: "others", label: "Other tickets" },
+                    { value: "bugs", label: "Bugs only" },
+                  ] as const
+                ).map((option) => (
+                  <Button
+                    key={option.value}
+                    type="button"
+                    size="sm"
+                    variant={boardTypeFilter === option.value ? "secondary" : "outline"}
+                    onClick={() => handleBoardTypeFilterChange(option.value)}
+                  >
+                    {option.label}
+                  </Button>
+                ))}
               </div>
 
               <DndContext

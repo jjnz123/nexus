@@ -11,16 +11,17 @@ import {
   type HierarchyRules,
   parseProjectHierarchyRules,
 } from "@/lib/tasks/hierarchy";
+import { TASK_TYPES, TASK_TYPE_LABELS } from "@/lib/tasks/task-types";
 import type { TaskType } from "./types";
 
-const TASK_TYPES: TaskType[] = ["epic", "feature", "story", "task"];
-const PARENT_TYPES: TaskType[] = ["epic", "feature", "story", "task"];
+const PARENT_TYPES: TaskType[] = [...TASK_TYPES];
 
 const HIERARCHY_TREE: { type: TaskType; label: string; defaultParents: string }[] = [
   { type: "epic", label: "Epic", defaultParents: "Top level (no parent)" },
   { type: "feature", label: "Feature", defaultParents: "Epic" },
   { type: "story", label: "Story", defaultParents: "Epic, Feature" },
   { type: "task", label: "Task", defaultParents: "Epic, Feature, Story, Task" },
+  { type: "bug", label: "Bug", defaultParents: "Epic, Feature, Story, Task (optional)" },
 ];
 
 export function TasksProjectHierarchySettings({
@@ -126,7 +127,7 @@ export function TasksProjectHierarchySettings({
             <tbody>
               {TASK_TYPES.map((childType) => (
                 <tr key={childType} className="border-b last:border-0">
-                  <td className="py-2 pr-4 capitalize">{childType}</td>
+                  <td className="py-2 pr-4">{TASK_TYPE_LABELS[childType]}</td>
                   {PARENT_TYPES.map((parentType) => (
                     <td key={`${childType}-${parentType}`} className="px-2 py-2 text-center">
                       <Checkbox

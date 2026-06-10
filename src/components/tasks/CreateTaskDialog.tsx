@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { TaskColumn, TaskPriority, TaskType } from "./types";
+import { TaskTypeSelectItems } from "./TaskTypeSelectItems";
 
 export function CreateTaskDialog({
   open,
@@ -164,10 +165,7 @@ export function CreateTaskDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="epic">Epic</SelectItem>
-                  <SelectItem value="feature">Feature</SelectItem>
-                  <SelectItem value="story">Story</SelectItem>
-                  <SelectItem value="task">Task</SelectItem>
+                  <TaskTypeSelectItems />
                 </SelectContent>
               </Select>
             </div>

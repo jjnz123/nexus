@@ -49,13 +49,13 @@ Editors can create and manage the library; viewers can browse and launch.
 A **Jira-inspired** task board with tickets, hierarchy, roadmap planning, and configurable fields:
 
 - Multiple **projects**, each with ticket keys (e.g. `OPS-001`); **last selected project persists** across reloads
-- **Kanban board** (horizontal columns) with **cross-column drag-and-drop** (drag anywhere on the card; optimistic updates with server persistence and rollback on failure; empty columns supported), **WIP limit enforcement** when moving tickets, and configurable **default ticket types** (Story + Task by default).
+- **Kanban board** (horizontal columns) with **cross-column drag-and-drop**, **WIP limit enforcement**, configurable **default ticket types** (Story + Task by default), and a **board type filter** (All / Other tickets / Bugs only) persisted per user and project. Ticket types include **Epic, Feature, Story, Task, and Bug**.
 - **Backlog modal** — full-screen table (key, title, type, parent, assignee, priority, due date, points, status); search/filter; rank via drag handle; drag rows onto board columns or use **Move to board** dropdown.
 - **Issues view** — sortable columns, column visibility, quick filters, row selection, and bulk actions (assign, move, priority, delete).
 - **View switcher** — jump between Board, Issues, and Roadmap from the page header.
 - **Roadmap** — tree-ordered hierarchy (children directly under parents); inline bulk editing with draft/commit workflow; **insert rows between lines**; parent picker shows full ticket names and respects hierarchy rules.
 - **Tickets** — tabbed detail modal (Overview, Specification, Links & files, Discussion) with **top-anchored layout**; Overview **Description** uses a **rich text editor** (bold, italic, underline, headings, lists, font size, text colour) with **resizable height persisted per user**; **Save and close** alongside Save; **Links & files** supports drag-and-drop uploads, URL links, `.eml` emails, **attachment preview modal** (PDF, Office docs, images, plain text), and **attachment versioning**; **hierarchy rules** configurable per project
-- **Project settings** — tabbed layout (General, Board, Roadmap, Hierarchy, Fields & Display); columns, labels, **board card fields** (parent, due date, stale indicator, child subtasks), **visible board types**, and clearer **hierarchy rules** UI.
+- **Project settings** — tabbed layout (General, Board, Roadmap, Hierarchy, Fields & Display); columns, labels, **board card fields** (parent, due date, stale indicator, child subtasks), **visible board types**, **bug visibility default** (show bugs / hide bugs / always show all types), and clearer **hierarchy rules** UI.
 
 ### Monitoring
 

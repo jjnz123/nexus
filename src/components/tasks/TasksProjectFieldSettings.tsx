@@ -34,6 +34,7 @@ import {
   type ProjectTicketFieldSettings,
   type TicketFieldConfig,
 } from "@/lib/tasks/ticket-fields";
+import { TASK_TYPES, TASK_TYPE_LABELS } from "@/lib/tasks/task-types";
 import type { ProjectBoard, TaskType } from "./types";
 
 function SortableFieldRow({
@@ -129,7 +130,7 @@ export function TasksProjectFieldSettings({
         await updateProjectFieldSettings({
           projectId: board.project.id,
           ticketFields: Object.fromEntries(
-            (["epic", "feature", "story", "task"] as TaskType[]).map((type) => [
+            TASK_TYPES.map((type) => [
               type,
               settings[type].map(({ key, visible }) => ({ key, visible })),
             ])
@@ -158,10 +159,11 @@ export function TasksProjectFieldSettings({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="epic">Epic</SelectItem>
-              <SelectItem value="feature">Feature</SelectItem>
-              <SelectItem value="story">Story</SelectItem>
-              <SelectItem value="task">Task</SelectItem>
+              {TASK_TYPES.map((type) => (
+                <SelectItem key={type} value={type}>
+                  {TASK_TYPE_LABELS[type]}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <Button variant="outline" onClick={resetType}>

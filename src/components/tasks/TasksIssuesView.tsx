@@ -31,6 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { BoardTask, ProjectBoard, TaskPriority, TaskType } from "./types";
+import { TASK_TYPES, TASK_TYPE_LABELS } from "@/lib/tasks/task-types";
 
 function makeTaskKey(projectKey: string, taskNumber: number) {
   return `${projectKey}-${String(taskNumber).padStart(3, "0")}`;
@@ -62,7 +63,7 @@ const COLUMN_DEFS: { id: IssueColumnId; label: string; defaultVisible: boolean }
   { id: "storyPoints", label: "Points", defaultVisible: false },
 ];
 
-const typeOrder: Record<TaskType, number> = { epic: 0, feature: 1, story: 2, task: 3 };
+const typeOrder: Record<TaskType, number> = { epic: 0, feature: 1, story: 2, task: 3, bug: 4 };
 const priorityOrder: Record<TaskPriority, number> = {
   urgent: 0,
   high: 1,
@@ -287,10 +288,11 @@ export function TasksIssuesView({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All types</SelectItem>
-            <SelectItem value="epic">Epic</SelectItem>
-            <SelectItem value="feature">Feature</SelectItem>
-            <SelectItem value="story">Story</SelectItem>
-            <SelectItem value="task">Task</SelectItem>
+            {TASK_TYPES.map((type) => (
+              <SelectItem key={type} value={type}>
+                {TASK_TYPE_LABELS[type]}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
         <Select value={columnFilter} onValueChange={setColumnFilter}>

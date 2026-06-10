@@ -51,6 +51,7 @@ import { TaskCommentsPanel } from "./TaskCommentsPanel";
 import { TaskLinkedIssuesPanel } from "./TaskLinkedIssuesPanel";
 import { TaskLinksAndFilesPanel } from "./TaskLinksAndFilesPanel";
 import { TaskChildSubtasksPanel } from "./TaskChildSubtasksPanel";
+import { TaskTypeSelectItems } from "./TaskTypeSelectItems";
 
 import type { TaskColumn, TaskComment, TaskDetails, TaskLabel, TaskPriority, TaskType } from "./types";
 
@@ -315,10 +316,7 @@ export function TaskModal({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="epic">Epic</SelectItem>
-                <SelectItem value="feature">Feature</SelectItem>
-                <SelectItem value="story">Story</SelectItem>
-                <SelectItem value="task">Task</SelectItem>
+                <TaskTypeSelectItems />
               </SelectContent>
             </Select>
           </MetadataField>

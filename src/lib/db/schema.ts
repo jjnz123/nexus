@@ -49,7 +49,7 @@ export const taskPriorityEnum = pgEnum("task_priority", [
   "urgent",
 ]);
 
-export const taskTypeEnum = pgEnum("task_type", ["epic", "feature", "story", "task"]);
+export const taskTypeEnum = pgEnum("task_type", ["epic", "feature", "story", "task", "bug"]);
 export const taskLinkTypeEnum = pgEnum("task_link_type", ["relates_to", "blocks", "duplicates"]);
 
 export const bookmarkVisibilityEnum = pgEnum("bookmark_visibility", ["everyone", "restricted"]);

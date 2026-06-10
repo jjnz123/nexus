@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { taskTypeSchema } from "@/lib/tasks/task-types";
 
 export const projectSchema = z.object({
   key: z
@@ -29,7 +30,7 @@ export const taskSchema = z.object({
   priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
   dueDate: z.string().datetime().nullable().optional(),
   assigneeId: z.string().uuid().nullable().optional(),
-  type: z.enum(["epic", "feature", "story", "task"]).optional(),
+  type: taskTypeSchema.optional(),
   parentId: z.string().uuid().nullable().optional(),
   sortOrder: z.number().int().optional(),
 });
@@ -92,10 +93,7 @@ export const createChildTaskSchema = z.object({
   title: z.string().min(1).max(300),
 });
 
-export const hierarchyRulesSchema = z.record(
-  z.enum(["epic", "feature", "story", "task"]),
-  z.array(z.enum(["epic", "feature", "story", "task"]))
-);
+export const hierarchyRulesSchema = z.record(taskTypeSchema, z.array(taskTypeSchema));
 
 export const updateProjectHierarchySettingsSchema = z.object({
   projectId: z.string().uuid(),
@@ -109,10 +107,7 @@ export const ticketFieldConfigSchema = z.object({
 
 export const updateProjectFieldSettingsSchema = z.object({
   projectId: z.string().uuid(),
-  ticketFields: z.record(
-    z.enum(["epic", "feature", "story", "task"]),
-    z.array(ticketFieldConfigSchema)
-  ),
+  ticketFields: z.record(taskTypeSchema, z.array(ticketFieldConfigSchema)),
 });
 
 export const boardCardFieldsSchema = z.object({
@@ -125,9 +120,10 @@ export const boardCardFieldsSchema = z.object({
 export const updateProjectBoardSettingsSchema = z.object({
   projectId: z.string().uuid(),
   boardSettings: z.object({
-    visibleTypes: z.array(z.enum(["epic", "feature", "story", "task"])).min(1),
+    visibleTypes: z.array(taskTypeSchema).min(1),
     cardFields: boardCardFieldsSchema,
     staleDays: z.number().int().min(1).max(365),
+    bugBoardMode: z.enum(["show_bugs", "hide_bugs", "all_types"]).optional(),
   }),
 });
 
@@ -150,7 +146,7 @@ export const roadmapCommitSchema = z.object({
     z.object({
       draftId: z.string(),
       title: z.string().min(1).max(300),
-      type: z.enum(["epic", "feature", "story", "task"]),
+      type: taskTypeSchema,
       parentId: z.string().uuid().nullable().optional(),
       assigneeId: z.string().uuid().nullable().optional(),
       priority: z.enum(["low", "medium", "high", "urgent"]).optional(),

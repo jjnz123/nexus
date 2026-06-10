@@ -8,9 +8,10 @@ export const DEFAULT_HIERARCHY_RULES: HierarchyRules = {
   feature: ["epic"],
   story: ["epic", "feature"],
   task: ["epic", "feature", "story", "task"],
+  bug: ["epic", "feature", "story", "task"],
 };
 
-const TASK_TYPES: TaskType[] = ["epic", "feature", "story", "task"];
+const TASK_TYPES: TaskType[] = ["epic", "feature", "story", "task", "bug"];
 
 export function parseProjectHierarchyRules(
   settings: Record<string, unknown> | null | undefined

@@ -36,6 +36,9 @@ const bookmarkPrefsSchema = z.object({
   tasksWorkspace: z
     .object({
       descriptionHeight: z.number().min(120).max(800).optional(),
+      boardFilters: z
+        .record(z.string(), z.enum(["all", "bugs", "others"]))
+        .optional(),
     })
     .optional(),
   homeDashboard: z

@@ -21,6 +21,7 @@ import {
   type ProjectTicketFieldSettings,
 } from "@/lib/tasks/ticket-fields";
 import type { BoardTask, TaskPriority, TaskType } from "./types";
+import { TaskTypeSelectItems } from "./TaskTypeSelectItems";
 
 function makeTaskKey(projectKey: string, taskNumber: number) {
   return `${projectKey}-${String(taskNumber).padStart(3, "0")}`;
@@ -168,10 +169,7 @@ export function TasksBacklogPanel({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="epic">Epic</SelectItem>
-                      <SelectItem value="feature">Feature</SelectItem>
-                      <SelectItem value="story">Story</SelectItem>
-                      <SelectItem value="task">Task</SelectItem>
+                      <TaskTypeSelectItems />
                     </SelectContent>
                   </Select>
                 ) : null}
