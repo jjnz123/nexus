@@ -1,4 +1,5 @@
 import { getProjectBoard, getProjects, getTaskByKey } from "@/server/actions/tasks";
+import { getBookmarkPreferences } from "@/server/actions/preferences";
 import { TasksPage } from "@/components/tasks/TasksPage";
 
 function getTaskKeyFromSlug(slug: string[] | undefined) {
@@ -13,11 +14,17 @@ export default async function TasksRoutePage({
   params: Promise<{ slug?: string[] }>;
 }) {
   const resolvedParams = await params;
-  const projects = await getProjects();
+  const [projects, prefs] = await Promise.all([getProjects(), getBookmarkPreferences()]);
   const taskKey = getTaskKeyFromSlug(resolvedParams.slug);
   const deepLinkedTask = taskKey ? await getTaskByKey(taskKey) : null;
 
-  const initialProjectId = deepLinkedTask?.project.id ?? projects[0]?.id;
+  const savedProjectId =
+    prefs.activeKanbanProjectId &&
+    projects.some((project) => project.id === prefs.activeKanbanProjectId)
+      ? prefs.activeKanbanProjectId
+      : null;
+
+  const initialProjectId = deepLinkedTask?.project.id ?? savedProjectId ?? projects[0]?.id;
   const initialBoard = initialProjectId ? await getProjectBoard(initialProjectId) : null;
 
   return (

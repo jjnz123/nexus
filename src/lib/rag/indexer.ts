@@ -224,8 +224,13 @@ export async function indexUserNote(note: UserNote) {
     text,
     scope: "user",
     noteId: note.id,
+    kanbanProjectId: note.projectId ?? null,
     mimeType: note.language === "markdown" ? "text/markdown" : "text/plain",
-    metadata: { noteId: note.id, language: note.language },
+    metadata: {
+      noteId: note.id,
+      language: note.language,
+      projectId: note.projectId ?? undefined,
+    },
     chunkStrategy: note.language === "markdown" ? "markdown" : "document",
   });
 }

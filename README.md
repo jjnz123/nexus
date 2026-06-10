@@ -19,12 +19,14 @@ Nexus helps your team find things faster, stay on top of work, and spot problems
 
 ### Notes
 
-A personal **scratchpad** at `/notes` (VS Code / Code Runner style):
+A **project-organised scratchpad** at `/notes` (VS Code / Code Runner style):
 
-- **File explorer** on the left with multiple notes open as **tabs** across the top.
-- **Syntax modes** — Plain Text, Markdown, Shell, JavaScript, TypeScript, Python, JSON, YAML, SQL, HTML, CSS.
-- **Run / preview** for Markdown with a toggleable bottom preview pane.
-- **Autosave** — all notes are user-specific and persisted in PostgreSQL.
+- **Project sidebar** — filter notes by kanban project or **General**; active project persisted per user
+- **File explorer** listing notes in the selected project, with multiple open notes as **tabs** across the top
+- **Move notes** between projects from the editor toolbar
+- **Syntax modes** — Plain Text, Markdown, Shell, JavaScript, TypeScript, Python, JSON, YAML, SQL, HTML, CSS
+- **Run / preview** for Markdown with a toggleable bottom preview pane
+- **Autosave** — notes are user-specific and persisted in PostgreSQL
 
 ### Bookmarks
 
@@ -45,12 +47,12 @@ Editors can create and manage the library; viewers can browse and launch.
 
 A **Jira-inspired** task board with tickets, hierarchy, roadmap planning, and configurable fields:
 
-- Multiple **projects**, each with ticket keys (e.g. `OPS-001`).
+- Multiple **projects**, each with ticket keys (e.g. `OPS-001`); **last selected project persists** across reloads
 - **Kanban board** (horizontal columns) plus **backlog panel** with expanded create form.
 - **Issues view** — sortable columns, column visibility, quick filters, row selection, and bulk actions (assign, move, priority, delete).
 - **View switcher** — jump between Board, Issues, and Roadmap from the page header.
 - **Roadmap** — inline bulk editing with draft/commit workflow; add any ticket type; hierarchy, assignee, dates, story points, status.
-- **Tickets** — tabbed detail modal (Overview, Specification, Links & files, Discussion) with title, description, details, acceptance criteria, definition of done, story points, attachments (preview), linked issues, threaded comments.
+- **Tickets** — tabbed detail modal (Overview, Specification, Links & files, Discussion) with **top-anchored layout**; Overview shows **Description + Discussion** on the left and metadata (type, status, assignee, labels, subtasks, etc.) in a **right sidebar**
 - **Project settings** — columns, labels, and **per-type field configuration** (show/hide + drag reorder).
 
 ### Monitoring

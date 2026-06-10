@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v3.6.1
+**Current release:** v3.7.0
 
 ## 1. Overview
 
@@ -267,7 +267,7 @@ Three-panel workspace (full-bleed within app shell):
 - `ai_messages` — role, content, attachments (jsonb), metadata (jsonb, skill events), timestamps
 - `ai_project_files` — project knowledge base files with text preview cache
 - `ai_conversation_files` — conversation-scoped files with text preview cache
-- User preferences: `active_ai_project_id`, `active_ai_conversation_id`, `chat_sidebar_collapsed`, `app_sidebar_collapsed`
+- User preferences: `active_ai_project_id`, `active_ai_conversation_id`, `active_kanban_project_id`, `chat_sidebar_collapsed`, `app_sidebar_collapsed`
 
 ## 4.8 Notes (`/notes`)
 
@@ -276,22 +276,23 @@ All authenticated users.
 ### Layout
 
 - Full-bleed workspace within the app shell (similar to `/chat`)
-- **Left** — collapsible file explorer listing the user's notes
+- **Left** — collapsible sidebar with **project list** (General + kanban projects) and filtered note list
 - **Top** — tab bar for multiple open notes
-- **Center** — title, language/mode selector, editor textarea
+- **Center** — title, project selector (move note), language/mode selector, editor textarea
 - **Bottom** — optional Markdown preview pane (toggleable; **Run** opens preview for Markdown)
 
 ### Features
 
-- Create, rename (inline title), and delete notes
+- Create, rename (inline title), delete, and **move notes between projects**
+- Filter notes by selected project (General = no project)
 - **Syntax modes:** Plain Text, Markdown, Shell Script, JavaScript, TypeScript, Python, JSON, YAML, SQL, HTML, CSS
 - **Autosave** on edit (debounced server persistence)
-- Workspace state persisted per user: open tabs, active tab, preview visibility, explorer collapsed
+- Workspace state persisted per user: active project, open tabs, active tab, preview visibility, explorer collapsed
 
 ### Data Model
 
-- `user_notes` — `id`, `user_id`, `title`, `content`, `language`, `sort_order`, timestamps
-- `user_preferences.notes_workspace` (jsonb) — open tab IDs, active tab, preview/explorer UI state
+- `user_notes` — `id`, `user_id`, optional `project_id` (FK → kanban `projects`), `title`, `content`, `language`, `sort_order`, timestamps
+- `user_preferences.notes_workspace` (jsonb) — `activeProjectId`, open tab IDs, active tab, preview/explorer UI state
 
 ## 5. Bookmarks (`/bookmarks`)
 
@@ -416,6 +417,7 @@ Requires `tasks:view`. Edit operations require `tasks:edit`.
 
 - List and switch between projects
 - Create project with key (e.g. `OPS`) and display name
+- **Last selected project persisted** in `user_preferences.active_kanban_project_id` (restored on reload; deep-linked tickets override)
 - Empty state when no projects exist
 
 ### 6.2 Layout & Views
@@ -486,15 +488,15 @@ Requires `tasks:edit`.
 ### 6.10 Ticket Detail Modal
 
 - Deep-linkable via `/tasks/[KEY]` (e.g. `/tasks/OPS-001`)
-- **Tabbed layout** — Overview, Specification, Links & files, Discussion (reduces cramped single-page scrolling)
+- **Top-anchored dialog** — fixed height with internal scroll; tab changes do not shift modal position
+- **Tabbed layout** — Overview, Specification, Links & files, Discussion
 - Header: ticket key badge, type/status badges, inline title edit
 - Field visibility/order driven by project ticket field settings for the ticket type
 - Edit all ticket fields (see §6.3)
-- **Overview tab** — metadata grid, description, labels (pill toggles), subtasks
+- **Overview tab** — two-column issue-tracker layout: **Description + Discussion** (threaded comments) on the left; **right sidebar** for type, status, assignee, priority, due date, story points, parent, labels, subtasks
 - **Specification tab** — details, acceptance criteria, definition of done
 - **Links & files tab** — linked issues panel (search, link, unlink, open linked ticket); attachments (upload, preview images/PDFs, delete)
-- **Discussion tab** — threaded comments with avatars, sticky composer
-- **Subtasks:** add, toggle complete, progress indicator
+- **Discussion tab** — full-height threaded comments (same panel as Overview)
 - Copy shareable ticket URL
 - Sticky footer: Save / Delete (with confirmation)
 
@@ -646,6 +648,7 @@ Requires `monitoring:configure` to enable; `monitoring:view` to display status.
 - Bookmarks sort mode
 - Home favourites order
 - Active AI project and conversation (`/chat`)
+- Active kanban/tasks project (`/tasks`)
 - Chat sidebar collapsed state (`/chat`)
 - App sidebar collapsed state (global nav)
 - Notes workspace state (`/notes`)

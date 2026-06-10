@@ -23,6 +23,7 @@ import {
   getTaskByKey,
   reorderTasks,
 } from "@/server/actions/tasks";
+import { updateBookmarkPreferences } from "@/server/actions/preferences";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -273,6 +274,7 @@ export function TasksPage({
         setModalOpen(false);
         setModalTaskDetails(null);
         setModalTaskKey(null);
+        await updateBookmarkPreferences({ activeKanbanProjectId: projectId });
         router.replace("/tasks");
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Unable to switch project");

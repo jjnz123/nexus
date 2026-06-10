@@ -21,12 +21,14 @@ const bookmarkPrefsSchema = z.object({
     .optional(),
   activeAiProjectId: z.string().uuid().nullable().optional(),
   activeAiConversationId: z.string().uuid().nullable().optional(),
+  activeKanbanProjectId: z.string().uuid().nullable().optional(),
   chatSidebarCollapsed: z.boolean().optional(),
   appSidebarCollapsed: z.boolean().optional(),
   notesWorkspace: z
     .object({
       openTabIds: z.array(z.string().uuid()),
       activeTabId: z.string().uuid().nullable(),
+      activeProjectId: z.string().uuid().nullable(),
       previewVisible: z.boolean(),
       explorerCollapsed: z.boolean(),
     })

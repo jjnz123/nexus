@@ -236,112 +236,199 @@ export function TaskModal({
     });
   };
 
-  const metadataPanel = (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      {visible("type") ? (
-        <MetadataField label="Type">
-          <Select value={taskType} onValueChange={(v) => setTaskType(v as TaskType)}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="epic">Epic</SelectItem>
-              <SelectItem value="feature">Feature</SelectItem>
-              <SelectItem value="story">Story</SelectItem>
-              <SelectItem value="task">Task</SelectItem>
-            </SelectContent>
-          </Select>
-        </MetadataField>
-      ) : null}
-      {visible("column") ? (
-        <MetadataField label="Status">
-          <Select value={columnId} onValueChange={setColumnId}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {columns.map((column) => (
-                <SelectItem key={column.id} value={column.id}>
-                  {column.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </MetadataField>
-      ) : null}
-      {visible("assignee") ? (
-        <MetadataField label="Assignee">
-          <Select value={assigneeId} onValueChange={setAssigneeId}>
-            <SelectTrigger>
-              <SelectValue placeholder="Unassigned" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">Unassigned</SelectItem>
-              {projectUsers.map((user) => (
-                <SelectItem key={user.id} value={user.id}>
-                  {user.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </MetadataField>
-      ) : null}
-      {visible("priority") ? (
-        <MetadataField label="Priority">
-          <Select value={priority} onValueChange={(v) => setPriority(v as TaskPriority)}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="low">Low</SelectItem>
-              <SelectItem value="medium">Medium</SelectItem>
-              <SelectItem value="high">High</SelectItem>
-              <SelectItem value="urgent">Urgent</SelectItem>
-            </SelectContent>
-          </Select>
-        </MetadataField>
-      ) : null}
-      {visible("dueDate") ? (
-        <MetadataField label="Due date">
-          <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
-        </MetadataField>
-      ) : null}
-      {visible("storyPoints") ? (
-        <MetadataField label="Story points">
-          <Input
-            type="number"
-            min={0}
-            value={storyPoints}
-            onChange={(e) => setStoryPoints(e.target.value)}
-          />
-        </MetadataField>
-      ) : null}
-      {visible("parent") ? (
-        <MetadataField label="Parent">
-          <Select value={parentId} onValueChange={setParentId}>
-            <SelectTrigger>
-              <SelectValue placeholder="None" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">None</SelectItem>
-              {parentCandidates
-                .filter((candidate) => candidate.id !== taskDetails?.task.id)
-                .map((candidate) => (
-                  <SelectItem key={candidate.id} value={candidate.id}>
-                    {candidate.type} · {candidate.title}
+  const metadataSidebar = (
+    <aside className="space-y-4 lg:border-l lg:pl-6">
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Details</p>
+      <div className="space-y-4">
+        {visible("type") ? (
+          <MetadataField label="Type">
+            <Select value={taskType} onValueChange={(v) => setTaskType(v as TaskType)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="epic">Epic</SelectItem>
+                <SelectItem value="feature">Feature</SelectItem>
+                <SelectItem value="story">Story</SelectItem>
+                <SelectItem value="task">Task</SelectItem>
+              </SelectContent>
+            </Select>
+          </MetadataField>
+        ) : null}
+        {visible("column") ? (
+          <MetadataField label="Status">
+            <Select value={columnId} onValueChange={setColumnId}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {columns.map((column) => (
+                  <SelectItem key={column.id} value={column.id}>
+                    {column.name}
                   </SelectItem>
                 ))}
-            </SelectContent>
-          </Select>
-        </MetadataField>
+              </SelectContent>
+            </Select>
+          </MetadataField>
+        ) : null}
+        {visible("assignee") ? (
+          <MetadataField label="Assignee">
+            <Select value={assigneeId} onValueChange={setAssigneeId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Unassigned" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Unassigned</SelectItem>
+                {projectUsers.map((user) => (
+                  <SelectItem key={user.id} value={user.id}>
+                    {user.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </MetadataField>
+        ) : null}
+        {visible("priority") ? (
+          <MetadataField label="Priority">
+            <Select value={priority} onValueChange={(v) => setPriority(v as TaskPriority)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="low">Low</SelectItem>
+                <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="high">High</SelectItem>
+                <SelectItem value="urgent">Urgent</SelectItem>
+              </SelectContent>
+            </Select>
+          </MetadataField>
+        ) : null}
+        {visible("dueDate") ? (
+          <MetadataField label="Due date">
+            <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+          </MetadataField>
+        ) : null}
+        {visible("storyPoints") ? (
+          <MetadataField label="Story points">
+            <Input
+              type="number"
+              min={0}
+              value={storyPoints}
+              onChange={(e) => setStoryPoints(e.target.value)}
+            />
+          </MetadataField>
+        ) : null}
+        {visible("parent") ? (
+          <MetadataField label="Parent">
+            <Select value={parentId} onValueChange={setParentId}>
+              <SelectTrigger>
+                <SelectValue placeholder="None" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                {parentCandidates
+                  .filter((candidate) => candidate.id !== taskDetails?.task.id)
+                  .map((candidate) => (
+                    <SelectItem key={candidate.id} value={candidate.id}>
+                      {candidate.type} · {candidate.title}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </MetadataField>
+        ) : null}
+      </div>
+
+      {visible("labels") ? (
+        <div className="space-y-2 border-t pt-4">
+          <Label>Labels</Label>
+          <div className="flex flex-wrap gap-2">
+            {labels.map((label) => {
+              const checked = selectedLabels.includes(label.id);
+              return (
+                <button
+                  key={label.id}
+                  type="button"
+                  onClick={() => toggleLabel(label.id)}
+                  className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs transition ${
+                    checked ? "border-primary bg-primary/10 text-primary" : "hover:bg-accent"
+                  }`}
+                >
+                  <span
+                    className="inline-flex h-2 w-2 rounded-full"
+                    style={{ backgroundColor: label.color }}
+                  />
+                  {label.name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       ) : null}
-    </div>
+
+      {visible("subtasks") ? (
+        <div className="space-y-3 border-t pt-4">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-medium">Subtasks</h4>
+            <p className="text-xs text-muted-foreground">
+              <CheckCheck className="mr-1 inline h-3 w-3" />
+              {completedSubtasks}/{localSubtasks.length}
+            </p>
+          </div>
+          <div className="space-y-2">
+            {localSubtasks.map((subtask) => (
+              <label
+                key={subtask.id}
+                className="flex items-center gap-2 rounded-md border px-2 py-2"
+              >
+                <Checkbox
+                  checked={subtask.completed}
+                  onCheckedChange={(checked) =>
+                    toggleSubtaskItem(subtask.id, checked === true)
+                  }
+                />
+                <span
+                  className={
+                    subtask.completed ? "text-muted-foreground line-through" : ""
+                  }
+                >
+                  {subtask.title}
+                </span>
+              </label>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <Input
+              value={subtaskDraft}
+              onChange={(event) => setSubtaskDraft(event.target.value)}
+              placeholder="Add subtask"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") addSubtaskItem();
+              }}
+            />
+            <Button variant="outline" onClick={addSubtaskItem} disabled={isPending}>
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      ) : null}
+    </aside>
   );
+
+  const discussionPanel =
+    taskDetails && visible("comments") ? (
+      <TaskCommentsPanel
+        taskId={taskDetails.task.id}
+        comments={localComments}
+        onChange={setLocalComments}
+        embedded={activeTab === "overview"}
+      />
+    ) : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[92vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl">
-        <DialogHeader className="space-y-3 border-b px-6 py-4">
+      <DialogContent className="top-[4vh] flex h-[min(92vh,calc(100vh-2.5rem))] max-h-[92vh] translate-y-0 flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl">
+        <DialogHeader className="shrink-0 space-y-3 border-b px-6 py-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="space-y-2">
               <DialogTitle className="flex flex-wrap items-center gap-2 text-left">
@@ -388,111 +475,48 @@ export function TaskModal({
           <p className="px-6 py-8 text-sm text-muted-foreground">Loading ticket details…</p>
         ) : (
           <>
-            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
-              <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="mb-4">
+            <div className="flex min-h-0 flex-1 flex-col px-6 py-4">
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="flex min-h-0 flex-1 flex-col">
+                <TabsList className="mb-0 shrink-0 self-start">
                   <TabsTrigger value="overview">Overview</TabsTrigger>
                   <TabsTrigger value="spec">Specification</TabsTrigger>
                   <TabsTrigger value="links">Links & files</TabsTrigger>
                   <TabsTrigger value="discussion">
                     Discussion
                     {localComments.length ? (
-                      <Badge variant="secondary" className="ml-1.5 h-5 px-1.5 text-[10px]">
-                        {localComments.length}
-                      </Badge>
+                      <span className="ml-1.5 text-[10px] text-muted-foreground">
+                        ({localComments.length})
+                      </span>
                     ) : null}
                   </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="overview" className="mt-0 space-y-5">
-                  {metadataPanel}
-                  {visible("description") ? (
-                    <div className="space-y-2">
-                      <Label htmlFor="task-description">Description</Label>
-                      <Textarea
-                        id="task-description"
-                        value={description}
-                        onChange={(event) => setDescription(event.target.value)}
-                        rows={5}
-                        placeholder="Summary of the work…"
-                      />
-                    </div>
-                  ) : null}
-                  {visible("labels") ? (
-                    <div className="space-y-2">
-                      <Label>Labels</Label>
-                      <div className="flex flex-wrap gap-2">
-                        {labels.map((label) => {
-                          const checked = selectedLabels.includes(label.id);
-                          return (
-                            <button
-                              key={label.id}
-                              type="button"
-                              onClick={() => toggleLabel(label.id)}
-                              className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs transition ${
-                                checked ? "border-primary bg-primary/10 text-primary" : "hover:bg-accent"
-                              }`}
-                            >
-                              <span
-                                className="inline-flex h-2 w-2 rounded-full"
-                                style={{ backgroundColor: label.color }}
-                              />
-                              {label.name}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ) : null}
-                  {visible("subtasks") ? (
-                    <div className="space-y-3 rounded-lg border p-4">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-medium">Subtasks</h4>
-                        <p className="text-xs text-muted-foreground">
-                          <CheckCheck className="mr-1 inline h-3 w-3" />
-                          {completedSubtasks}/{localSubtasks.length}
-                        </p>
-                      </div>
-                      <div className="space-y-2">
-                        {localSubtasks.map((subtask) => (
-                          <label
-                            key={subtask.id}
-                            className="flex items-center gap-2 rounded-md border px-2 py-2"
-                          >
-                            <Checkbox
-                              checked={subtask.completed}
-                              onCheckedChange={(checked) =>
-                                toggleSubtaskItem(subtask.id, checked === true)
-                              }
+                <div className="min-h-0 flex-1 overflow-y-auto pt-4">
+                  <TabsContent value="overview" className="mt-0">
+                    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
+                      <div className="min-w-0 space-y-6">
+                        {visible("description") ? (
+                          <div className="space-y-2">
+                            <Label htmlFor="task-description" className="text-sm font-semibold">
+                              Description
+                            </Label>
+                            <Textarea
+                              id="task-description"
+                              value={description}
+                              onChange={(event) => setDescription(event.target.value)}
+                              rows={8}
+                              className="min-h-[180px] resize-y"
+                              placeholder="Summary of the work…"
                             />
-                            <span
-                              className={
-                                subtask.completed ? "text-muted-foreground line-through" : ""
-                              }
-                            >
-                              {subtask.title}
-                            </span>
-                          </label>
-                        ))}
+                          </div>
+                        ) : null}
+                        {discussionPanel}
                       </div>
-                      <div className="flex gap-2">
-                        <Input
-                          value={subtaskDraft}
-                          onChange={(event) => setSubtaskDraft(event.target.value)}
-                          placeholder="Add subtask"
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") addSubtaskItem();
-                          }}
-                        />
-                        <Button variant="outline" onClick={addSubtaskItem} disabled={isPending}>
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      {metadataSidebar}
                     </div>
-                  ) : null}
-                </TabsContent>
+                  </TabsContent>
 
-                <TabsContent value="spec" className="mt-0 space-y-4">
+                  <TabsContent value="spec" className="mt-0 space-y-4">
                   {visible("details") ? (
                     <div className="space-y-2">
                       <Label htmlFor="task-details">Details</Label>
@@ -551,20 +575,15 @@ export function TaskModal({
                 </TabsContent>
 
                 <TabsContent value="discussion" className="mt-0">
-                  {visible("comments") ? (
-                    <TaskCommentsPanel
-                      taskId={taskDetails.task.id}
-                      comments={localComments}
-                      onChange={setLocalComments}
-                    />
-                  ) : (
+                  {discussionPanel ?? (
                     <p className="text-sm text-muted-foreground">Comments are hidden for this ticket type.</p>
                   )}
                 </TabsContent>
+                </div>
               </Tabs>
             </div>
 
-            <div className="flex items-center justify-between gap-2 border-t bg-background px-6 py-4">
+            <div className="flex shrink-0 items-center justify-between gap-2 border-t bg-background px-6 py-4">
               <Button type="button" variant="destructive" onClick={deleteTaskNow} disabled={isPending}>
                 <Trash2 className="mr-2 h-4 w-4" />
                 Delete

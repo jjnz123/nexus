@@ -145,6 +145,9 @@ export const userNotes = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").references((): AnyPgColumn => projects.id, {
+      onDelete: "set null",
+    }),
     title: text("title").notNull().default("Untitled"),
     content: text("content").notNull().default(""),
     language: text("language").notNull().default("plaintext"),
@@ -152,7 +155,10 @@ export const userNotes = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
-  (table) => [index("user_notes_user_idx").on(table.userId)]
+  (table) => [
+    index("user_notes_user_idx").on(table.userId),
+    index("user_notes_project_idx").on(table.projectId),
+  ]
 );
 
 export type NoteLanguage =
@@ -183,6 +189,10 @@ export const userPreferences = pgTable("user_preferences", {
   bookmarksSortMode: text("bookmarks_sort_mode").notNull().default("custom"),
   activeAiProjectId: uuid("active_ai_project_id"),
   activeAiConversationId: uuid("active_ai_conversation_id"),
+  activeKanbanProjectId: uuid("active_kanban_project_id").references(
+    (): AnyPgColumn => projects.id,
+    { onDelete: "set null" }
+  ),
   chatSidebarCollapsed: boolean("chat_sidebar_collapsed").notNull().default(false),
   appSidebarCollapsed: boolean("app_sidebar_collapsed").notNull().default(false),
   colorTheme: text("color_theme").$type<ColorTheme>().notNull().default("dark"),
@@ -190,12 +200,14 @@ export const userPreferences = pgTable("user_preferences", {
     .$type<{
       openTabIds: string[];
       activeTabId: string | null;
+      activeProjectId: string | null;
       previewVisible: boolean;
       explorerCollapsed: boolean;
     }>()
     .default({
       openTabIds: [],
       activeTabId: null,
+      activeProjectId: null,
       previewVisible: true,
       explorerCollapsed: false,
     }),

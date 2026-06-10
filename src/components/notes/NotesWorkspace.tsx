@@ -7,6 +7,8 @@ import {
   ChevronDown,
   ChevronRight,
   FilePlus,
+  Folder,
+  FolderOpen,
   PanelBottomClose,
   PanelBottomOpen,
   Play,
@@ -49,20 +51,30 @@ const LANGUAGES: { value: NoteLanguage; label: string }[] = [
 type WorkspaceState = {
   openTabIds: string[];
   activeTabId: string | null;
+  activeProjectId: string | null;
   previewVisible: boolean;
   explorerCollapsed: boolean;
 };
+
+type NoteProject = { id: string; key: string; name: string };
 
 type DraftMap = Record<string, { title: string; content: string; language: NoteLanguage }>;
 
 export function NotesWorkspace({
   initialNotes,
   initialWorkspace,
+  projects,
 }: {
   initialNotes: UserNote[];
   initialWorkspace: WorkspaceState;
+  projects: NoteProject[];
 }) {
   const [notes, setNotes] = useState(initialNotes);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(() => {
+    const saved = initialWorkspace.activeProjectId ?? null;
+    if (saved && !projects.some((project) => project.id === saved)) return null;
+    return saved;
+  });
   const [openTabIds, setOpenTabIds] = useState(initialWorkspace.openTabIds);
   const [activeTabId, setActiveTabId] = useState<string | null>(
     initialWorkspace.activeTabId ?? initialNotes[0]?.id ?? null
@@ -87,6 +99,16 @@ export function NotesWorkspace({
     [notes, openTabIds]
   );
 
+  const projectNotes = useMemo(
+    () =>
+      notes.filter((note) =>
+        activeProjectId ? note.projectId === activeProjectId : !note.projectId
+      ),
+    [notes, activeProjectId]
+  );
+
+  const activeNote = activeTabId ? notes.find((note) => note.id === activeTabId) : null;
+
   const activeDraft = activeTabId ? drafts[activeTabId] : null;
 
   const persistWorkspace = useCallback((next: Partial<WorkspaceState>) => {
@@ -96,12 +118,21 @@ export function NotesWorkspace({
         notesWorkspace: {
           openTabIds: next.openTabIds ?? openTabIds,
           activeTabId: next.activeTabId ?? activeTabId,
+          activeProjectId: next.activeProjectId ?? activeProjectId,
           previewVisible: next.previewVisible ?? previewVisible,
           explorerCollapsed: next.explorerCollapsed ?? explorerCollapsed,
         },
       });
     }, 400);
-  }, [activeTabId, explorerCollapsed, openTabIds, previewVisible]);
+  }, [activeProjectId, activeTabId, explorerCollapsed, openTabIds, previewVisible]);
+
+  const selectProject = useCallback(
+    (projectId: string | null) => {
+      setActiveProjectId(projectId);
+      persistWorkspace({ activeProjectId: projectId });
+    },
+    [persistWorkspace]
+  );
 
   const openNote = useCallback(
     (note: UserNote) => {
@@ -160,10 +191,10 @@ export function NotesWorkspace({
   }, []);
 
   useEffect(() => {
-    if (openTabIds.length === 0 && notes.length > 0) {
-      openNote(notes[0]);
+    if (openTabIds.length === 0 && projectNotes.length > 0) {
+      openNote(projectNotes[0]);
     }
-  }, [notes, openNote, openTabIds.length]);
+  }, [openNote, openTabIds.length, projectNotes]);
 
   useEffect(() => {
     return () => {
@@ -175,7 +206,11 @@ export function NotesWorkspace({
   async function handleCreateNote() {
     startTransition(async () => {
       try {
-        const note = await createUserNote({ title: "Untitled", language: "plaintext" });
+        const note = await createUserNote({
+          title: "Untitled",
+          language: "plaintext",
+          projectId: activeProjectId,
+        });
         setNotes((prev) => [note, ...prev]);
         setDrafts((prev) => ({
           ...prev,
@@ -184,6 +219,22 @@ export function NotesWorkspace({
         openNote(note);
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Failed to create note");
+      }
+    });
+  }
+
+  async function handleMoveNote(projectId: string | null) {
+    if (!activeTabId) return;
+    startTransition(async () => {
+      try {
+        const saved = await updateUserNote({ id: activeTabId, projectId });
+        setNotes((prev) => prev.map((note) => (note.id === saved.id ? saved : note)));
+        if (projectId !== activeProjectId) {
+          closeTab(activeTabId);
+        }
+        toast.success(projectId ? "Note moved to project" : "Note moved to General");
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to move note");
       }
     });
   }
@@ -211,7 +262,7 @@ export function NotesWorkspace({
           <div>
             <h1 className="text-lg font-semibold">Notes</h1>
             <p className="text-xs text-muted-foreground">
-              Personal scratchpad · autosaved
+              Project notes · autosaved
               {saveState === "saving" ? " · saving…" : saveState === "saved" ? " · saved" : ""}
             </p>
           </div>
@@ -244,10 +295,10 @@ export function NotesWorkspace({
 
       <div className="flex min-h-0 flex-1">
         {!explorerCollapsed ? (
-          <aside className="flex w-56 shrink-0 flex-col border-r bg-card/30">
+          <aside className="flex w-72 shrink-0 flex-col border-r bg-card/30">
             <div className="flex items-center justify-between border-b px-3 py-2">
               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Files
+                Projects
               </span>
               <Button
                 size="icon"
@@ -261,13 +312,62 @@ export function NotesWorkspace({
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
+            <div className="border-b p-2">
+              <button
+                type="button"
+                onClick={() => selectProject(null)}
+                className={cn(
+                  "mb-1 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition hover:bg-accent",
+                  activeProjectId === null && "bg-accent font-medium"
+                )}
+              >
+                {activeProjectId === null ? (
+                  <FolderOpen className="h-4 w-4 shrink-0 text-primary" />
+                ) : (
+                  <Folder className="h-4 w-4 shrink-0 text-muted-foreground" />
+                )}
+                <span className="truncate">General</span>
+                <span className="ml-auto text-[10px] text-muted-foreground">
+                  {notes.filter((note) => !note.projectId).length}
+                </span>
+              </button>
+              {projects.map((project) => (
+                <button
+                  key={project.id}
+                  type="button"
+                  onClick={() => selectProject(project.id)}
+                  className={cn(
+                    "mb-1 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition hover:bg-accent",
+                    activeProjectId === project.id && "bg-accent font-medium"
+                  )}
+                >
+                  {activeProjectId === project.id ? (
+                    <FolderOpen className="h-4 w-4 shrink-0 text-primary" />
+                  ) : (
+                    <Folder className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  )}
+                  <span className="min-w-0 truncate">{project.name}</span>
+                  <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">
+                    {notes.filter((note) => note.projectId === project.id).length}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center justify-between border-b px-3 py-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Notes
+              </span>
+              <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => void handleCreateNote()}>
+                <FilePlus className="h-3.5 w-3.5" />
+              </Button>
+            </div>
             <div className="min-h-0 flex-1 overflow-y-auto p-2">
-              {notes.length === 0 ? (
+              {projectNotes.length === 0 ? (
                 <p className="px-2 py-6 text-center text-xs text-muted-foreground">
-                  No notes yet
+                  No notes in this project
                 </p>
               ) : (
-                notes.map((note) => (
+                projectNotes.map((note) => (
                   <button
                     key={note.id}
                     type="button"
@@ -346,6 +446,24 @@ export function NotesWorkspace({
                   }
                   className="min-w-[160px] flex-1 bg-transparent text-sm font-medium outline-none"
                 />
+                <Select
+                  value={activeNote?.projectId ?? "general"}
+                  onValueChange={(value) =>
+                    void handleMoveNote(value === "general" ? null : value)
+                  }
+                >
+                  <SelectTrigger className="h-8 w-[180px]">
+                    <SelectValue placeholder="Project" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="general">General</SelectItem>
+                    {projects.map((project) => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <Select
                   value={activeDraft.language}
                   onValueChange={(value) =>

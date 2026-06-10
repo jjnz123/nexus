@@ -27,6 +27,7 @@ const noteLanguageSchema = z.enum([
 const createNoteSchema = z.object({
   title: z.string().trim().min(1).max(200).optional(),
   language: noteLanguageSchema.optional(),
+  projectId: z.string().uuid().nullable().optional(),
 });
 
 const updateNoteSchema = z.object({
@@ -34,6 +35,7 @@ const updateNoteSchema = z.object({
   title: z.string().trim().min(1).max(200).optional(),
   content: z.string().max(500_000).optional(),
   language: noteLanguageSchema.optional(),
+  projectId: z.string().uuid().nullable().optional(),
 });
 
 export async function getUserNotes() {
@@ -69,6 +71,7 @@ export async function createUserNote(input?: unknown) {
       userId: session.user.id,
       title: data.title ?? "Untitled",
       language: (data.language ?? "plaintext") as NoteLanguage,
+      projectId: data.projectId ?? null,
       sortOrder: existing.length,
     })
     .returning();
@@ -88,6 +91,7 @@ export async function updateUserNote(input: unknown) {
       ...(data.title !== undefined ? { title: data.title } : {}),
       ...(data.content !== undefined ? { content: data.content } : {}),
       ...(data.language !== undefined ? { language: data.language } : {}),
+      ...(data.projectId !== undefined ? { projectId: data.projectId } : {}),
       updatedAt: new Date(),
     })
     .where(and(eq(userNotes.id, data.id), eq(userNotes.userId, session.user.id)))
@@ -109,6 +113,6 @@ export async function deleteUserNote(id: string) {
   return { success: true };
 }
 
-export async function renameUserNote(id: string, title: string) {
-  return updateUserNote({ id, title });
+export async function moveUserNoteToProject(id: string, projectId: string | null) {
+  return updateUserNote({ id, projectId });
 }

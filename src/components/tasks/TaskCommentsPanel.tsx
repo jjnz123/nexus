@@ -127,10 +127,12 @@ export function TaskCommentsPanel({
   taskId,
   comments,
   onChange,
+  embedded = false,
 }: {
   taskId: string;
   comments: TaskComment[];
   onChange: (next: TaskComment[]) => void;
+  embedded?: boolean;
 }) {
   const [isPending, startTransition] = useTransition();
   const [commentDraft, setCommentDraft] = useState("");
@@ -158,11 +160,17 @@ export function TaskCommentsPanel({
   }
 
   return (
-    <div className="flex min-h-[360px] flex-col rounded-lg border">
+    <div
+      className={
+        embedded
+          ? "flex min-h-[280px] flex-col rounded-lg border bg-card/30"
+          : "flex min-h-[360px] flex-col rounded-lg border"
+      }
+    >
       <div className="border-b px-4 py-3">
-        <h4 className="font-medium">Comments</h4>
+        <h4 className="font-medium">Discussion</h4>
         <p className="text-xs text-muted-foreground">
-          Threaded discussion with replies. {comments.length} comment{comments.length === 1 ? "" : "s"}.
+          Threaded comments with replies. {comments.length} comment{comments.length === 1 ? "" : "s"}.
         </p>
       </div>
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
