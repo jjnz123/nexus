@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v3.9.0
+**Current release:** v3.9.1
 
 ## 1. Overview
 
@@ -424,7 +424,7 @@ Requires `tasks:view`. Edit operations require `tasks:edit`.
 
 - **Collapsible Tasks sidebar** — Board, Issues, Roadmap, Project settings (icon-only + hover expand)
 - **View switcher** in the page header — quick toggle between Board, Issues, and Roadmap (alongside sidebar navigation)
-- **Kanban board** — non-backlog columns only, single horizontal scroll row (no wrapping); cross-column drag-and-drop with optimistic UI and rollback on server failure; **WIP limits block drops** when a column is at capacity (toast warning)
+- **Kanban board** — non-backlog columns only, single horizontal scroll row (no wrapping); cross-column drag-and-drop from anywhere on the card with optimistic UI and rollback on server failure; **WIP limits block drops** when a column is at capacity (toast warning); improved collision detection for column drops
 - **Board type filter** — configurable in Project Settings → Board (`projects.settings.boardSettings.visibleTypes`); defaults to Story + Task only on the kanban board
 - **Board card fields** — configurable per project: parent ticket, due date, stale indicator (days since last update), child subtask count
 - **Backlog modal** — full-screen dialog (top-right button); Jira-like table with search/filter; drag handle to rank; drag row onto board column or use column dropdown; quick-create row

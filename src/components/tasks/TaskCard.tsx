@@ -3,7 +3,6 @@
 import { CSS } from "@dnd-kit/utilities";
 import { useSortable } from "@dnd-kit/sortable";
 import { Calendar, Clock, Flag, GitBranch, GripVertical, ListTree } from "lucide-react";
-import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
@@ -67,30 +66,33 @@ export function TaskCard({
   const stale = cardFields.stale && isTaskStale(task.updatedAt, staleDays);
 
   return (
-    <motion.article
+    <article
       ref={setNodeRef}
       style={style}
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
+      {...attributes}
+      {...listeners}
       className={cn(
-        "group rounded-lg border bg-card p-3 shadow-sm transition hover:border-primary/50 hover:shadow-md",
+        "group cursor-grab touch-none rounded-lg border bg-card p-3 shadow-sm transition hover:border-primary/50 hover:shadow-md active:cursor-grabbing",
         isDragging && "opacity-60",
         stale && "border-amber-500/40"
       )}
     >
       <div className="mb-2 flex items-start justify-between gap-2">
-        <button onClick={onClick} className="text-left">
+        <button
+          type="button"
+          onClick={onClick}
+          onPointerDown={(event) => event.stopPropagation()}
+          className="text-left"
+        >
           <p className="text-xs text-muted-foreground">{taskKey}</p>
           <h4 className="line-clamp-2 text-sm font-medium">{task.title}</h4>
         </button>
-        <button
-          {...attributes}
-          {...listeners}
-          className="rounded p-1 text-muted-foreground opacity-0 transition hover:bg-accent group-hover:opacity-100"
-          aria-label="Drag task"
+        <span
+          className="rounded p-1 text-muted-foreground opacity-40 group-hover:opacity-100"
+          aria-hidden
         >
           <GripVertical className="h-4 w-4" />
-        </button>
+        </span>
       </div>
 
       {cardFields.parent && parentKey ? (
@@ -147,6 +149,6 @@ export function TaskCard({
           ))}
         </div>
       ) : null}
-    </motion.article>
+    </article>
   );
 }

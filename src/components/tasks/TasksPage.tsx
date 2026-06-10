@@ -7,10 +7,14 @@ import {
   DndContext,
   DragOverlay,
   PointerSensor,
+  closestCorners,
+  pointerWithin,
   useDroppable,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragEndEvent,
+  type DragOverEvent,
 } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { Plus, Search, Inbox } from "lucide-react";
@@ -69,6 +73,35 @@ function splitTasksByColumn(tasks: BoardTask[]) {
     acc[task.columnId].push(task);
     return acc;
   }, {});
+}
+
+const boardCollisionDetection: CollisionDetection = (args) => {
+  const pointerHits = pointerWithin(args);
+  if (pointerHits.length > 0) return pointerHits;
+  return closestCorners(args);
+};
+
+function resolveDropTarget(
+  overId: string | number | undefined,
+  tasks: BoardTask[]
+): string | null {
+  if (overId == null) return null;
+  const id = String(overId);
+  if (id.startsWith("column-")) return id.replace("column-", "");
+  return tasks.find((task) => task.id === id)?.columnId ?? null;
+}
+
+function wouldExceedWipLimit(
+  tasks: BoardTask[],
+  activeTaskId: string,
+  targetColumnId: string,
+  wipLimit: number
+) {
+  const activeTask = tasks.find((task) => task.id === activeTaskId);
+  if (!activeTask || activeTask.columnId === targetColumnId) return false;
+
+  const targetCount = tasks.filter((task) => task.columnId === targetColumnId).length;
+  return targetCount + 1 > wipLimit;
 }
 
 function dropIntoColumn(tasks: BoardTask[], activeTaskId: string, targetColumnId: string, overId: string) {
@@ -392,48 +425,88 @@ export function TasksPage({
     }
   };
 
-  const onDragEnd = (event: DragEndEvent) => {
+  const onDragOver = (event: DragOverEvent) => {
     if (!board) return;
     const { active, over } = event;
-    if (!over || active.id === over.id) {
+    if (!over || active.id === over.id) return;
+
+    const activeId = String(active.id);
+    const targetColumnId = resolveDropTarget(over.id, board.tasks);
+    if (!targetColumnId) return;
+
+    const activeTask = board.tasks.find((task) => task.id === activeId);
+    if (!activeTask || activeTask.columnId === targetColumnId) return;
+
+    const targetColumn = board.columns.find((column) => column.id === targetColumnId);
+    if (
+      targetColumn?.wipLimit != null &&
+      wouldExceedWipLimit(board.tasks, activeId, targetColumnId, targetColumn.wipLimit)
+    ) {
+      return;
+    }
+
+    setBoard((prev) => {
+      if (!prev) return prev;
+      const current = prev.tasks.find((task) => task.id === activeId);
+      if (!current || current.columnId === targetColumnId) return prev;
+      return {
+        ...prev,
+        tasks: dropIntoColumn(prev.tasks, activeId, targetColumnId, String(over.id)),
+      };
+    });
+  };
+
+  const onDragEnd = (event: DragEndEvent) => {
+    if (!board) return;
+    const { active, over, collisions } = event;
+    const overId = over?.id ?? collisions?.[0]?.id;
+    if (!overId || active.id === overId) {
       setActiveDragId(null);
       return;
     }
 
-    const overIsColumn = typeof over.id === "string" && over.id.startsWith("column-");
-    const targetColumnId = overIsColumn
-      ? String(over.id).replace("column-", "")
-      : board.tasks.find((task) => task.id === over.id)?.columnId;
+    const activeId = String(active.id);
+    const targetColumnId = resolveDropTarget(overId, board.tasks);
     if (!targetColumnId) {
       setActiveDragId(null);
       return;
     }
 
-    const activeTask = board.tasks.find((task) => task.id === String(active.id));
+    const activeTask = board.tasks.find((task) => task.id === activeId);
     const targetColumn = board.columns.find((column) => column.id === targetColumnId);
 
     if (
       activeTask &&
       targetColumn?.wipLimit != null &&
-      activeTask.columnId !== targetColumnId &&
-      (columnWipCounts[targetColumnId] ?? 0) >= targetColumn.wipLimit
+      wouldExceedWipLimit(board.tasks, activeId, targetColumnId, targetColumn.wipLimit)
     ) {
       toast.warning(
         `WIP limit reached for ${targetColumn.name} (${targetColumn.wipLimit}). Remove or move a ticket first.`
       );
       setActiveDragId(null);
+      void refreshBoard();
       return;
     }
 
     const previousTasks = board.tasks;
-    const nextTasks = dropIntoColumn(board.tasks, String(active.id), targetColumnId, String(over.id));
+    const nextTasks = dropIntoColumn(board.tasks, activeId, targetColumnId, String(overId));
     setBoard({ ...board, tasks: nextTasks });
     setActiveDragId(null);
 
     startTransition(async () => {
       try {
+        const previousById = new Map(previousTasks.map((task) => [task.id, task]));
+        const changedTasks = nextTasks.filter((task) => {
+          const before = previousById.get(task.id);
+          return (
+            !before ||
+            before.columnId !== task.columnId ||
+            before.sortOrder !== task.sortOrder
+          );
+        });
+
         await reorderTasks(
-          nextTasks.map((task) => ({
+          changedTasks.map((task) => ({
             id: task.id,
             columnId: task.columnId,
             sortOrder: task.sortOrder,
@@ -450,7 +523,7 @@ export function TasksPage({
     const targetColumn = board?.columns.find((column) => column.id === columnId);
     if (
       targetColumn?.wipLimit != null &&
-      (columnWipCounts[columnId] ?? 0) >= targetColumn.wipLimit
+      wouldExceedWipLimit(board?.tasks ?? [], taskId, columnId, targetColumn.wipLimit)
     ) {
       toast.warning(
         `WIP limit reached for ${targetColumn.name} (${targetColumn.wipLimit}). Remove or move a ticket first.`
@@ -621,9 +694,14 @@ export function TasksPage({
 
               <DndContext
                 sensors={sensors}
+                collisionDetection={boardCollisionDetection}
                 onDragStart={(event) => setActiveDragId(String(event.active.id))}
+                onDragOver={onDragOver}
                 onDragEnd={onDragEnd}
-                onDragCancel={() => setActiveDragId(null)}
+                onDragCancel={() => {
+                  setActiveDragId(null);
+                  void refreshBoard();
+                }}
               >
                 <div className="flex gap-4 overflow-x-auto pb-2">
                   {kanbanColumns.map((column) => {
@@ -673,7 +751,7 @@ export function TasksPage({
                           items={tasks.map((task) => task.id)}
                           strategy={verticalListSortingStrategy}
                         >
-                          <div className="space-y-2">
+                          <div className="min-h-[120px] space-y-2">
                             <AnimatePresence>
                               {tasks.length === 0 ? (
                                 <motion.div
