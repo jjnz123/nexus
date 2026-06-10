@@ -70,12 +70,34 @@ export type TaskComment = {
   userName: string;
 };
 
+export type TaskAttachmentKind = "file" | "url" | "email";
+
 export type TaskAttachment = {
   id: string;
+  kind: TaskAttachmentKind;
   filename: string;
-  path: string;
+  displayTitle: string | null;
+  path: string | null;
+  url: string | null;
   mimeType: string;
   size: number;
+  version: number;
+  groupId: string | null;
+  isCurrent: boolean;
+  emailSubject: string | null;
+  emailFrom: string | null;
+  emailSentAt: string | Date | null;
+  uploadedByName: string | null;
+  createdAt: string | Date;
+};
+
+export type TaskChild = {
+  id: string;
+  key: string;
+  title: string;
+  type: TaskType;
+  columnId: string;
+  assigneeName: string | null;
 };
 
 export type TaskLink = {
@@ -93,6 +115,7 @@ export type TaskDetails = {
   comments: TaskComment[];
   subtasks: TaskSubtask[];
   attachments: TaskAttachment[];
+  childTasks: TaskChild[];
   links: TaskLink[];
   labelIds: string[];
 };

@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v3.7.1
+**Current release:** v3.8.0
 
 ## 1. Overview
 
@@ -431,15 +431,15 @@ Requires `tasks:view`. Edit operations require `tasks:edit`.
 ### 6.3 Task Hierarchy & Ticket Fields
 
 - Ticket types: **Epic**, **Feature**, **Story**, **Task**
-- Optional **parent** link for hierarchy (Epic → Feature → Story/Task)
+- Optional **parent** link for hierarchy (Epic → Feature → Story/Task); **configurable hierarchy rules** per project in settings; parent dropdown filtered by allowed types; server-side validation prevents cycles and invalid parents
 - Extended ticket fields stored on `tasks`:
   - Title, description, **details**, **acceptance criteria**, **definition of done**, **story points**
   - Priority, due date, assignee, column/status, type, parent, labels
 - **Linked issues** — `task_links` table (relates to, blocks, duplicates); search-and-link UI in ticket modal
-- **Attachments** — upload via `/api/uploads`, stored in `task_attachments` with mime type; image/PDF preview in modal
+- **Attachments & links** — drag-and-drop file upload; **version history** when re-uploading the same filename; external **URL links** (SharePoint, Drive, etc.); separate **Emails** section for dragged `.eml` files with subject/sender/date; upload via `/api/uploads`, stored in `task_attachments` with kind (`file` | `url` | `email`)
+- **Child subtasks** — quick-create linked child tickets (`tasks.parent_id`) from the ticket modal sidebar
+- **Checklist subtasks** — lightweight checklist rows in `task_subtasks` (toggle complete)
 - **Comments** — threaded replies via `parent_id` on `task_comments`
-
-### 6.4 Filtering
 
 - Search tasks by title, description, and key
 - Filter by priority: all, low, medium, high, urgent
@@ -468,6 +468,7 @@ Requires `tasks:edit`.
 - **Columns:** drag-to-reorder, create, edit (name, color, WIP limit), delete (non-backlog columns)
 - Backlog column managed here but hidden from kanban
 - **Labels:** create with name and color
+- **Hierarchy rules:** matrix of allowed parent types per child type (stored in `projects.settings.hierarchyRules`); defaults match Epic → Feature → Story/Task
 - **Ticket fields by type:** per Epic/Feature/Story/Task — drag-to-reorder fields, show/hide toggles; stored in `projects.settings.ticketFields`; controls ticket modal, backlog create form visibility
 
 ### 6.8 Create Ticket
@@ -493,9 +494,9 @@ Requires `tasks:edit`.
 - Header: ticket key badge, type/status badges, inline title edit
 - Field visibility/order driven by project ticket field settings for the ticket type
 - Edit all ticket fields (see §6.3)
-- **Overview tab** — two-column issue-tracker layout: **Description + Discussion** (threaded comments) on the left; **right sidebar** for type, status, assignee, priority, due date, story points, parent, labels, subtasks
+- **Links & files tab** — drag-and-drop zone (files + `.eml` emails); external URL links; file attachments with version history and per-version download; linked issues panel; image/PDF preview
+- **Overview tab** — two-column issue-tracker layout: **Description + Discussion** on the left; **right sidebar** for type, status, assignee, priority, due date, story points, parent (filtered by hierarchy rules), labels, checklist, and **child subtasks**
 - **Specification tab** — details, acceptance criteria, definition of done
-- **Links & files tab** — linked issues panel (search, link, unlink, open linked ticket); attachments (upload, preview images/PDFs, delete)
 - **Discussion tab** — full-height threaded comments (same panel as Overview)
 - Copy shareable ticket URL
 - Sticky footer: Save / Delete (with confirmation)

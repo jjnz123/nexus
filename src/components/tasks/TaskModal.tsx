@@ -36,9 +36,15 @@ import {
   type ProjectTicketFieldSettings,
   type TicketFieldKey,
 } from "@/lib/tasks/ticket-fields";
-import { TaskAttachmentsPanel } from "./TaskAttachmentsPanel";
+import {
+  getAllowedParentTypes,
+  isParentTypeAllowed,
+  type HierarchyRules,
+} from "@/lib/tasks/hierarchy";
+import { TaskChildSubtasksPanel } from "./TaskChildSubtasksPanel";
 import { TaskCommentsPanel } from "./TaskCommentsPanel";
 import { TaskLinkedIssuesPanel } from "./TaskLinkedIssuesPanel";
+import { TaskLinksAndFilesPanel } from "./TaskLinksAndFilesPanel";
 import type { TaskColumn, TaskComment, TaskDetails, TaskLabel, TaskPriority, TaskType } from "./types";
 
 function asDateInput(value: string | Date | null) {
@@ -78,6 +84,7 @@ export function TaskModal({
   projectUsers,
   parentCandidates,
   fieldSettings,
+  hierarchyRules,
   onOpenLinkedTask,
   onTaskSaved,
   onTaskDeleted,
@@ -91,6 +98,7 @@ export function TaskModal({
   projectUsers: { id: string; name: string }[];
   parentCandidates: { id: string; title: string; type: TaskType; number: number }[];
   fieldSettings: ProjectTicketFieldSettings;
+  hierarchyRules: HierarchyRules;
   onOpenLinkedTask: (taskKey: string) => void;
   onTaskSaved: () => Promise<void> | void;
   onTaskDeleted?: () => void;
@@ -114,6 +122,7 @@ export function TaskModal({
   const [localSubtasks, setLocalSubtasks] = useState<TaskDetails["subtasks"]>([]);
   const [localComments, setLocalComments] = useState<TaskComment[]>([]);
   const [localAttachments, setLocalAttachments] = useState<TaskDetails["attachments"]>([]);
+  const [localChildTasks, setLocalChildTasks] = useState<TaskDetails["childTasks"]>([]);
   const [localLinks, setLocalLinks] = useState<TaskDetails["links"]>([]);
 
   useEffect(() => {
@@ -134,6 +143,7 @@ export function TaskModal({
     setLocalSubtasks(taskDetails.subtasks);
     setLocalComments(taskDetails.comments);
     setLocalAttachments(taskDetails.attachments);
+    setLocalChildTasks(taskDetails.childTasks);
     setLocalLinks(taskDetails.links);
     setActiveTab("overview");
   }, [taskDetails]);
@@ -146,6 +156,19 @@ export function TaskModal({
   );
 
   const statusColumn = columns.find((column) => column.id === columnId);
+
+  const filteredParentCandidates = useMemo(() => {
+    if (!taskDetails) return [];
+    return parentCandidates.filter((candidate) => {
+      if (candidate.id === taskDetails.task.id) return false;
+      return isParentTypeAllowed(taskType, candidate.type, hierarchyRules);
+    });
+  }, [hierarchyRules, parentCandidates, taskDetails, taskType]);
+
+  const allowedParentLabels = useMemo(
+    () => getAllowedParentTypes(taskType, hierarchyRules),
+    [hierarchyRules, taskType]
+  );
 
   const copyTaskUrl = async () => {
     if (!taskKey || typeof window === "undefined") return;
@@ -319,23 +342,28 @@ export function TaskModal({
           </MetadataField>
         ) : null}
         {visible("parent") ? (
-          <MetadataField label="Parent">
-            <Select value={parentId} onValueChange={setParentId}>
-              <SelectTrigger>
-                <SelectValue placeholder="None" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">None</SelectItem>
-                {parentCandidates
-                  .filter((candidate) => candidate.id !== taskDetails?.task.id)
-                  .map((candidate) => (
-                    <SelectItem key={candidate.id} value={candidate.id}>
-                      {candidate.type} · {candidate.title}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-          </MetadataField>
+        <MetadataField label="Parent">
+          <Select value={parentId} onValueChange={setParentId}>
+            <SelectTrigger>
+              <SelectValue placeholder="None" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">None</SelectItem>
+              {filteredParentCandidates.map((candidate) => (
+                <SelectItem key={candidate.id} value={candidate.id}>
+                  {candidate.type} · {candidate.title}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {allowedParentLabels.length ? (
+            <p className="text-[10px] text-muted-foreground">
+              Allowed parent types: {allowedParentLabels.join(", ")}
+            </p>
+          ) : (
+            <p className="text-[10px] text-muted-foreground">This type cannot have a parent.</p>
+          )}
+        </MetadataField>
         ) : null}
       </div>
 
@@ -369,7 +397,7 @@ export function TaskModal({
       {visible("subtasks") ? (
         <div className="space-y-3 border-t pt-4">
           <div className="flex items-center justify-between">
-            <h4 className="text-sm font-medium">Subtasks</h4>
+            <h4 className="text-sm font-medium">Checklist</h4>
             <p className="text-xs text-muted-foreground">
               <CheckCheck className="mr-1 inline h-3 w-3" />
               {completedSubtasks}/{localSubtasks.length}
@@ -411,6 +439,15 @@ export function TaskModal({
             </Button>
           </div>
         </div>
+      ) : null}
+
+      {taskDetails ? (
+        <TaskChildSubtasksPanel
+          parentTaskId={taskDetails.task.id}
+          childTasks={localChildTasks}
+          onOpenTask={onOpenLinkedTask}
+          onChange={refreshDetails}
+        />
       ) : null}
     </aside>
   );
@@ -556,19 +593,19 @@ export function TaskModal({
                 </TabsContent>
 
                 <TabsContent value="links" className="mt-0 space-y-4">
+                  {visible("attachments") ? (
+                    <TaskLinksAndFilesPanel
+                      taskId={taskDetails.task.id}
+                      attachments={localAttachments}
+                      onChange={refreshDetails}
+                    />
+                  ) : null}
                   {visible("linkedIssues") ? (
                     <TaskLinkedIssuesPanel
                       taskId={taskDetails.task.id}
                       projectId={taskDetails.project.id}
                       links={localLinks}
                       onOpenLinkedTask={onOpenLinkedTask}
-                      onChange={refreshDetails}
-                    />
-                  ) : null}
-                  {visible("attachments") ? (
-                    <TaskAttachmentsPanel
-                      taskId={taskDetails.task.id}
-                      attachments={localAttachments}
                       onChange={refreshDetails}
                     />
                   ) : null}

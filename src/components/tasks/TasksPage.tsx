@@ -55,6 +55,7 @@ import type { BoardTask, ProjectBoard, ProjectSummary, TaskDetails, TaskPriority
 import {
   parseProjectTicketFieldSettings,
 } from "@/lib/tasks/ticket-fields";
+import { parseProjectHierarchyRules } from "@/lib/tasks/hierarchy";
 
 function makeTaskKey(projectKey: string, taskNumber: number) {
   return `${projectKey}-${String(taskNumber).padStart(3, "0")}`;
@@ -202,6 +203,11 @@ export function TasksPage({
 
   const ticketFieldSettings = useMemo(
     () => parseProjectTicketFieldSettings(board?.project.settings),
+    [board?.project.settings]
+  );
+
+  const hierarchyRules = useMemo(
+    () => parseProjectHierarchyRules(board?.project.settings),
     [board?.project.settings]
   );
 
@@ -708,6 +714,7 @@ export function TasksPage({
         projectUsers={projectUsers}
         parentCandidates={parentCandidates}
         fieldSettings={ticketFieldSettings}
+        hierarchyRules={hierarchyRules}
         onOpenLinkedTask={(key) => {
           const match = board.tasks.find(
             (task) => makeTaskKey(board.project.key, task.number) === key

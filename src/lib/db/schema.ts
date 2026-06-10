@@ -694,18 +694,34 @@ export const taskComments = pgTable("task_comments", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const taskAttachments = pgTable("task_attachments", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  taskId: uuid("task_id")
-    .notNull()
-    .references(() => tasks.id, { onDelete: "cascade" }),
-  filename: text("filename").notNull(),
-  path: text("path").notNull(),
-  mimeType: text("mime_type").notNull().default("application/octet-stream"),
-  size: integer("size").notNull(),
-  uploadedBy: uuid("uploaded_by").references(() => users.id),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+export const taskAttachments = pgTable(
+  "task_attachments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    taskId: uuid("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    kind: text("kind").$type<"file" | "url" | "email">().notNull().default("file"),
+    filename: text("filename").notNull(),
+    displayTitle: text("display_title"),
+    path: text("path"),
+    url: text("url"),
+    mimeType: text("mime_type").notNull().default("application/octet-stream"),
+    size: integer("size").notNull().default(0),
+    version: integer("version").notNull().default(1),
+    groupId: uuid("group_id"),
+    isCurrent: boolean("is_current").notNull().default(true),
+    emailSubject: text("email_subject"),
+    emailFrom: text("email_from"),
+    emailSentAt: timestamp("email_sent_at"),
+    uploadedBy: uuid("uploaded_by").references(() => users.id),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("task_attachments_task_kind_idx").on(table.taskId, table.kind),
+    index("task_attachments_group_idx").on(table.groupId),
+  ]
+);
 
 export const taskLinks = pgTable(
   "task_links",

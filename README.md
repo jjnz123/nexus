@@ -52,7 +52,7 @@ A **Jira-inspired** task board with tickets, hierarchy, roadmap planning, and co
 - **Issues view** — sortable columns, column visibility, quick filters, row selection, and bulk actions (assign, move, priority, delete).
 - **View switcher** — jump between Board, Issues, and Roadmap from the page header.
 - **Roadmap** — inline bulk editing with draft/commit workflow; add any ticket type; hierarchy, assignee, dates, story points, status.
-- **Tickets** — tabbed detail modal (Overview, Specification, Links & files, Discussion) with **top-anchored layout**; Overview shows **Description + Discussion** on the left and metadata (type, status, assignee, labels, subtasks, etc.) in a **right sidebar**
+- **Tickets** — tabbed detail modal (Overview, Specification, Links & files, Discussion) with **top-anchored layout**; Overview shows **Description + Discussion** on the left and metadata in a **right sidebar**; **Links & files** supports drag-and-drop uploads, URL links, `.eml` emails, and **attachment versioning**; create **child subtasks** from the sidebar; **hierarchy rules** configurable per project
 - **Project settings** — columns, labels, and **per-type field configuration** (show/hide + drag reorder).
 
 ### Monitoring

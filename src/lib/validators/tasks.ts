@@ -67,7 +67,38 @@ export const taskAttachmentSchema = z.object({
   filename: z.string().min(1).max(300),
   path: z.string().min(1).max(500),
   mimeType: z.string().max(200).optional(),
-  size: z.number().int().positive(),
+  size: z.number().int().nonnegative(),
+});
+
+export const taskUrlLinkSchema = z.object({
+  taskId: z.string().uuid(),
+  title: z.string().min(1).max(300),
+  url: z.string().url().max(2000),
+});
+
+export const taskEmailAttachmentSchema = z.object({
+  taskId: z.string().uuid(),
+  filename: z.string().min(1).max(300),
+  path: z.string().min(1).max(500),
+  size: z.number().int().nonnegative(),
+  emailSubject: z.string().max(500).nullable().optional(),
+  emailFrom: z.string().max(500).nullable().optional(),
+  emailSentAt: z.string().datetime().nullable().optional(),
+});
+
+export const createChildTaskSchema = z.object({
+  parentTaskId: z.string().uuid(),
+  title: z.string().min(1).max(300),
+});
+
+export const hierarchyRulesSchema = z.record(
+  z.enum(["epic", "feature", "story", "task"]),
+  z.array(z.enum(["epic", "feature", "story", "task"]))
+);
+
+export const updateProjectHierarchySettingsSchema = z.object({
+  projectId: z.string().uuid(),
+  hierarchyRules: hierarchyRulesSchema,
 });
 
 export const ticketFieldConfigSchema = z.object({

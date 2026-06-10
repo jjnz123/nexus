@@ -30,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { ProjectBoard } from "./types";
 import { TasksProjectFieldSettings } from "./TasksProjectFieldSettings";
+import { TasksProjectHierarchySettings } from "./TasksProjectHierarchySettings";
 
 function SortableColumnRow({
   column,
@@ -289,6 +290,11 @@ export function TasksProjectSettings({
           </Button>
         </div>
       </section>
+
+      <TasksProjectHierarchySettings
+        projectId={board.project.id}
+        settings={board.project.settings}
+      />
 
       <TasksProjectFieldSettings board={board} onRefresh={onRefresh} />
     </div>

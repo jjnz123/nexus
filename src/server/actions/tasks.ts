@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq, asc, and, max, or, ilike, ne } from "drizzle-orm";
+import { eq, asc, and, max, or, ilike, ne, desc, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/lib/db";
 import {
@@ -28,6 +28,10 @@ import {
   labelSchema,
   taskLinkSchema,
   taskAttachmentSchema,
+  taskUrlLinkSchema,
+  taskEmailAttachmentSchema,
+  createChildTaskSchema,
+  updateProjectHierarchySettingsSchema,
   updateProjectFieldSettingsSchema,
   roadmapCommitSchema,
   bulkUpdateTasksSchema,
@@ -36,8 +40,93 @@ import {
 import { createNotification } from "./users";
 import { logAudit } from "@/server/audit";
 import { indexTaskById } from "@/lib/rag/indexer";
+
+function mapAttachmentRow(
+  row: typeof taskAttachments.$inferSelect,
+  uploadedByName: string | null
+) {
+  return {
+    id: row.id,
+    kind: row.kind,
+    filename: row.filename,
+    displayTitle: row.displayTitle,
+    path: row.path,
+    url: row.url,
+    mimeType: row.mimeType,
+    size: row.size,
+    version: row.version,
+    groupId: row.groupId,
+    isCurrent: row.isCurrent,
+    emailSubject: row.emailSubject,
+    emailFrom: row.emailFrom,
+    emailSentAt: row.emailSentAt,
+    uploadedByName,
+    createdAt: row.createdAt,
+  };
+}
+
+async function loadProjectHierarchyRules(projectId: string): Promise<HierarchyRules> {
+  const [project] = await db.select().from(projects).where(eq(projects.id, projectId)).limit(1);
+  return parseProjectHierarchyRules((project?.settings ?? {}) as Record<string, unknown>);
+}
+
+async function loadParentTask(id: string) {
+  const [parent] = await db
+    .select({ id: tasks.id, type: tasks.type, projectId: tasks.projectId })
+    .from(tasks)
+    .where(eq(tasks.id, id))
+    .limit(1);
+  return parent ?? null;
+}
+
+async function loadDescendantTaskIds(taskId: string): Promise<string[]> {
+  const all = await db
+    .select({ id: tasks.id, parentId: tasks.parentId })
+    .from(tasks);
+  const descendants: string[] = [];
+  const queue = [taskId];
+  while (queue.length) {
+    const current = queue.shift()!;
+    for (const row of all) {
+      if (row.parentId === current && !descendants.includes(row.id)) {
+        descendants.push(row.id);
+        queue.push(row.id);
+      }
+    }
+  }
+  return descendants;
+}
+
+async function validateTaskParent({
+  childId,
+  childType,
+  parentId,
+  projectId,
+}: {
+  childId?: string;
+  childType: TaskType;
+  parentId: string | null | undefined;
+  projectId: string;
+}) {
+  const rules = await loadProjectHierarchyRules(projectId);
+  await assertValidTaskParent({
+    childId,
+    childType,
+    parentId,
+    projectId,
+    rules,
+    loadParent: loadParentTask,
+    loadDescendantIds: loadDescendantTaskIds,
+  });
+}
 import { deleteRagSource } from "@/lib/rag/store";
 import { RAG_SOURCE_TYPES } from "@/lib/rag/types";
+import {
+  assertValidTaskParent,
+  parseProjectHierarchyRules,
+  type HierarchyRules,
+} from "@/lib/tasks/hierarchy";
+import type { TaskType } from "@/components/tasks/types";
 
 export async function getProjects() {
   const session = await requireAuth();
@@ -167,9 +256,18 @@ export async function getTaskByKey(taskKey: string) {
     .orderBy(asc(taskSubtasks.sortOrder));
 
   const attachmentRows = await db
-    .select()
+    .select({ attachment: taskAttachments, user: users })
     .from(taskAttachments)
-    .where(eq(taskAttachments.taskId, task.id));
+    .leftJoin(users, eq(taskAttachments.uploadedBy, users.id))
+    .where(eq(taskAttachments.taskId, task.id))
+    .orderBy(desc(taskAttachments.createdAt));
+
+  const childRows = await db
+    .select({ task: tasks, user: users })
+    .from(tasks)
+    .leftJoin(users, eq(tasks.assigneeId, users.id))
+    .where(eq(tasks.parentId, task.id))
+    .orderBy(asc(tasks.sortOrder), asc(tasks.number));
 
   const outgoingLinks = await db
     .select({ link: taskLinks, linked: tasks, project: projects })
@@ -217,12 +315,16 @@ export async function getTaskByKey(taskKey: string) {
       userName: user.name,
     })),
     subtasks,
-    attachments: attachmentRows.map((row) => ({
-      id: row.id,
-      filename: row.filename,
-      path: row.path,
-      mimeType: row.mimeType,
-      size: row.size,
+    attachments: attachmentRows.map(({ attachment, user }) =>
+      mapAttachmentRow(attachment, user?.name ?? null)
+    ),
+    childTasks: childRows.map(({ task: child, user }) => ({
+      id: child.id,
+      key: `${project.key}-${String(child.number).padStart(3, "0")}`,
+      title: child.title,
+      type: child.type,
+      columnId: child.columnId,
+      assigneeName: user?.name ?? null,
     })),
     links,
     labelIds: labelMaps.map((m) => m.labelId),
@@ -233,6 +335,12 @@ export async function createTask(input: unknown) {
   const session = await requireAuth();
   requireSessionPermission(session, "tasks:edit");
   const data = taskSchema.parse(input);
+
+  await validateTaskParent({
+    childType: data.type ?? "task",
+    parentId: data.parentId,
+    projectId: data.projectId,
+  });
 
   const [maxNum] = await db
     .select({ value: max(tasks.number) })
@@ -302,6 +410,17 @@ export async function updateTask(input: unknown) {
 
   const [existing] = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1);
   if (!existing) throw new Error("Task not found");
+
+  const nextType = (updates.type ?? existing.type) as TaskType;
+  const nextParentId =
+    updates.parentId !== undefined ? updates.parentId : existing.parentId;
+
+  await validateTaskParent({
+    childId: id,
+    childType: nextType,
+    parentId: nextParentId,
+    projectId: existing.projectId,
+  });
 
   const [task] = await db
     .update(tasks)
@@ -663,19 +782,170 @@ export async function addTaskAttachment(input: unknown) {
   const session = await requireAuth();
   requireSessionPermission(session, "tasks:edit");
   const data = taskAttachmentSchema.parse(input);
+
+  const [task] = await db.select().from(tasks).where(eq(tasks.id, data.taskId)).limit(1);
+  if (!task) throw new Error("Task not found");
+
+  const normalizedName = data.filename.toLowerCase();
+  const existingVersions = await db
+    .select()
+    .from(taskAttachments)
+    .where(
+      and(
+        eq(taskAttachments.taskId, data.taskId),
+        eq(taskAttachments.kind, "file"),
+        sql`lower(${taskAttachments.filename}) = ${normalizedName}`
+      )
+    )
+    .orderBy(desc(taskAttachments.version));
+
+  let groupId = crypto.randomUUID();
+  let version = 1;
+
+  if (existingVersions.length > 0) {
+    const latest = existingVersions[0];
+    groupId = latest.groupId ?? latest.id;
+    version = latest.version + 1;
+    await db
+      .update(taskAttachments)
+      .set({ isCurrent: false })
+      .where(
+        or(
+          eq(taskAttachments.groupId, groupId),
+          eq(taskAttachments.id, groupId)
+        )
+      );
+  }
+
   const [attachment] = await db
     .insert(taskAttachments)
     .values({
       taskId: data.taskId,
+      kind: "file",
       filename: data.filename,
       path: data.path,
       mimeType: data.mimeType ?? "application/octet-stream",
       size: data.size,
+      version,
+      groupId,
+      isCurrent: true,
       uploadedBy: session.user.id,
     })
     .returning();
+
   revalidatePath("/tasks");
-  return attachment;
+  const [user] = await db
+    .select({ name: users.name })
+    .from(users)
+    .where(eq(users.id, session.user.id))
+    .limit(1);
+  return mapAttachmentRow(attachment, user?.name ?? null);
+}
+
+export async function addTaskUrlLink(input: unknown) {
+  const session = await requireAuth();
+  requireSessionPermission(session, "tasks:edit");
+  const data = taskUrlLinkSchema.parse(input);
+
+  const [attachment] = await db
+    .insert(taskAttachments)
+    .values({
+      taskId: data.taskId,
+      kind: "url",
+      filename: data.title,
+      displayTitle: data.title,
+      url: data.url,
+      path: null,
+      mimeType: "text/uri-list",
+      size: 0,
+      version: 1,
+      groupId: crypto.randomUUID(),
+      isCurrent: true,
+      uploadedBy: session.user.id,
+    })
+    .returning();
+
+  revalidatePath("/tasks");
+  const [user] = await db
+    .select({ name: users.name })
+    .from(users)
+    .where(eq(users.id, session.user.id))
+    .limit(1);
+  return mapAttachmentRow(attachment, user?.name ?? null);
+}
+
+export async function addTaskEmailAttachment(input: unknown) {
+  const session = await requireAuth();
+  requireSessionPermission(session, "tasks:edit");
+  const data = taskEmailAttachmentSchema.parse(input);
+
+  const [attachment] = await db
+    .insert(taskAttachments)
+    .values({
+      taskId: data.taskId,
+      kind: "email",
+      filename: data.filename,
+      displayTitle: data.emailSubject ?? data.filename,
+      path: data.path,
+      mimeType: "message/rfc822",
+      size: data.size,
+      version: 1,
+      groupId: crypto.randomUUID(),
+      isCurrent: true,
+      emailSubject: data.emailSubject ?? null,
+      emailFrom: data.emailFrom ?? null,
+      emailSentAt: data.emailSentAt ? new Date(data.emailSentAt) : null,
+      uploadedBy: session.user.id,
+    })
+    .returning();
+
+  revalidatePath("/tasks");
+  const [user] = await db
+    .select({ name: users.name })
+    .from(users)
+    .where(eq(users.id, session.user.id))
+    .limit(1);
+  return mapAttachmentRow(attachment, user?.name ?? null);
+}
+
+export async function createChildTask(input: unknown) {
+  const session = await requireAuth();
+  requireSessionPermission(session, "tasks:edit");
+  const data = createChildTaskSchema.parse(input);
+
+  const [parent] = await db.select().from(tasks).where(eq(tasks.id, data.parentTaskId)).limit(1);
+  if (!parent) throw new Error("Parent task not found");
+
+  await validateTaskParent({
+    childType: "task",
+    parentId: parent.id,
+    projectId: parent.projectId,
+  });
+
+  const child = await createTask({
+    projectId: parent.projectId,
+    columnId: parent.columnId,
+    title: data.title,
+    type: "task",
+    parentId: parent.id,
+    priority: parent.priority,
+  });
+
+  const [project] = await db
+    .select()
+    .from(projects)
+    .where(eq(projects.id, parent.projectId))
+    .limit(1);
+
+  revalidatePath("/tasks");
+  return {
+    id: child.id,
+    key: `${project?.key ?? "TASK"}-${String(child.number).padStart(3, "0")}`,
+    title: child.title,
+    type: child.type,
+    columnId: child.columnId,
+    assigneeName: null,
+  };
 }
 
 export async function deleteTaskAttachment(attachmentId: string) {
@@ -684,6 +954,33 @@ export async function deleteTaskAttachment(attachmentId: string) {
   await db.delete(taskAttachments).where(eq(taskAttachments.id, attachmentId));
   revalidatePath("/tasks");
   return { success: true };
+}
+
+export async function updateProjectHierarchySettings(input: unknown) {
+  const session = await requireAuth();
+  requireSessionPermission(session, "tasks:edit");
+  const data = updateProjectHierarchySettingsSchema.parse(input);
+
+  const [project] = await db
+    .select()
+    .from(projects)
+    .where(eq(projects.id, data.projectId))
+    .limit(1);
+  if (!project) throw new Error("Project not found");
+
+  const nextSettings = {
+    ...(project.settings ?? {}),
+    hierarchyRules: data.hierarchyRules,
+  };
+
+  const [updated] = await db
+    .update(projects)
+    .set({ settings: nextSettings })
+    .where(eq(projects.id, data.projectId))
+    .returning();
+
+  revalidatePath("/tasks");
+  return updated;
 }
 
 export async function updateProjectFieldSettings(input: unknown) {
