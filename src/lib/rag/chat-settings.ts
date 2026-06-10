@@ -18,6 +18,8 @@ const EMPTY_FILTERS: RagSearchFilters = {
   meetingDateTo: null,
   meetingLabels: [],
   noteLanguage: null,
+  taskDateFrom: null,
+  taskDateTo: null,
 };
 
 export function defaultChatRagSettings(): ChatRagSettings {
@@ -57,6 +59,8 @@ export function hasActiveRagFilters(filters: RagSearchFilters) {
       filters.meetingDateFrom ||
       filters.meetingDateTo ||
       filters.meetingLabels?.length ||
-      filters.noteLanguage
+      filters.noteLanguage ||
+      filters.taskDateFrom ||
+      filters.taskDateTo
   );
 }

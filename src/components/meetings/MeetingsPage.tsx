@@ -10,6 +10,7 @@ import type { Meeting, Project } from "@/lib/db/schema";
 import { datetimeLocalToIso, nowDatetimeLocal } from "@/lib/meetings/datetime";
 import { archiveMeeting, createMeeting } from "@/server/actions/meetings";
 import { MeetingProjectSelect } from "@/components/meetings/MeetingProjectSelect";
+import { AudioInputSelect } from "@/components/meetings/AudioInputSelect";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -154,6 +155,7 @@ export function MeetingsPage({
                 canCreateProject={canCreateProject}
               />
             </div>
+            <AudioInputSelect id="new-meeting-audio-input" />
           </div>
           <div className="flex flex-wrap gap-2">
             <Button className="gap-2" disabled={isPending} onClick={() => createAndOpen("record")}>

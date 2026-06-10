@@ -23,6 +23,8 @@ import {
   updateMeeting,
 } from "@/server/actions/meetings";
 import { MeetingProjectSelect } from "@/components/meetings/MeetingProjectSelect";
+import { AudioInputSelect } from "@/components/meetings/AudioInputSelect";
+import { getRecordingExtension, useRecording } from "@/components/meetings/recording-context";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,11 +39,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WHISPER_MAX_BYTES } from "@/lib/uploads";
-import {
-  buildMediaRecorderOptions,
-  getRecordingExtension,
-  type RecordingSettings,
-} from "@/lib/recording";
+import type { RecordingSettings } from "@/lib/recording";
 
 type MeetingDetailProps = {
   meeting: Meeting;
@@ -62,25 +60,27 @@ export function MeetingDetailView({
   messages: initialMessages,
   projects: initialProjects,
   canCreateProject = false,
-  recordingSettings,
+  recordingSettings: _recordingSettings,
 }: MeetingDetailProps) {
+  const recordingContext = useRecording();
   const [meeting, setMeeting] = useState(initialMeeting);
   const [projects, setProjects] = useState(initialProjects);
   const [actionItems, setActionItems] = useState(initialActionItems);
   const [messages, setMessages] = useState(initialMessages);
   const [question, setQuestion] = useState("");
-  const [recording, setRecording] = useState(false);
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(meeting.title);
   const [editMeetingAt, setEditMeetingAt] = useState(toDatetimeLocalValue(new Date(meeting.meetingAt)));
   const [editProjectId, setEditProjectId] = useState(meeting.projectId ?? "none");
-  const chunksRef = useRef<BlobPart[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [isUploading, setIsUploading] = useState(false);
+
+  const isRecordingThisMeeting =
+    recordingContext.isRecording &&
+    recordingContext.activeRecording?.meetingId === meeting.id;
 
   const isArchived = !!meeting.archivedAt;
 
@@ -150,34 +150,20 @@ export function MeetingDetailView({
   }
 
   function startRecording() {
-    void navigator.mediaDevices
-      .getUserMedia({ audio: true })
-      .then((stream) => {
-        const recorder = new MediaRecorder(stream, buildMediaRecorderOptions(recordingSettings));
-        chunksRef.current = [];
-        recorder.ondataavailable = (e) => {
-          if (e.data.size) chunksRef.current.push(e.data);
-        };
-        recorder.onstop = () => {
-          stream.getTracks().forEach((t) => t.stop());
-          const mimeType = recorder.mimeType || recordingSettings.recordingAudioMimeType;
-          const blob = new Blob(chunksRef.current, { type: mimeType });
-          const ext = getRecordingExtension(mimeType);
-          void uploadBlob(blob, `meeting-${Date.now()}.${ext}`).catch((error) => {
-            toast.error(error instanceof Error ? error.message : "Upload failed");
-          });
-        };
-        recorder.start();
-        setMediaRecorder(recorder);
-        setRecording(true);
-      })
-      .catch(() => toast.error("Microphone access denied"));
+    void recordingContext.startRecording({
+      meetingId: meeting.id,
+      title: meeting.title,
+      projectName,
+      projectKey,
+      onStop: async (blob, mimeType) => {
+        const ext = getRecordingExtension(mimeType);
+        await uploadBlob(blob, `meeting-${Date.now()}.${ext}`);
+      },
+    });
   }
 
   function stopRecording() {
-    mediaRecorder?.stop();
-    setMediaRecorder(null);
-    setRecording(false);
+    recordingContext.stopRecording();
   }
 
   function onFileSelected(file: File | null) {
@@ -399,15 +385,17 @@ export function MeetingDetailView({
             <CardTitle>Capture audio</CardTitle>
             <CardDescription>Record in the browser or upload an audio file (max 25MB for Whisper).</CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-wrap gap-2">
+          <CardContent className="space-y-4">
+            <AudioInputSelect id="meeting-audio-input" />
+            <div className="flex flex-wrap gap-2">
             {isUploading ? (
               <div className="flex w-full items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Uploading audio…
               </div>
             ) : null}
-            {!recording ? (
-              <Button className="gap-2" onClick={startRecording} disabled={isUploading}>
+            {!isRecordingThisMeeting ? (
+              <Button className="gap-2" onClick={startRecording} disabled={isUploading || recordingContext.isRecording}>
                 <Mic className="h-4 w-4" />
                 Start recording
               </Button>
@@ -420,7 +408,7 @@ export function MeetingDetailView({
             <Button
               variant="outline"
               className="gap-2"
-              disabled={isUploading || recording}
+              disabled={isUploading || isRecordingThisMeeting || recordingContext.isRecording}
               onClick={() => fileInputRef.current?.click()}
             >
               <Upload className="h-4 w-4" />
@@ -433,6 +421,7 @@ export function MeetingDetailView({
               className="hidden"
               onChange={(e) => onFileSelected(e.target.files?.[0] ?? null)}
             />
+            </div>
           </CardContent>
         </Card>
       ) : null}

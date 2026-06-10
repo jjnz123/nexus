@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ChatComposer } from "@/components/chat/ChatComposer";
 import { ChatConversationTabs } from "@/components/chat/ChatConversationTabs";
-import { ChatFileManager } from "@/components/chat/ChatFileManager";
+import { ChatFileManager, type ChatFileManagerTab } from "@/components/chat/ChatFileManager";
 import { ChatMessageBubble } from "@/components/chat/ChatMessageBubble";
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
 import {
@@ -116,7 +116,7 @@ export function ChatPage({
   const [searchFilters, setSearchFilters] = useState<RagSearchFilters>({});
   const [sidebarCollapsed, setSidebarCollapsed] = useState(initialSidebarCollapsed);
   const [filesOpen, setFilesOpen] = useState(false);
-  const [fileManagerTab, setFileManagerTab] = useState<"project" | "conversation">("conversation");
+  const [fileManagerTab, setFileManagerTab] = useState<ChatFileManagerTab>("conversation");
   const [fileManagerProjectId, setFileManagerProjectId] = useState<string | null>(null);
   const [fileManagerConversationId, setFileManagerConversationId] = useState<string | null>(null);
   const [skillsOpen, setSkillsOpen] = useState(false);

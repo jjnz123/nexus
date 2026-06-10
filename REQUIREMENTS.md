@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v4.5.0
+**Current release:** v4.6.0
 
 ## 1. Overview
 
@@ -252,12 +252,12 @@ Three-panel workspace (full-bleed within app shell):
 
 - **Project-level files** — upload, rename, delete files shared across all conversations in a project (knowledge base)
 - **Conversation-level files** — upload, rename, delete files scoped to the current conversation only
-- File manager dialog labels scope clearly (**Project-wide** vs **This conversation** badges)
-- File manager dialog with search, image/document grouping, drag-and-drop upload, previews, and bulk upload
+- **Meetings tab** (project file manager) — browse meeting recordings/transcripts linked to the project (read-only)
+- **Tasks tab** (project file manager) — browse ticket attachments for the project (read-only)
+- **Green indexed tick** on all file manager rows when content is in the vector database (`rag_index_state.status = indexed`)
+- File manager dialog with search, image/document grouping, drag-and-drop upload (project/conversation tabs), previews
 - Text file content indexed for **semantic RAG retrieval** in AI responses (see §16)
-- **Ticket attachments** (Tasks module uploads) indexed as `task_attachment` sources when text is extractable
-- Falls back to 8KB text previews when `OPENAI_API_KEY` is not set
-- Message-level attachments remain supported in the composer
+- **Knowledge search defaults:** Files and Notes on; **Meetings** and **Tasks** off until enabled — enabling either opens a time-range picker (7 days, 30 days, all time, custom)
 
 ### AI Skills (Tool Use)
 
@@ -753,7 +753,9 @@ Requires `ai:use`. Transcription requires `OPENAI_API_KEY`; summarization requir
 
 - Create meeting with **title**, **date/time** (defaults to now), and optional **project** link
 - **Create a new Tasks project** inline from the meeting form when the user has `tasks:edit`
-- **Record** in browser (MediaRecorder; format/bitrate configurable in Admin → System Settings, default **96 kbps Opus WebM**) or **upload** audio file (up to 200MB upload; **Whisper transcription limited to 25MB**)
+- **Select audio input device** before recording (enumerates `audioinput` devices after microphone permission; choice persisted in localStorage)
+- **Record** in browser (MediaRecorder via global `RecordingProvider`; format/bitrate configurable in Admin → System Settings, default **96 kbps Opus WebM**) or **upload** audio file (up to 200MB upload; **Whisper transcription limited to 25MB**)
+- **Header recording indicator** (pulsing mic icon next to notifications) while recording — dropdown shows duration, channel count, project, meeting title, live dB meters, stop action, and link to meeting detail
 - States: `recording` → `processing` → `ready` (or `failed`)
 - Background processing: Whisper transcription → Grok summary + action item extraction
 - Processing view shows spinner and **auto-refreshes** when transcription completes
@@ -826,8 +828,8 @@ Full RAG pipeline across AI Chat files, Notes, Meetings, and Tasks (Phases 1–4
 - **Hybrid search:** vector similarity + PostgreSQL full-text search, fused with reciprocal rank fusion (RRF)
 - **Query rewriting:** Grok expands user queries before embedding (improved entity-preserving prompt when `XAI_API_KEY` set)
 - **Re-ranking:** fused score ordering before context budget trim
-- **Scoped search in `/chat`:** persistent Files / Notes / Meetings / Tasks toggles above composer (saved in browser localStorage); when a conversation belongs to a project, retrieval is automatically limited to that project’s notes, meetings, tasks, and files. **General** conversations (no project) are restricted to **conversation files only** — notes, meetings, tasks, and cross-project file search are disabled at retrieval and in the UI
-- **Metadata filters in `/chat`:** meeting date range, meeting label, note language — applied at retrieval without query syntax (kanban project filter is implicit from the conversation when set)
+- **Scoped search in `/chat`:** persistent Files / Notes / Meetings / Tasks toggles above composer (saved in browser localStorage). **Default:** Files and Notes on; Meetings and Tasks **off**. Enabling Meetings or Tasks opens a time-range dialog (7 days, 30 days, all time, custom). When a conversation belongs to a project, retrieval is limited to that project. **General** conversations: conversation files only.
+- **Metadata filters in `/chat`:** meeting date range (set via scope toggle dialog or filters panel), meeting label, note language — applied at retrieval. Task date range filters apply when Tasks scope is enabled (`taskDateFrom` / `taskDateTo` on chunk metadata)
 - **Meeting Q&A:** uses RAG retrieval for long meetings instead of full transcript injection
 - Context budget ~12KB; citations with deep links and source category; deduplicated **Referenced files** list persisted on assistant messages; retrieval logged to `rag_retrieval_logs` and `rag_retrieval_runs` (timings, scores, used-in-context flag)
 

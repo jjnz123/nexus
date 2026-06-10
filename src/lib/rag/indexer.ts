@@ -363,6 +363,7 @@ export async function indexTaskAttachment(
       projectKey: project.key,
       filePath: attachment.path,
       attachmentKind: attachment.kind,
+      createdAt: attachment.createdAt.toISOString(),
     },
     chunkStrategy: chooseChunkStrategy(displayName, attachment.mimeType),
   });
@@ -421,6 +422,8 @@ export async function indexTaskById(taskId: string, indexedByUserId: string) {
       taskKey,
       projectKey: project.key,
       projectId: task.projectId,
+      updatedAt: task.updatedAt.toISOString(),
+      createdAt: task.createdAt.toISOString(),
     },
     chunkStrategy: "markdown",
   });

@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { hasPermission, type UserPermissionOverrides } from "@/lib/permissions";
 import type { UserRole } from "@/lib/db/schema";
+import { RecordingHeaderControl } from "@/components/meetings/RecordingHeaderControl";
 import {
   getNotifications,
   getUnreadNotificationCount,
@@ -135,6 +136,8 @@ export function ProfileMenu({
           ) : null}
         </>
       ) : null}
+
+      <RecordingHeaderControl />
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>

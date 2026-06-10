@@ -74,7 +74,7 @@ A background worker runs checks continuously so the dashboard stays current.
 When an xAI API key is configured, users with permission can:
 
 - Chat with **Grok** from the home page search bar — conversations are saved in **AI Chat** (default **General** project; optional project context selector).
-- Use the full **AI Chat** workspace at `/chat` with **shared kanban projects**, per-project file icons in the sidebar, per-conversation file icons in the conversation list, project badges on conversations, and **General** conversations limited to **conversation files only** (no cross-project knowledge search). Includes project-scoped RAG, edit last message, fork tabs, collapsed sources, **Enter** = new line / **Shift+Enter** = send.
+- Use the full **AI Chat** workspace at `/chat` with **shared kanban projects**, file manager tabs (project files, conversation files, **meetings**, **task attachments**), green **indexed** ticks on RAG-ready content, knowledge search toggles (**Meetings** and **Tasks** off by default with time-range picker), and **General** conversations limited to conversation files only.
 - Get **AI-suggested metadata** when creating bookmarks (title, description, tags, icon).
 - **Analyse audit logs** in the admin panel (summaries, anomalies, follow-ups).
 
@@ -82,10 +82,11 @@ Leave the API key unset to run Nexus without AI features.
 
 ### Meeting Assistant
 
-At `/meetings` (requires `ai:use`):
+At `/meetings` (requires `meetings:view`):
 
 - **Create** meetings with title, **date/time** (defaults to now), and optional **project** — or **create a new project** inline (`tasks:edit`).
-- **Record** or upload meeting audio (browser recordings default to **96 kbps Opus WebM**; admins can change format/bitrate under System Settings).
+- **Choose audio input device** (microphone, Loopback, BlackHole, etc.) before recording.
+- **Record** or upload meeting audio — a **recording indicator** in the header shows duration, channels, project, and live dB meters while recording is active.
 - **Transcribe** with OpenAI Whisper (`OPENAI_API_KEY`).
 - **Summarize** and extract **action items** with Grok.
 - **Ask questions** about the meeting in a scoped chat interface.

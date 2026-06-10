@@ -18,12 +18,8 @@ export const RAG_HYBRID_CANDIDATE_LIMIT = 20;
 export const RAG_MAX_CONTEXT_CHARS = 12_000;
 export const RAG_MIN_SIMILARITY = 0.2;
 export const RAG_FULL_TEXT_MAX_BYTES = 2_000_000;
-export const DEFAULT_RAG_SEARCH_SCOPES: RagSearchScope[] = [
-  "files",
-  "notes",
-  "meetings",
-  "tasks",
-];
+/** Default chat knowledge scopes — meetings and tasks are opt-in via toggles. */
+export const DEFAULT_RAG_SEARCH_SCOPES: RagSearchScope[] = ["files", "notes"];
 
 export type RagChunkInput = {
   chunkIndex: number;
@@ -54,6 +50,8 @@ export type RagSearchFilters = {
   meetingDateTo?: string | null;
   meetingLabels?: string[];
   noteLanguage?: string | null;
+  taskDateFrom?: string | null;
+  taskDateTo?: string | null;
 };
 
 export type RagRetrievalDebugChunk = {

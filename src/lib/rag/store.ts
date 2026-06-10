@@ -253,6 +253,26 @@ function buildMetadataFilter(input: RagSearchInput, sql: ReturnType<typeof getSq
     )`;
   }
 
+  if (filters.taskDateFrom) {
+    clause = sql`${clause} AND (
+      source_type NOT IN ${sql([RAG_SOURCE_TYPES.TASK, RAG_SOURCE_TYPES.TASK_ATTACHMENT])}
+      OR coalesce(
+        (metadata->>'updatedAt')::timestamptz,
+        (metadata->>'createdAt')::timestamptz
+      ) >= ${filters.taskDateFrom}::timestamptz
+    )`;
+  }
+
+  if (filters.taskDateTo) {
+    clause = sql`${clause} AND (
+      source_type NOT IN ${sql([RAG_SOURCE_TYPES.TASK, RAG_SOURCE_TYPES.TASK_ATTACHMENT])}
+      OR coalesce(
+        (metadata->>'updatedAt')::timestamptz,
+        (metadata->>'createdAt')::timestamptz
+      ) <= ${filters.taskDateTo}::timestamptz
+    )`;
+  }
+
   return clause;
 }
 

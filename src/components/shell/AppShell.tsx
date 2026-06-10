@@ -16,7 +16,9 @@ import {
 } from "lucide-react";
 import { hasPermission, type Permission, type UserPermissionOverrides } from "@/lib/permissions";
 import type { UserRole } from "@/lib/db/schema";
+import type { RecordingSettings } from "@/lib/recording";
 import { CollapsibleSideRail, SideNavLink } from "@/components/ui/collapsible-side-rail";
+import { RecordingProvider } from "@/components/meetings/recording-context";
 import { ProfileMenu } from "./ProfileMenu";
 import { updateBookmarkPreferences } from "@/server/actions/preferences";
 
@@ -41,6 +43,7 @@ export function AppShell({
   portalSubtitle,
   portalSubtitleEnabled,
   initialAppSidebarCollapsed,
+  recordingSettings,
 }: {
   children: React.ReactNode;
   user: {
@@ -53,6 +56,7 @@ export function AppShell({
   portalSubtitle: string;
   portalSubtitleEnabled: boolean;
   initialAppSidebarCollapsed: boolean;
+  recordingSettings?: Partial<RecordingSettings>;
 }) {
   const pathname = usePathname();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(initialAppSidebarCollapsed);
@@ -67,7 +71,8 @@ export function AppShell({
   };
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-background">
+    <RecordingProvider recordingSettings={recordingSettings}>
+      <div className="flex h-dvh overflow-hidden bg-background">
       <CollapsibleSideRail
         collapsed={sidebarCollapsed}
         onCollapsedChange={handleSidebarCollapsedChange}
@@ -123,6 +128,7 @@ export function AppShell({
           {children}
         </motion.main>
       </div>
-    </div>
+      </div>
+    </RecordingProvider>
   );
 }
