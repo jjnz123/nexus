@@ -30,6 +30,7 @@ import type {
   AiSkillEvent,
   RagCitation,
   RagSearchScope,
+  ReferencedFile,
   UserRole,
 } from "@/lib/db/schema";
 import type { UserPermissionOverrides } from "@/lib/permissions";
@@ -108,6 +109,7 @@ export function ChatPage({
   const [streamingContent, setStreamingContent] = useState("");
   const [streamingSkills, setStreamingSkills] = useState<AiSkillEvent[]>([]);
   const [streamingCitations, setStreamingCitations] = useState<RagCitation[]>([]);
+  const [streamingReferencedFiles, setStreamingReferencedFiles] = useState<ReferencedFile[]>([]);
   const [searchScopes, setSearchScopes] = useState<RagSearchScope[]>([...DEFAULT_RAG_SEARCH_SCOPES]);
   const [searchFilters, setSearchFilters] = useState<RagSearchFilters>({});
   const [sidebarCollapsed, setSidebarCollapsed] = useState(initialSidebarCollapsed);
@@ -197,11 +199,23 @@ export function ChatPage({
       role: "assistant",
       content: streamingContent,
       attachments: [],
-      metadata: { skills: streamingSkills, citations: streamingCitations },
+      metadata: {
+        skills: streamingSkills,
+        citations: streamingCitations,
+        referencedFiles: streamingReferencedFiles,
+      },
       createdAt: new Date(),
     };
     return [...messages, streamingMessage];
-  }, [messages, isStreaming, streamingContent, streamingSkills, streamingCitations, activeConversationId]);
+  }, [
+    messages,
+    isStreaming,
+    streamingContent,
+    streamingSkills,
+    streamingCitations,
+    streamingReferencedFiles,
+    activeConversationId,
+  ]);
 
   const refreshWorkspace = useCallback(async () => {
     const workspace = await getAiWorkspace();
@@ -362,6 +376,7 @@ export function ChatPage({
       setStreamingContent("");
       setStreamingSkills([]);
       setStreamingCitations([]);
+      setStreamingReferencedFiles([]);
 
       try {
         const apiMessages = history.map((message) => ({
@@ -381,6 +396,7 @@ export function ChatPage({
             searchFilters: searchFiltersRef.current,
             onSkillsChange: setStreamingSkills,
             onCitationsChange: setStreamingCitations,
+            onReferencedFilesChange: setStreamingReferencedFiles,
           }
         );
 
@@ -389,6 +405,7 @@ export function ChatPage({
             const saved = await appendAssistantMessage(conversationId, result.content, {
               skills: result.skills,
               citations: result.citations,
+              referencedFiles: result.referencedFiles,
             });
             setMessages((prev) => [...prev, saved]);
           }
@@ -398,6 +415,7 @@ export function ChatPage({
         const saved = await appendAssistantMessage(conversationId, result.content, {
           skills: result.skills,
           citations: result.citations,
+          referencedFiles: result.referencedFiles,
         });
         setMessages((prev) => [...prev, saved]);
         await refreshWorkspace();
@@ -601,6 +619,9 @@ export function ChatPage({
                         isStreaming={message.id === "streaming"}
                         streamingSkills={message.id === "streaming" ? streamingSkills : []}
                         streamingCitations={message.id === "streaming" ? streamingCitations : []}
+                        streamingReferencedFiles={
+                          message.id === "streaming" ? streamingReferencedFiles : []
+                        }
                         showRegenerate={
                           message.role === "assistant" &&
                           message.id === lastAssistantId &&

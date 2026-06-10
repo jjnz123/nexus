@@ -368,6 +368,25 @@ export type AiSkillEvent = {
 export type AiMessageMetadata = {
   skills?: AiSkillEvent[];
   citations?: RagCitation[];
+  referencedFiles?: ReferencedFile[];
+};
+
+export type ReferencedFileSourceCategory =
+  | "project_file"
+  | "conversation_file"
+  | "ticket_attachment";
+
+export type ReferencedFile = {
+  id: string;
+  filename: string;
+  mimeType: string | null;
+  sourceCategory: ReferencedFileSourceCategory;
+  href: string;
+  preview?: string;
+  pageLabel?: string;
+  taskKey?: string;
+  aiProjectId?: string | null;
+  aiConversationId?: string | null;
 };
 
 export type RagCitation = {
@@ -377,11 +396,16 @@ export type RagCitation = {
   title: string;
   excerpt: string;
   href: string;
+  filename?: string;
+  mimeType?: string | null;
+  sourceCategory?: ReferencedFileSourceCategory;
+  pageLabel?: string;
 };
 
 export type RagSourceType =
   | "ai_project_file"
   | "ai_conversation_file"
+  | "task_attachment"
   | "user_note"
   | "meeting_transcript"
   | "meeting_summary"

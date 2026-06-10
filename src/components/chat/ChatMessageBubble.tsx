@@ -9,8 +9,9 @@ import { toast } from "sonner";
 import { MarkdownMessage } from "@/components/ai/MarkdownMessage";
 import { Button } from "@/components/ui/button";
 import { SkillEvents } from "@/components/chat/SkillEvents";
-import type { AiMessage, AiMessageAttachment, AiSkillEvent, RagCitation } from "@/lib/db/schema";
+import type { AiMessage, AiMessageAttachment, AiSkillEvent, RagCitation, ReferencedFile } from "@/lib/db/schema";
 import { RagCitations } from "@/components/chat/RagCitations";
+import { ReferencedFiles } from "@/components/chat/ReferencedFiles";
 import { cn } from "@/lib/utils";
 
 function AttachmentList({ attachments }: { attachments: AiMessageAttachment[] }) {
@@ -56,6 +57,7 @@ export function ChatMessageBubble({
   isStreaming = false,
   streamingSkills = [],
   streamingCitations = [],
+  streamingReferencedFiles = [],
   showRegenerate = false,
   onRegenerate,
   registerRef,
@@ -64,6 +66,7 @@ export function ChatMessageBubble({
   isStreaming?: boolean;
   streamingSkills?: AiSkillEvent[];
   streamingCitations?: RagCitation[];
+  streamingReferencedFiles?: ReferencedFile[];
   showRegenerate?: boolean;
   onRegenerate?: () => void;
   registerRef?: (el: HTMLDivElement | null) => void;
@@ -72,6 +75,9 @@ export function ChatMessageBubble({
   const isUser = message.role === "user";
   const skills = isStreaming ? streamingSkills : (message.metadata?.skills ?? []);
   const citations = isStreaming ? streamingCitations : (message.metadata?.citations ?? []);
+  const referencedFiles = isStreaming
+    ? streamingReferencedFiles
+    : (message.metadata?.referencedFiles ?? []);
 
   async function copyContent() {
     await navigator.clipboard.writeText(message.content);
@@ -118,6 +124,7 @@ export function ChatMessageBubble({
           <>
             {message.content ? <MarkdownMessage content={message.content} /> : null}
             <RagCitations citations={citations} />
+            <ReferencedFiles files={referencedFiles} />
             {isStreaming && !message.content && !skills.length ? (
               <span className="text-muted-foreground animate-pulse">Thinking…</span>
             ) : null}

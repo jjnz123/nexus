@@ -12,6 +12,7 @@ import {
   meetingActionItems,
   meetings,
   projects,
+  taskAttachments,
   taskComments,
   tasks,
   taskSubtasks,
@@ -313,6 +314,60 @@ export async function indexMeetingContent(
   await Promise.all(jobs.map((job) => job.catch(() => undefined)));
 }
 
+export async function indexTaskAttachment(
+  attachment: typeof taskAttachments.$inferSelect,
+  indexedByUserId: string
+) {
+  if ((attachment.kind !== "file" && attachment.kind !== "email") || !attachment.path) {
+    return { indexed: false as const };
+  }
+
+  const [task] = await db.select().from(tasks).where(eq(tasks.id, attachment.taskId)).limit(1);
+  if (!task) return { indexed: false as const };
+
+  const [project] = await db
+    .select()
+    .from(projects)
+    .where(eq(projects.id, task.projectId))
+    .limit(1);
+  if (!project) return { indexed: false as const };
+
+  const taskKey = `${project.key}-${task.number}`;
+  const displayName = attachment.displayTitle ?? attachment.filename;
+
+  const fullText =
+    (await extractFullText(attachment.path, attachment.mimeType, attachment.filename)) ??
+    (await extractTextPreview(attachment.path, attachment.mimeType, attachment.filename));
+
+  if (!fullText?.trim()) {
+    await deleteRagSourceFromStore(RAG_SOURCE_TYPES.TASK_ATTACHMENT, attachment.id);
+    return { indexed: false as const, reason: "no_text" as const };
+  }
+
+  return indexTextContent({
+    userId: indexedByUserId,
+    sourceType: RAG_SOURCE_TYPES.TASK_ATTACHMENT,
+    sourceId: attachment.id,
+    title: `${taskKey} — ${displayName}`,
+    text: fullText,
+    scope: "org",
+    taskId: task.id,
+    kanbanProjectId: task.projectId,
+    mimeType: attachment.mimeType,
+    metadata: {
+      filename: attachment.filename,
+      displayTitle: displayName,
+      taskId: task.id,
+      taskKey,
+      projectId: task.projectId,
+      projectKey: project.key,
+      filePath: attachment.path,
+      attachmentKind: attachment.kind,
+    },
+    chunkStrategy: chooseChunkStrategy(displayName, attachment.mimeType),
+  });
+}
+
 export async function indexTaskById(taskId: string, indexedByUserId: string) {
   const [task] = await db.select().from(tasks).where(eq(tasks.id, taskId)).limit(1);
   if (!task) return;
@@ -431,6 +486,16 @@ export async function reindexRagSource(sourceType: RagTextIndexInput["sourceType
     const [task] = await db.select().from(tasks).where(eq(tasks.id, sourceId)).limit(1);
     if (!task) throw new Error("Task not found");
     return indexTaskById(task.id, task.assigneeId ?? task.projectId);
+  }
+
+  if (sourceType === RAG_SOURCE_TYPES.TASK_ATTACHMENT) {
+    const [attachment] = await db
+      .select()
+      .from(taskAttachments)
+      .where(eq(taskAttachments.id, sourceId))
+      .limit(1);
+    if (!attachment) throw new Error("Attachment not found");
+    return indexTaskAttachment(attachment, attachment.uploadedBy ?? attachment.taskId);
   }
 
   throw new Error(`Reindex not supported for ${sourceType}`);

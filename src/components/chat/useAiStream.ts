@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
-import type { AiSkillEvent, RagCitation, RagSearchScope } from "@/lib/db/schema";
+import type { AiSkillEvent, RagCitation, RagSearchScope, ReferencedFile } from "@/lib/db/schema";
 import type { RagSearchFilters } from "@/lib/rag/types";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
@@ -10,6 +10,7 @@ export type AiStreamResult = {
   content: string;
   skills: AiSkillEvent[];
   citations: RagCitation[];
+  referencedFiles: ReferencedFile[];
 };
 
 async function readAiError(response: Response): Promise<string> {
@@ -34,6 +35,7 @@ export function useAiStream() {
         onSkill?: (event: AiSkillEvent) => void;
         onSkillsChange?: (skills: AiSkillEvent[]) => void;
         onCitationsChange?: (citations: RagCitation[]) => void;
+        onReferencedFilesChange?: (files: ReferencedFile[]) => void;
       }
     ): Promise<AiStreamResult> => {
       const response = await fetch("/api/ai/chat", {
@@ -61,6 +63,7 @@ export function useAiStream() {
       let full = "";
       const skills: AiSkillEvent[] = [];
       const citations: RagCitation[] = [];
+      const referencedFiles: ReferencedFile[] = [];
 
       while (true) {
         const { done, value } = await reader.read();
@@ -83,7 +86,13 @@ export function useAiStream() {
           try {
             const parsed = JSON.parse(data) as
               | { type: "content"; delta: string }
-              | { type: "done"; content: string; skills?: AiSkillEvent[]; citations?: RagCitation[] }
+              | {
+                  type: "done";
+                  content: string;
+                  skills?: AiSkillEvent[];
+                  citations?: RagCitation[];
+                  referencedFiles?: ReferencedFile[];
+                }
               | { type: "skill"; event: AiSkillEvent }
               | { type: "error"; message: string }
               | {
@@ -119,6 +128,10 @@ export function useAiStream() {
                   citations.splice(0, citations.length, ...parsed.citations);
                   options?.onCitationsChange?.([...citations]);
                 }
+                if (parsed.referencedFiles?.length) {
+                  referencedFiles.splice(0, referencedFiles.length, ...parsed.referencedFiles);
+                  options?.onReferencedFilesChange?.([...referencedFiles]);
+                }
                 continue;
               }
             }
@@ -138,7 +151,7 @@ export function useAiStream() {
         }
       }
 
-      return { content: full, skills, citations };
+      return { content: full, skills, citations, referencedFiles };
     },
     []
   );

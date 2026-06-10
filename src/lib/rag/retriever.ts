@@ -5,6 +5,14 @@ import { reciprocalRankFusion, rerankByScore } from "@/lib/rag/hybrid";
 import { ensureAiFilesIndexed } from "@/lib/rag/indexer";
 import { rewriteRetrievalQuery } from "@/lib/rag/query-rewrite";
 import {
+  buildReferencedFilesFromAiFiles,
+  buildReferencedFilesFromChunks,
+  categoryLabel,
+  enrichCitationFromChunk,
+  formatReferencedFilenames,
+  sourceTypeToCategory,
+} from "@/lib/rag/referenced-files";
+import {
   logRetrievalRun,
   searchKeywordChunks,
   searchVectorChunks,
@@ -49,35 +57,62 @@ function trimChunksToBudget(chunks: RetrievedRagChunk[], maxChars: number) {
 export function buildRagContextBlock(chunks: RetrievedRagChunk[]): {
   contextBlock: string;
   citations: RagCitation[];
+  referencedFiles: ReturnType<typeof buildReferencedFilesFromChunks>;
 } {
   const citations: RagCitation[] = [];
+  const referencedFiles = buildReferencedFilesFromChunks(chunks);
 
   const sections = chunks.map((chunk, index) => {
     const citationNumber = index + 1;
     const excerpt =
       chunk.content.length > 240 ? `${chunk.content.slice(0, 240).trim()}…` : chunk.content;
+    const filename =
+      typeof chunk.metadata.filename === "string" ? chunk.metadata.filename : chunk.title;
+    const category = sourceTypeToCategory(chunk.sourceType);
+    const categoryLabelText = category ? categoryLabel(category) : chunk.sourceType;
 
-    citations.push({
-      chunkId: chunk.id,
-      sourceType: chunk.sourceType,
-      sourceId: chunk.sourceId,
-      title: chunk.title,
-      excerpt,
-      href: buildCitationHref(chunk.sourceType, chunk.metadata),
-    });
+    citations.push(
+      enrichCitationFromChunk(chunk, {
+        chunkId: chunk.id,
+        sourceType: chunk.sourceType,
+        sourceId: chunk.sourceId,
+        title: chunk.title,
+        excerpt,
+        href: buildCitationHref(chunk.sourceType, chunk.metadata),
+      })
+    );
 
     const scoreLabel = chunk.fusedScore ?? chunk.similarity;
-    return `[${citationNumber}] **${chunk.title}** (${chunk.sourceType}, score ${scoreLabel.toFixed(3)})\n${chunk.content}`;
+    return `[${citationNumber}] **${filename}** (${categoryLabelText}, score ${scoreLabel.toFixed(3)})\n${chunk.content}`;
   });
+
+  const fileList =
+    referencedFiles.length > 0
+      ? [
+          "### Files available in this context",
+          ...referencedFiles.map(
+            (file) =>
+              `- **${file.filename}** (${categoryLabel(file.sourceCategory)})`
+          ),
+          "",
+          "When your answer uses content from these files, begin by naming the specific filenames (e.g. \"Based on **Requirements_v3.pdf** and **Architecture_Diagram.pptx**...\").",
+        ].join("\n")
+      : null;
 
   const contextBlock = [
     "## Retrieved knowledge (cite sources as [1], [2], …)",
     "Use the excerpts below when answering. If the answer is not supported by these sources, say so.",
+    fileList,
+    referencedFiles.length
+      ? `Retrieved files: ${formatReferencedFilenames(referencedFiles)}.`
+      : null,
     "",
     sections.join("\n\n---\n\n"),
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 
-  return { contextBlock, citations };
+  return { contextBlock, citations, referencedFiles };
 }
 
 function buildRetrievalDebug(input: {
@@ -147,9 +182,18 @@ export async function retrievePortalKnowledge(input: {
     input.projectFiles || input.conversationFiles
       ? buildFileContextBlock(input.projectFiles ?? [], input.conversationFiles ?? [])
       : "";
+  const fallbackReferencedFiles =
+    input.projectFiles || input.conversationFiles
+      ? buildReferencedFilesFromAiFiles(input.projectFiles ?? [], input.conversationFiles ?? [])
+      : [];
 
   if (!isRagEnabled()) {
-    return { contextBlock: fallbackBlock, citations: [], usedRag: false };
+    return {
+      contextBlock: fallbackBlock,
+      citations: [],
+      referencedFiles: fallbackReferencedFiles,
+      usedRag: false,
+    };
   }
 
   if (input.projectFiles?.length || input.conversationFiles?.length) {
@@ -176,7 +220,13 @@ export async function retrievePortalKnowledge(input: {
   timings.embed = Date.now() - embedStarted;
 
   if (!queryEmbedding.length) {
-    return { contextBlock: fallbackBlock, citations: [], usedRag: false, retrievalQuery };
+    return {
+      contextBlock: fallbackBlock,
+      citations: [],
+      referencedFiles: fallbackReferencedFiles,
+      usedRag: false,
+      retrievalQuery,
+    };
   }
 
   const searchInput = {
@@ -237,6 +287,7 @@ export async function retrievePortalKnowledge(input: {
     return {
       contextBlock: fallbackBlock,
       citations: [],
+      referencedFiles: fallbackReferencedFiles,
       usedRag: false,
       retrievalQuery,
       debug: input.includeDebug
@@ -254,7 +305,7 @@ export async function retrievePortalKnowledge(input: {
   }
 
   const trimmed = trimChunksToBudget(fused, RAG_MAX_CONTEXT_CHARS);
-  const { contextBlock, citations } = buildRagContextBlock(trimmed);
+  const { contextBlock, citations, referencedFiles } = buildRagContextBlock(trimmed);
 
   await logRetrievalRun({
     userId: input.userId,
@@ -278,6 +329,7 @@ export async function retrievePortalKnowledge(input: {
   return {
     contextBlock,
     citations,
+    referencedFiles,
     usedRag: true,
     retrievalQuery,
     debug: input.includeDebug

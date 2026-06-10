@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v4.1.1
+**Current release:** v4.2.0
 
 ## 1. Overview
 
@@ -233,6 +233,7 @@ Three-panel workspace (full-bleed within app shell):
 
 - Streaming Grok responses via `/api/ai/chat` with messages persisted to PostgreSQL
 - User vs assistant bubbles with markdown (assistant), copy, and regenerate (latest assistant reply)
+- **File transparency** — when RAG retrieves files, the model is instructed to name filenames in its answer; assistant messages show a collapsible **Referenced files** panel (icon, filename, source category: project / conversation / ticket attachment, optional preview) plus enhanced **Sources** citations
 - **Attachments** — images, PDFs, and text files via `/api/uploads`; thumbnails for images, file cards for documents
 - Starter prompt chips on empty conversation
 - Stop streaming mid-generation (partial assistant reply saved when content exists)
@@ -244,6 +245,7 @@ Three-panel workspace (full-bleed within app shell):
 - File manager dialog labels scope clearly (**Project-wide** vs **This conversation** badges)
 - File manager dialog with search, image/document grouping, drag-and-drop upload, previews, and bulk upload
 - Text file content indexed for **semantic RAG retrieval** in AI responses (see §16)
+- **Ticket attachments** (Tasks module uploads) indexed as `task_attachment` sources when text is extractable
 - Falls back to 8KB text previews when `OPENAI_API_KEY` is not set
 - Message-level attachments remain supported in the composer
 
@@ -272,7 +274,7 @@ Three-panel workspace (full-bleed within app shell):
 
 - `ai_projects` — user-owned project folders
 - `ai_conversations` — title, project link, last message preview/at, `enabled_skills` (jsonb)
-- `ai_messages` — role, content, attachments (jsonb), metadata (jsonb, skill events), timestamps
+- `ai_messages` — role, content, attachments (jsonb), metadata (jsonb: skill events, citations, referenced files), timestamps
 - `ai_project_files` — project knowledge base files with text preview cache
 - `ai_conversation_files` — conversation-scoped files with text preview cache
 - User preferences: `active_ai_project_id`, `active_ai_conversation_id`, `active_kanban_project_id`, `chat_sidebar_collapsed`, `app_sidebar_collapsed`
@@ -795,6 +797,14 @@ Full RAG pipeline across AI Chat files, Notes, Meetings, and Tasks (Phases 1–4
 | `user_note` | Title + content | Create, update, delete |
 | `meeting_transcript` / `meeting_summary` / `meeting_action_item` | Transcript, summary, action items | After processing, archive metadata update, delete |
 | `task` | Title, description, details, AC, DoD, subtasks, comments | Create, update, delete, comments, subtasks |
+| `task_attachment` | Ticket file/email attachment text | Upload, delete |
+
+### File referencing in AI Chat
+
+- Retrieved file chunks carry metadata: `filename`, `mimeType`, `sourceCategory` (`project_file`, `conversation_file`, `ticket_attachment`), optional `pageLabel`
+- Context block lists retrieved filenames and instructs the model to name them when used
+- Assistant message metadata stores deduplicated `referencedFiles[]` alongside `citations[]`
+- UI: **Referenced files** panel (collapsible after 3 items) + **Sources** with category badges
 
 ### Ingestion
 
@@ -810,7 +820,7 @@ Full RAG pipeline across AI Chat files, Notes, Meetings, and Tasks (Phases 1–4
 - **Scoped search in `/chat`:** persistent Files / Notes / Meetings / Tasks toggles above composer (saved in browser localStorage)
 - **Metadata filters in `/chat`:** kanban project, meeting date range, meeting label, note language — applied at retrieval without query syntax
 - **Meeting Q&A:** uses RAG retrieval for long meetings instead of full transcript injection
-- Context budget ~12KB; citations with deep links and hover excerpts; retrieval logged to `rag_retrieval_logs` and `rag_retrieval_runs` (timings, scores, used-in-context flag)
+- Context budget ~12KB; citations with deep links, source category, and hover excerpts; deduplicated **Referenced files** list persisted on assistant messages; retrieval logged to `rag_retrieval_logs` and `rag_retrieval_runs` (timings, scores, used-in-context flag)
 
 ### Admin
 

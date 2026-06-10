@@ -41,8 +41,9 @@ export function buildFileContextBlock(
   if (projectFiles.length) {
     sections.push(
       "## Project knowledge base files\n" +
+        "When using these files, name the specific filenames in your answer.\n\n" +
         projectFiles
-          .map((file) => formatFileEntry(file.displayName, file.mimeType, file.textPreview))
+          .map((file) => formatFileEntry(file.filename, file.mimeType, file.textPreview))
           .join("\n\n")
     );
   }
@@ -50,8 +51,9 @@ export function buildFileContextBlock(
   if (conversationFiles.length) {
     sections.push(
       "## Conversation files\n" +
+        "When using these files, name the specific filenames in your answer.\n\n" +
         conversationFiles
-          .map((file) => formatFileEntry(file.displayName, file.mimeType, file.textPreview))
+          .map((file) => formatFileEntry(file.filename, file.mimeType, file.textPreview))
           .join("\n\n")
     );
   }

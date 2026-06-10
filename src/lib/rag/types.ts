@@ -1,8 +1,9 @@
-import type { RagCitation, RagScope, RagSearchScope, RagSourceType } from "@/lib/db/schema";
+import type { RagCitation, RagScope, RagSearchScope, RagSourceType, ReferencedFile } from "@/lib/db/schema";
 
 export const RAG_SOURCE_TYPES = {
   AI_PROJECT_FILE: "ai_project_file",
   AI_CONVERSATION_FILE: "ai_conversation_file",
+  TASK_ATTACHMENT: "task_attachment",
   USER_NOTE: "user_note",
   MEETING_TRANSCRIPT: "meeting_transcript",
   MEETING_SUMMARY: "meeting_summary",
@@ -92,6 +93,7 @@ export type RagRetrievalDebug = {
 export type RagContextResult = {
   contextBlock: string;
   citations: RagCitation[];
+  referencedFiles: ReferencedFile[];
   usedRag: boolean;
   retrievalQuery?: string;
   debug?: RagRetrievalDebug;
@@ -174,7 +176,9 @@ export function scopesToSourceTypes(scopes: RagSearchScope[]): RagSourceType[] {
       RAG_SOURCE_TYPES.MEETING_ACTION_ITEM
     );
   }
-  if (scopes.includes("tasks")) types.push(RAG_SOURCE_TYPES.TASK);
+  if (scopes.includes("tasks")) {
+    types.push(RAG_SOURCE_TYPES.TASK, RAG_SOURCE_TYPES.TASK_ATTACHMENT);
+  }
   return types;
 }
 
@@ -196,6 +200,9 @@ export function buildCitationHref(
     return meetingId ? `/meetings/${meetingId}` : "/meetings";
   }
   if (sourceType === "task" && typeof metadata.taskKey === "string") {
+    return `/tasks/${metadata.taskKey}`;
+  }
+  if (sourceType === "task_attachment" && typeof metadata.taskKey === "string") {
     return `/tasks/${metadata.taskKey}`;
   }
   return "/chat";

@@ -40,7 +40,7 @@ import {
 } from "@/lib/validators/tasks";
 import { createNotification } from "./users";
 import { logAudit } from "@/server/audit";
-import { indexTaskById } from "@/lib/rag/indexer";
+import { indexTaskById, indexTaskAttachment } from "@/lib/rag/indexer";
 import { deleteRagSource } from "@/lib/rag/store";
 import { RAG_SOURCE_TYPES } from "@/lib/rag/types";
 import {
@@ -862,6 +862,8 @@ export async function addTaskAttachment(input: unknown) {
     })
     .returning();
 
+  void indexTaskAttachment(attachment, session.user.id).catch(() => undefined);
+
   revalidatePath("/tasks");
   const [user] = await db
     .select({ name: users.name })
@@ -928,6 +930,8 @@ export async function addTaskEmailAttachment(input: unknown) {
     })
     .returning();
 
+  void indexTaskAttachment(attachment, session.user.id).catch(() => undefined);
+
   revalidatePath("/tasks");
   const [user] = await db
     .select({ name: users.name })
@@ -980,6 +984,7 @@ export async function createChildTask(input: unknown) {
 export async function deleteTaskAttachment(attachmentId: string) {
   const session = await requireAuth();
   requireSessionPermission(session, "tasks:edit");
+  await deleteRagSource(RAG_SOURCE_TYPES.TASK_ATTACHMENT, attachmentId);
   await db.delete(taskAttachments).where(eq(taskAttachments.id, attachmentId));
   revalidatePath("/tasks");
   return { success: true };

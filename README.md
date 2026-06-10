@@ -74,7 +74,7 @@ A background worker runs checks continuously so the dashboard stays current.
 When an xAI API key is configured, users with permission can:
 
 - Chat with **Grok** from the home page search bar or AI drawer.
-- Use the full **AI Chat** workspace at `/chat` with projects, conversations, project- and conversation-level file knowledge bases (**semantic RAG** across files, notes, meetings, and tasks when `OPENAI_API_KEY` is set), **persistent scoped search toggles** (Files / Notes / Meetings / Tasks), **metadata filters** (kanban project, meeting date range, note language, meeting labels), per-conversation **Skills**, clickable source **citations** with excerpts, and **compact skill activity** (Web/X search, tasks, etc. shown as one-line chips; expand for source links only—the final answer stays full).
+- Use the full **AI Chat** workspace at `/chat` with projects, conversations, project- and conversation-level file knowledge bases (**semantic RAG** across files, notes, meetings, and tasks when `OPENAI_API_KEY` is set), **persistent scoped search toggles** (Files / Notes / Meetings / Tasks), **metadata filters** (kanban project, meeting date range, note language, meeting labels), per-conversation **Skills**, clickable source **citations** with excerpts, a dedicated **Referenced files** section (filename, type icon, source category, preview), and **compact skill activity** (Web/X search, tasks, etc. shown as one-line chips; expand for source links only—the final answer stays full).
 - Get **AI-suggested metadata** when creating bookmarks (title, description, tags, icon).
 - **Analyse audit logs** in the admin panel (summaries, anomalies, follow-ups).
 

@@ -7,7 +7,7 @@ import {
   aiProjects,
 } from "@/lib/db/schema";
 import { retrieveChatKnowledge } from "@/lib/rag/retriever";
-import type { RagCitation, RagSearchScope } from "@/lib/db/schema";
+import type { RagCitation, RagSearchScope, ReferencedFile } from "@/lib/db/schema";
 import type { RagSearchFilters } from "@/lib/rag/types";
 import { hasPermission } from "@/lib/permissions";
 import { getSkillLabel } from "@/lib/ai/skills/definitions";
@@ -38,7 +38,13 @@ type ChatUser = {
 type StreamEvent =
   | { type: "skill"; event: AiSkillEvent }
   | { type: "content"; delta: string }
-  | { type: "done"; content: string; skills: AiSkillEvent[]; citations?: RagCitation[] }
+  | {
+      type: "done";
+      content: string;
+      skills: AiSkillEvent[];
+      citations?: RagCitation[];
+      referencedFiles?: ReferencedFile[];
+    }
   | { type: "error"; message: string };
 
 async function loadKnowledgeContext(
@@ -144,6 +150,11 @@ export async function runAiChatWithSkills({
     if (knowledge.usedRag) {
       systemParts.push(
         "When you use retrieved knowledge, cite sources inline using [1], [2], etc. matching the numbered excerpts above."
+      );
+    }
+    if (knowledge.referencedFiles.length) {
+      systemParts.push(
+        "When your answer uses content from files, begin by naming the specific filenames in bold (e.g. \"Based on **Requirements_v3.pdf** and **Architecture_Diagram.pptx**...\")."
       );
     }
   }
@@ -265,8 +276,19 @@ export async function runAiChatWithSkills({
       await new Promise((r) => setTimeout(r, 8));
     }
 
-    onEvent?.({ type: "done", content, skills: skillEvents, citations: knowledge.citations });
-    return { content, skills: skillEvents, citations: knowledge.citations };
+    onEvent?.({
+      type: "done",
+      content,
+      skills: skillEvents,
+      citations: knowledge.citations,
+      referencedFiles: knowledge.referencedFiles,
+    });
+    return {
+      content,
+      skills: skillEvents,
+      citations: knowledge.citations,
+      referencedFiles: knowledge.referencedFiles,
+    };
   }
 
   throw new Error("Too many skill rounds");

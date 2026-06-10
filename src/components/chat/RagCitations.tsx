@@ -4,6 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { ExternalLink, FileText } from "lucide-react";
 import type { RagCitation } from "@/lib/db/schema";
+import { Badge } from "@/components/ui/badge";
+import { categoryLabel } from "@/lib/rag/referenced-files";
 import { cn } from "@/lib/utils";
 
 export function RagCitations({ citations }: { citations: RagCitation[] }) {
@@ -24,6 +26,7 @@ export function RagCitations({ citations }: { citations: RagCitation[] }) {
 function CitationItem({ citation, index }: { citation: RagCitation; index: number }) {
   const [expanded, setExpanded] = useState(false);
   const isInternal = citation.href.startsWith("/");
+  const label = citation.filename ?? citation.title;
 
   return (
     <li className="text-xs">
@@ -38,8 +41,18 @@ function CitationItem({ citation, index }: { citation: RagCitation; index: numbe
             onBlur={() => setExpanded(false)}
           >
             <FileText className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <span>
-              [{index + 1}] {citation.title}
+            <span className="inline-flex flex-wrap items-center gap-1.5">
+              <span>
+                [{index + 1}] {label}
+              </span>
+              {citation.sourceCategory ? (
+                <Badge variant="outline" className="text-[10px] font-normal">
+                  {categoryLabel(citation.sourceCategory)}
+                </Badge>
+              ) : null}
+              {citation.pageLabel ? (
+                <span className="font-normal text-muted-foreground">{citation.pageLabel}</span>
+              ) : null}
             </span>
           </Link>
         ) : (
@@ -54,8 +67,15 @@ function CitationItem({ citation, index }: { citation: RagCitation; index: numbe
             onBlur={() => setExpanded(false)}
           >
             <FileText className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <span>
-              [{index + 1}] {citation.title}
+            <span className="inline-flex flex-wrap items-center gap-1.5">
+              <span>
+                [{index + 1}] {label}
+              </span>
+              {citation.sourceCategory ? (
+                <Badge variant="outline" className="text-[10px] font-normal">
+                  {categoryLabel(citation.sourceCategory)}
+                </Badge>
+              ) : null}
             </span>
             <ExternalLink className="mt-0.5 h-3 w-3 shrink-0 opacity-60" />
           </a>
