@@ -1,6 +1,6 @@
 "use client";
 
-import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { PanelLeftClose } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -89,7 +89,19 @@ export function CollapsibleSideRail({
           className="flex shrink-0 items-center justify-center"
           style={{ width: compactWidth }}
         >
-          <span className="flex h-9 w-9 items-center justify-center">{headerIcon}</span>
+          <button
+            type="button"
+            className={cn(
+              "flex h-9 w-9 items-center justify-center rounded-md transition-colors",
+              collapsed && "cursor-pointer hover:bg-accent"
+            )}
+            onClick={() => {
+              if (collapsed) onCollapsedChange(false);
+            }}
+            title={collapsed ? "Expand sidebar" : undefined}
+          >
+            {headerIcon}
+          </button>
         </div>
         <div
           className={cn(
@@ -100,38 +112,19 @@ export function CollapsibleSideRail({
           {headerLabel ? (
             <span className="truncate text-lg font-bold tracking-tight">{headerLabel}</span>
           ) : null}
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-8 w-8 shrink-0"
-            onClick={() => onCollapsedChange(!collapsed)}
-            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            {collapsed ? (
-              <PanelLeftOpen className="h-4 w-4" />
-            ) : (
+          {!isCompact ? (
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8 shrink-0"
+              onClick={() => onCollapsedChange(true)}
+              title="Collapse sidebar"
+            >
               <PanelLeftClose className="h-4 w-4" />
-            )}
-          </Button>
+            </Button>
+          ) : null}
         </div>
       </div>
-
-      {!showLabels ? (
-        <div
-          className="flex shrink-0 items-center justify-center border-b py-1"
-          style={{ width: compactWidth }}
-        >
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-8 w-8"
-            onClick={() => onCollapsedChange(!collapsed)}
-            title="Expand sidebar"
-          >
-            <PanelLeftOpen className="h-4 w-4" />
-          </Button>
-        </div>
-      ) : null}
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {children({ showLabels })}

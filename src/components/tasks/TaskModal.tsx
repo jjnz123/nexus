@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { CheckCheck, Copy, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -10,6 +10,7 @@ import {
   toggleSubtask,
   updateTask,
 } from "@/server/actions/tasks";
+import { updateBookmarkPreferences } from "@/server/actions/preferences";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -31,6 +32,11 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
+import {
+  DEFAULT_TASKS_WORKSPACE,
+  type TasksWorkspacePrefs,
+} from "@/lib/preferences/workspace";
 import {
   isTicketFieldVisible,
   type ProjectTicketFieldSettings,
@@ -41,11 +47,21 @@ import {
   isParentTypeAllowed,
   type HierarchyRules,
 } from "@/lib/tasks/hierarchy";
-import { TaskChildSubtasksPanel } from "./TaskChildSubtasksPanel";
 import { TaskCommentsPanel } from "./TaskCommentsPanel";
 import { TaskLinkedIssuesPanel } from "./TaskLinkedIssuesPanel";
 import { TaskLinksAndFilesPanel } from "./TaskLinksAndFilesPanel";
+import { TaskChildSubtasksPanel } from "./TaskChildSubtasksPanel";
+
 import type { TaskColumn, TaskComment, TaskDetails, TaskLabel, TaskPriority, TaskType } from "./types";
+
+function plainTextToHtml(value: string) {
+  if (!value) return "";
+  if (/<[a-z][\s\S]*>/i.test(value)) return value;
+  return value
+    .split(/\n{2,}/)
+    .map((paragraph) => `<p>${paragraph.replace(/\n/g, "<br>")}</p>`)
+    .join("");
+}
 
 function asDateInput(value: string | Date | null) {
   if (!value) return "";
@@ -88,6 +104,7 @@ export function TaskModal({
   onOpenLinkedTask,
   onTaskSaved,
   onTaskDeleted,
+  tasksWorkspace = DEFAULT_TASKS_WORKSPACE,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -102,8 +119,13 @@ export function TaskModal({
   onOpenLinkedTask: (taskKey: string) => void;
   onTaskSaved: () => Promise<void> | void;
   onTaskDeleted?: () => void;
+  tasksWorkspace?: TasksWorkspacePrefs;
 }) {
   const [isPending, startTransition] = useTransition();
+  const heightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [descriptionHeight, setDescriptionHeight] = useState(
+    tasksWorkspace.descriptionHeight ?? DEFAULT_TASKS_WORKSPACE.descriptionHeight!
+  );
   const [activeTab, setActiveTab] = useState("overview");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -126,9 +148,31 @@ export function TaskModal({
   const [localLinks, setLocalLinks] = useState<TaskDetails["links"]>([]);
 
   useEffect(() => {
+    setDescriptionHeight(
+      tasksWorkspace.descriptionHeight ?? DEFAULT_TASKS_WORKSPACE.descriptionHeight!
+    );
+  }, [tasksWorkspace.descriptionHeight]);
+
+  const persistDescriptionHeight = useCallback((height: number) => {
+    setDescriptionHeight(height);
+    if (heightTimerRef.current) clearTimeout(heightTimerRef.current);
+    heightTimerRef.current = setTimeout(() => {
+      void updateBookmarkPreferences({
+        tasksWorkspace: { descriptionHeight: height },
+      });
+    }, 400);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (heightTimerRef.current) clearTimeout(heightTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!taskDetails) return;
     setTitle(taskDetails.task.title);
-    setDescription(taskDetails.task.description ?? "");
+    setDescription(plainTextToHtml(taskDetails.task.description ?? ""));
     setDetails(taskDetails.task.details ?? "");
     setAcceptanceCriteria(taskDetails.task.acceptanceCriteria ?? "");
     setDefinitionOfDone(taskDetails.task.definitionOfDone ?? "");
@@ -180,7 +224,7 @@ export function TaskModal({
     await onTaskSaved();
   };
 
-  const saveTask = () => {
+  const saveTask = (closeAfterSave = false) => {
     if (!taskDetails) return;
     startTransition(async () => {
       try {
@@ -201,7 +245,8 @@ export function TaskModal({
         });
         await setTaskLabels(taskDetails.task.id, selectedLabels);
         await refreshDetails();
-        toast.success("Ticket saved");
+        toast.success(closeAfterSave ? "Ticket saved and closed" : "Ticket saved");
+        if (closeAfterSave) onOpenChange(false);
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Unable to save ticket");
       }
@@ -528,13 +573,12 @@ export function TaskModal({
                             <Label htmlFor="task-description" className="text-sm font-semibold">
                               Description
                             </Label>
-                            <Textarea
-                              id="task-description"
+                            <RichTextEditor
                               value={description}
-                              onChange={(event) => setDescription(event.target.value)}
-                              rows={8}
-                              className="min-h-[180px] resize-y"
+                              onChange={setDescription}
                               placeholder="Summary of the work…"
+                              minHeight={descriptionHeight}
+                              onHeightChange={persistDescriptionHeight}
                             />
                           </div>
                         ) : null}
@@ -624,9 +668,18 @@ export function TaskModal({
                 <Trash2 className="mr-2 h-4 w-4" />
                 Delete
               </Button>
-              <Button onClick={saveTask} disabled={isPending || !title.trim()}>
-                {isPending ? "Saving…" : "Save changes"}
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => saveTask(true)}
+                  disabled={isPending || !title.trim()}
+                >
+                  {isPending ? "Saving…" : "Save and close"}
+                </Button>
+                <Button onClick={() => saveTask(false)} disabled={isPending || !title.trim()}>
+                  {isPending ? "Saving…" : "Save changes"}
+                </Button>
+              </div>
             </div>
           </>
         )}

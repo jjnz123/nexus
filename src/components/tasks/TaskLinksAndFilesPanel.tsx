@@ -1,19 +1,17 @@
 "use client";
 
 import { useMemo, useRef, useState, useTransition } from "react";
-import Image from "next/image";
 import { format } from "date-fns";
 import {
   ChevronDown,
   ChevronRight,
   ExternalLink,
-  FileText,
+  Eye,
   Link2,
   Mail,
   Paperclip,
   Trash2,
   Upload,
-  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -28,6 +26,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { isEmlFile, parseEmlFile } from "@/lib/tasks/eml";
+import { AttachmentPreviewModal } from "./AttachmentPreviewModal";
 import type { TaskAttachment } from "./types";
 
 async function uploadFile(file: File) {
@@ -42,14 +41,6 @@ async function uploadFile(file: File) {
     mimeType: file.type || "application/octet-stream",
     size: file.size,
   };
-}
-
-function isImage(mimeType: string) {
-  return mimeType.startsWith("image/");
-}
-
-function isPdf(mimeType: string) {
-  return mimeType === "application/pdf";
 }
 
 function groupFileAttachments(files: TaskAttachment[]) {
@@ -76,6 +67,7 @@ export function TaskLinksAndFilesPanel({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [preview, setPreview] = useState<TaskAttachment | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [urlTitle, setUrlTitle] = useState("");
@@ -162,11 +154,19 @@ export function TaskLinksAndFilesPanel({
     });
   }
 
+  function openPreview(attachment: TaskAttachment) {
+    setPreview(attachment);
+    setPreviewOpen(true);
+  }
+
   function removeAttachment(attachmentId: string) {
     startTransition(async () => {
       try {
         await deleteTaskAttachment(attachmentId);
-        if (preview?.id === attachmentId) setPreview(null);
+        if (preview?.id === attachmentId) {
+          setPreview(null);
+          setPreviewOpen(false);
+        }
         await onChange();
         toast.success("Removed");
       } catch (error) {
@@ -330,11 +330,7 @@ export function TaskLinksAndFilesPanel({
                     ) : (
                       <span className="mt-1 inline-flex h-7 w-7 shrink-0" />
                     )}
-                    <button
-                      type="button"
-                      className="min-w-0 flex-1 text-left"
-                      onClick={() => setPreview(current)}
-                    >
+                    <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="truncate text-sm font-medium">{current.filename}</p>
                         <Badge variant="secondary" className="h-5 text-[10px]">
@@ -351,17 +347,29 @@ export function TaskLinksAndFilesPanel({
                         {format(new Date(current.createdAt), "MMM d, yyyy")} ·{" "}
                         {current.uploadedByName ?? "Unknown"}
                       </p>
-                    </button>
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      className="shrink-0 text-destructive"
-                      disabled={isPending}
-                      onClick={() => removeAttachment(current.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    </div>
+                    <div className="flex shrink-0 gap-1">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-8"
+                        onClick={() => openPreview(current)}
+                      >
+                        <Eye className="mr-1 h-4 w-4" />
+                        Preview
+                      </Button>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="text-destructive"
+                        disabled={isPending}
+                        onClick={() => removeAttachment(current.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
 
                   {expanded && hasHistory ? (
@@ -453,55 +461,14 @@ export function TaskLinksAndFilesPanel({
         </section>
       ) : null}
 
-      {preview ? (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4">
-          <div className="relative max-h-[90vh] w-full max-w-3xl overflow-auto rounded-xl border bg-background p-4 shadow-xl">
-            <Button
-              type="button"
-              size="icon"
-              variant="ghost"
-              className="absolute right-2 top-2"
-              onClick={() => setPreview(null)}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-            <h5 className="mb-3 pr-10 font-medium">
-              {preview.filename}
-              {preview.version > 1 ? ` (v${preview.version})` : ""}
-            </h5>
-            {preview.path && isImage(preview.mimeType) ? (
-              <Image
-                src={`/uploads/${preview.path}`}
-                alt={preview.filename}
-                width={960}
-                height={720}
-                className="mx-auto max-h-[70vh] w-auto rounded object-contain"
-                unoptimized
-              />
-            ) : preview.path && isPdf(preview.mimeType) ? (
-              <iframe
-                title={preview.filename}
-                src={`/uploads/${preview.path}`}
-                className="h-[70vh] w-full rounded border"
-              />
-            ) : (
-              <div className="space-y-3 text-sm">
-                <div className="flex h-20 items-center justify-center rounded bg-muted/40">
-                  <FileText className="h-8 w-8 text-muted-foreground" />
-                </div>
-                <p className="text-muted-foreground">Preview not available for this file type.</p>
-                {preview.path ? (
-                  <Button asChild variant="outline">
-                    <a href={`/uploads/${preview.path}`} target="_blank" rel="noopener noreferrer">
-                      Open file
-                    </a>
-                  </Button>
-                ) : null}
-              </div>
-            )}
-          </div>
-        </div>
-      ) : null}
+      <AttachmentPreviewModal
+        attachment={preview}
+        open={previewOpen}
+        onOpenChange={(open) => {
+          setPreviewOpen(open);
+          if (!open) setPreview(null);
+        }}
+      />
     </div>
   );
 }

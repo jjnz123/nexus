@@ -1,6 +1,7 @@
 import { getProjectBoard, getProjects, getTaskByKey } from "@/server/actions/tasks";
 import { getBookmarkPreferences } from "@/server/actions/preferences";
 import { TasksPage } from "@/components/tasks/TasksPage";
+import { parseTasksWorkspace } from "@/lib/preferences/workspace";
 
 function getTaskKeyFromSlug(slug: string[] | undefined) {
   if (!slug || slug.length === 0) return null;
@@ -15,6 +16,7 @@ export default async function TasksRoutePage({
 }) {
   const resolvedParams = await params;
   const [projects, prefs] = await Promise.all([getProjects(), getBookmarkPreferences()]);
+  const tasksWorkspace = parseTasksWorkspace(prefs.tasksWorkspace);
   const taskKey = getTaskKeyFromSlug(resolvedParams.slug);
   const deepLinkedTask = taskKey ? await getTaskByKey(taskKey) : null;
 
@@ -33,6 +35,7 @@ export default async function TasksRoutePage({
       initialBoard={initialBoard}
       initialTask={deepLinkedTask}
       initialTaskKey={taskKey}
+      tasksWorkspace={tasksWorkspace}
     />
   );
 }

@@ -246,11 +246,13 @@ export function TasksPage({
   initialBoard,
   initialTask,
   initialTaskKey,
+  tasksWorkspace,
 }: {
   projects: ProjectSummary[];
   initialBoard: ProjectBoard | null;
   initialTask: TaskDetails | null;
   initialTaskKey: string | null;
+  tasksWorkspace?: import("@/lib/preferences/workspace").TasksWorkspacePrefs;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -982,6 +984,7 @@ export function TasksPage({
           if (pathname !== "/tasks") router.replace("/tasks");
           void refreshBoard();
         }}
+        tasksWorkspace={tasksWorkspace}
       />
     </div>
   );

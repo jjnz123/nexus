@@ -211,6 +211,28 @@ export const userPreferences = pgTable("user_preferences", {
       previewVisible: true,
       explorerCollapsed: false,
     }),
+  tasksWorkspace: jsonb("tasks_workspace")
+    .$type<{
+      descriptionHeight?: number;
+    }>()
+    .default({ descriptionHeight: 180 }),
+  homeDashboard: jsonb("home_dashboard")
+    .$type<{
+      widgetOrder: string[];
+      widgets: Record<string, { visible: boolean; minimized: boolean }>;
+      boardLinks: { id: string; projectId: string; label?: string | null }[];
+    }>()
+    .default({
+      widgetOrder: ["search", "operations", "suggestions", "favourites", "boardLinks"],
+      widgets: {
+        search: { visible: true, minimized: false },
+        operations: { visible: true, minimized: false },
+        suggestions: { visible: true, minimized: false },
+        favourites: { visible: true, minimized: false },
+        boardLinks: { visible: true, minimized: false },
+      },
+      boardLinks: [],
+    }),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 

@@ -2,9 +2,11 @@ import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/permissions";
 import { getAllBookmarkCards, getFavouriteCards } from "@/server/actions/bookmarks";
 import { getSmartBookmarkSuggestions } from "@/server/actions/bookmark-phase2";
-import { getHomeFavouriteOrder } from "@/server/actions/preferences";
+import { getHomeFavouriteOrder, getBookmarkPreferences } from "@/server/actions/preferences";
+import { getProjects } from "@/server/actions/tasks";
 import { getDashboardStats } from "@/server/actions/users";
 import { LandingPage } from "@/components/landing/LandingPage";
+import { parseHomeDashboard, type HomeDashboardConfig } from "@/lib/preferences/workspace";
 import type { BookmarkCard, BookmarkGroup, BookmarkTab } from "@/lib/db/schema";
 
 type BookmarkItem = {
@@ -35,10 +37,20 @@ export default async function AppHomePage() {
   const canViewTasks = hasPermission(role, "tasks:view", permissions);
   const canViewBookmarks = hasPermission(role, "bookmarks:view", permissions);
 
-  const [stats, homeOrder] = await Promise.all([
+  const [stats, homeOrder, prefs] = await Promise.all([
     getDashboardStats(),
     canViewBookmarks ? getHomeFavouriteOrder() : Promise.resolve([]),
+    getBookmarkPreferences(),
   ]);
+
+  const homeDashboard = parseHomeDashboard(prefs.homeDashboard as HomeDashboardConfig | null);
+  const taskProjects = canViewTasks
+    ? (await getProjects()).map((project) => ({
+        id: project.id,
+        key: project.key,
+        name: project.name,
+      }))
+    : [];
 
   let favourites: BookmarkItem[] = [];
   let allBookmarks: BookmarkItem[] = [];
@@ -67,6 +79,8 @@ export default async function AppHomePage() {
       canViewMonitoring={canViewMonitoring}
       canViewTasks={canViewTasks}
       canViewBookmarks={canViewBookmarks}
+      initialHomeDashboard={homeDashboard}
+      taskProjects={taskProjects}
     />
   );
 }

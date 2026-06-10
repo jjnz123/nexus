@@ -33,6 +33,32 @@ const bookmarkPrefsSchema = z.object({
       explorerCollapsed: z.boolean(),
     })
     .optional(),
+  tasksWorkspace: z
+    .object({
+      descriptionHeight: z.number().min(120).max(800).optional(),
+    })
+    .optional(),
+  homeDashboard: z
+    .object({
+      widgetOrder: z.array(
+        z.enum(["search", "operations", "suggestions", "favourites", "boardLinks"])
+      ),
+      widgets: z.record(
+        z.enum(["search", "operations", "suggestions", "favourites", "boardLinks"]),
+        z.object({
+          visible: z.boolean(),
+          minimized: z.boolean(),
+        })
+      ),
+      boardLinks: z.array(
+        z.object({
+          id: z.string().uuid(),
+          projectId: z.string().uuid(),
+          label: z.string().nullable().optional(),
+        })
+      ),
+    })
+    .optional(),
 });
 
 async function getOrCreatePrefs(userId: string) {

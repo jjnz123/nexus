@@ -16,6 +16,7 @@ Nexus helps your team find things faster, stay on top of work, and spot problems
 - Pin favourite bookmarks — order is **locked by default**; click the unlock icon to drag and rearrange.
 - See smart suggestions based on what you use often—or what you have not opened in a while.
 - Jump straight to monitoring or tasks when something needs attention.
+- **Customise your dashboard** — Edit dashboard mode lets you show/hide or minimise widgets; add **Board link** cards that open a project kanban board directly. Layout is saved per user.
 
 ### Notes
 
@@ -53,7 +54,7 @@ A **Jira-inspired** task board with tickets, hierarchy, roadmap planning, and co
 - **Issues view** — sortable columns, column visibility, quick filters, row selection, and bulk actions (assign, move, priority, delete).
 - **View switcher** — jump between Board, Issues, and Roadmap from the page header.
 - **Roadmap** — tree-ordered hierarchy (children directly under parents); inline bulk editing with draft/commit workflow; **insert rows between lines**; parent picker shows full ticket names and respects hierarchy rules.
-- **Tickets** — tabbed detail modal (Overview, Specification, Links & files, Discussion) with **top-anchored layout**; Overview shows **Description + child subtasks + Discussion** on the left and metadata in a **right sidebar**; **Links & files** supports drag-and-drop uploads, URL links, `.eml` emails, and **attachment versioning**; **hierarchy rules** configurable per project
+- **Tickets** — tabbed detail modal (Overview, Specification, Links & files, Discussion) with **top-anchored layout**; Overview **Description** uses a **rich text editor** (bold, italic, underline, headings, lists, font size, text colour) with **resizable height persisted per user**; **Save and close** alongside Save; **Links & files** supports drag-and-drop uploads, URL links, `.eml` emails, **attachment preview modal** (PDF, Office docs, images, plain text), and **attachment versioning**; **hierarchy rules** configurable per project
 - **Project settings** — tabbed layout (General, Board, Roadmap, Hierarchy, Fields & Display); columns, labels, **board card fields** (parent, due date, stale indicator, child subtasks), **visible board types**, and clearer **hierarchy rules** UI.
 
 ### Monitoring

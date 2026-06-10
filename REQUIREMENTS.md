@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v3.9.3
+**Current release:** v4.0.0
 
 ## 1. Overview
 
@@ -142,6 +142,14 @@ Available on all authenticated app routes.
 
 - Personalized time-based greeting with user name
 - Permission-aware rendering of widgets and sections
+- **Edit dashboard** mode — show/hide widgets, minimise sections (collapsed header only), persisted in `user_preferences.home_dashboard`
+- Configurable widget order: Search & AI, Operations, Smart suggestions, Favourites, Board links
+- **Board link cards** — user-added shortcuts to project kanban boards (`/tasks` with `activeKanbanProjectId` set); add/remove in edit mode
+
+### 4.1.1 App sidebar
+
+- Collapsible main navigation rail (56px collapsed / 256px expanded); state in `user_preferences.app_sidebar_collapsed`
+- Collapse control visible **only when expanded**; when collapsed, click the Nexus icon to expand (no floating toggle icon)
 
 ### 4.2 Search & AI Entry
 
@@ -502,12 +510,12 @@ Requires `tasks:edit`.
 - Header: ticket key badge, type/status badges, inline title edit
 - Field visibility/order driven by project ticket field settings for the ticket type
 - Edit all ticket fields (see §6.3)
-- **Links & files tab** — drag-and-drop zone (files + `.eml` emails); external URL links; file attachments with version history and per-version download; linked issues panel; image/PDF preview
-- **Overview tab** — two-column issue-tracker layout: **Description, child subtasks, and Discussion** on the left; **right sidebar** for type, status, assignee, priority, due date, story points, parent (filtered by hierarchy rules), labels, and checklist
+- **Links & files tab** — drag-and-drop zone (files + `.eml` emails); external URL links; file attachments with version history, per-version download, and **Preview** button opening a modal (PDF iframe, DOCX/XLSX client-side conversion, images, plain text; PPTX download fallback); linked issues panel
+- **Overview tab** — two-column issue-tracker layout: **Description** (TipTap rich text: bold, italic, underline, headings, lists, font size, colour; resizable editor height persisted in `user_preferences.tasks_workspace`), child subtasks, and Discussion on the left; **right sidebar** for type, status, assignee, priority, due date, story points, parent (filtered by hierarchy rules), labels, and checklist
 - **Specification tab** — details, acceptance criteria, definition of done
 - **Discussion tab** — full-height threaded comments (same panel as Overview)
 - Copy shareable ticket URL
-- Sticky footer: Save / Delete (with confirmation)
+- Sticky footer: **Save changes**, **Save and close**, and Delete (with confirmation)
 - Board refresh after save is client-driven (`getProjectBoard`) — task updates do not call `revalidatePath("/tasks")`, avoiding Server Component re-render errors on deep-linked ticket URLs; hierarchy parent validation runs only when type or parent changes
 
 ### 6.11 Server Actions (No UI Yet)

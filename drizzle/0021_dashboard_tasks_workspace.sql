@@ -1,0 +1,2 @@
+ALTER TABLE "user_preferences" ADD COLUMN IF NOT EXISTS "tasks_workspace" jsonb DEFAULT '{"descriptionHeight":180}'::jsonb;
+ALTER TABLE "user_preferences" ADD COLUMN IF NOT EXISTS "home_dashboard" jsonb DEFAULT '{"widgetOrder":["search","operations","suggestions","favourites","boardLinks"],"widgets":{"search":{"visible":true,"minimized":false},"operations":{"visible":true,"minimized":false},"suggestions":{"visible":true,"minimized":false},"favourites":{"visible":true,"minimized":false},"boardLinks":{"visible":true,"minimized":false}},"boardLinks":[]}'::jsonb;

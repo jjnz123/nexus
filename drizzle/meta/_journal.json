@@ -134,6 +134,13 @@
       "when": 1781005200000,
       "tag": "0020_task_links_files_hierarchy",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1781006000000,
+      "tag": "0021_dashboard_tasks_workspace",
+      "breakpoints": true
     }
   ]
 }
