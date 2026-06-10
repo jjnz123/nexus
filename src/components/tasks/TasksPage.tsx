@@ -47,7 +47,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { TaskCard } from "./TaskCard";
+import { TaskCard, TaskCardPreview } from "./TaskCard";
 import { TaskModal } from "./TaskModal";
 import { CreateTaskDialog } from "./CreateTaskDialog";
 import { TasksSidebar, type TasksSidebarView } from "./TasksSidebar";
@@ -62,6 +62,7 @@ import {
 } from "@/lib/tasks/ticket-fields";
 import { parseProjectHierarchyRules } from "@/lib/tasks/hierarchy";
 import { parseProjectBoardSettings } from "@/lib/tasks/project-settings";
+import { cn } from "@/lib/utils";
 
 function makeTaskKey(projectKey: string, taskNumber: number) {
   return `${projectKey}-${String(taskNumber).padStart(3, "0")}`;
@@ -77,7 +78,27 @@ function splitTasksByColumn(tasks: BoardTask[]) {
 
 const boardCollisionDetection: CollisionDetection = (args) => {
   const pointerHits = pointerWithin(args);
-  if (pointerHits.length > 0) return pointerHits;
+  if (pointerHits.length > 0) {
+    const activeColumnId = args.active.data.current?.columnId as string | undefined;
+
+    const columnHit = pointerHits.find((hit) => String(hit.id).startsWith("column-"));
+    if (columnHit) {
+      const targetColumnId = String(columnHit.id).replace("column-", "");
+      if (activeColumnId && targetColumnId !== activeColumnId) {
+        return [columnHit];
+      }
+    }
+
+    const taskHit = pointerHits.find((hit) => {
+      const id = String(hit.id);
+      if (id.startsWith("column-")) return false;
+      const overColumnId = hit.data?.current?.columnId as string | undefined;
+      return Boolean(activeColumnId && overColumnId && overColumnId !== activeColumnId);
+    });
+    if (taskHit) return [taskHit];
+
+    return pointerHits;
+  }
   return closestCorners(args);
 };
 
@@ -158,11 +179,13 @@ function KanbanColumn({
   id,
   className,
   children,
+  isDragTarget,
   onBacklogDrop,
 }: {
   id: string;
   className?: string;
   children: React.ReactNode;
+  isDragTarget?: boolean;
   onBacklogDrop?: (taskId: string, columnId: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({
@@ -170,10 +193,15 @@ function KanbanColumn({
     data: { type: "column", columnId: id },
   });
 
+  const highlighted = isOver || isDragTarget;
+
   return (
     <div
       ref={setNodeRef}
-      className={className}
+      className={cn(
+        className,
+        highlighted && "border-primary bg-primary/5 ring-2 ring-primary/30"
+      )}
       onDragOver={(event) => {
         if (event.dataTransfer.types.includes("application/x-nexus-backlog-task")) {
           event.preventDefault();
@@ -222,6 +250,7 @@ export function TasksPage({
   const [priorityFilter, setPriorityFilter] = useState<"all" | TaskPriority>("all");
   const [assigneeFilter, setAssigneeFilter] = useState("all");
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null);
 
   const [projectDialogOpen, setProjectDialogOpen] = useState(false);
   const [newProjectKey, setNewProjectKey] = useState("");
@@ -427,36 +456,16 @@ export function TasksPage({
 
   const onDragOver = (event: DragOverEvent) => {
     if (!board) return;
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-
-    const activeId = String(active.id);
-    const targetColumnId = resolveDropTarget(over.id, board.tasks);
-    if (!targetColumnId) return;
-
-    const activeTask = board.tasks.find((task) => task.id === activeId);
-    if (!activeTask || activeTask.columnId === targetColumnId) return;
-
-    const targetColumn = board.columns.find((column) => column.id === targetColumnId);
-    if (
-      targetColumn?.wipLimit != null &&
-      wouldExceedWipLimit(board.tasks, activeId, targetColumnId, targetColumn.wipLimit)
-    ) {
+    const { over } = event;
+    if (!over) {
+      setDragOverColumnId(null);
       return;
     }
-
-    setBoard((prev) => {
-      if (!prev) return prev;
-      const current = prev.tasks.find((task) => task.id === activeId);
-      if (!current || current.columnId === targetColumnId) return prev;
-      return {
-        ...prev,
-        tasks: dropIntoColumn(prev.tasks, activeId, targetColumnId, String(over.id)),
-      };
-    });
+    setDragOverColumnId(resolveDropTarget(over.id, board.tasks));
   };
 
   const onDragEnd = (event: DragEndEvent) => {
+    setDragOverColumnId(null);
     if (!board) return;
     const { active, over, collisions } = event;
     const overId = over?.id ?? collisions?.[0]?.id;
@@ -474,21 +483,20 @@ export function TasksPage({
 
     const activeTask = board.tasks.find((task) => task.id === activeId);
     const targetColumn = board.columns.find((column) => column.id === targetColumnId);
+    const previousTasks = board.tasks;
 
     if (
       activeTask &&
       targetColumn?.wipLimit != null &&
-      wouldExceedWipLimit(board.tasks, activeId, targetColumnId, targetColumn.wipLimit)
+      wouldExceedWipLimit(previousTasks, activeId, targetColumnId, targetColumn.wipLimit)
     ) {
       toast.warning(
         `WIP limit reached for ${targetColumn.name} (${targetColumn.wipLimit}). Remove or move a ticket first.`
       );
       setActiveDragId(null);
-      void refreshBoard();
       return;
     }
 
-    const previousTasks = board.tasks;
     const nextTasks = dropIntoColumn(board.tasks, activeId, targetColumnId, String(overId));
     setBoard({ ...board, tasks: nextTasks });
     setActiveDragId(null);
@@ -700,7 +708,7 @@ export function TasksPage({
                 onDragEnd={onDragEnd}
                 onDragCancel={() => {
                   setActiveDragId(null);
-                  void refreshBoard();
+                  setDragOverColumnId(null);
                 }}
               >
                 <div className="flex gap-4 overflow-x-auto pb-2">
@@ -712,8 +720,9 @@ export function TasksPage({
                       <KanbanColumn
                         key={column.id}
                         id={column.id}
+                        isDragTarget={dragOverColumnId === column.id && activeDragId != null}
                         onBacklogDrop={backlogPanelOpen ? onBacklogDropToColumn : undefined}
-                        className="w-[280px] shrink-0 rounded-xl border bg-card/50 p-3"
+                        className="w-[280px] shrink-0 rounded-xl border bg-card/50 p-3 transition-colors"
                       >
                         <div className="mb-3 flex items-center justify-between gap-2">
                           <div className="flex min-w-0 items-center gap-2">
@@ -786,9 +795,9 @@ export function TasksPage({
                   })}
                 </div>
 
-                <DragOverlay>
+                <DragOverlay dropAnimation={null}>
                   {activeDragTask ? (
-                    <TaskCard
+                    <TaskCardPreview
                       task={activeDragTask}
                       taskKey={makeTaskKey(board.project.key, activeDragTask.number)}
                       labelsById={labelsById}
@@ -800,7 +809,7 @@ export function TasksPage({
                           ? parentKeyById.get(activeDragTask.parentId) ?? null
                           : null
                       }
-                      onClick={() => {}}
+                      className="rotate-2 shadow-lg ring-2 ring-primary/40"
                     />
                   ) : null}
                 </DragOverlay>

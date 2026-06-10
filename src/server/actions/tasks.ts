@@ -41,6 +41,14 @@ import {
 import { createNotification } from "./users";
 import { logAudit } from "@/server/audit";
 import { indexTaskById } from "@/lib/rag/indexer";
+import { deleteRagSource } from "@/lib/rag/store";
+import { RAG_SOURCE_TYPES } from "@/lib/rag/types";
+import {
+  assertValidTaskParent,
+  parseProjectHierarchyRules,
+  type HierarchyRules,
+} from "@/lib/tasks/hierarchy";
+import type { TaskType } from "@/components/tasks/types";
 
 function mapAttachmentRow(
   row: typeof taskAttachments.$inferSelect,
@@ -120,14 +128,6 @@ async function validateTaskParent({
     loadDescendantIds: loadDescendantTaskIds,
   });
 }
-import { deleteRagSource } from "@/lib/rag/store";
-import { RAG_SOURCE_TYPES } from "@/lib/rag/types";
-import {
-  assertValidTaskParent,
-  parseProjectHierarchyRules,
-  type HierarchyRules,
-} from "@/lib/tasks/hierarchy";
-import type { TaskType } from "@/components/tasks/types";
 
 export async function getProjects() {
   const session = await requireAuth();
@@ -423,19 +423,40 @@ export async function updateTask(input: unknown) {
     projectId: existing.projectId,
   });
 
+  const payload = Object.fromEntries(
+    Object.entries(updates).filter(([, value]) => value !== undefined)
+  ) as Record<string, unknown>;
+
+  if ("dueDate" in payload) {
+    payload.dueDate =
+      payload.dueDate === null
+        ? null
+        : payload.dueDate
+          ? new Date(String(payload.dueDate))
+          : undefined;
+    if (payload.dueDate === undefined) delete payload.dueDate;
+  }
+
+  if ("storyPoints" in payload && payload.storyPoints === null) {
+    payload.storyPoints = null;
+  }
+
+  if (
+    typeof payload.columnId === "string" &&
+    payload.columnId !== existing.columnId
+  ) {
+    const columnTasks = await db
+      .select({ id: tasks.id })
+      .from(tasks)
+      .where(eq(tasks.columnId, payload.columnId));
+    payload.sortOrder = columnTasks.length;
+  }
+
+  payload.updatedAt = new Date();
+
   const [task] = await db
     .update(tasks)
-    .set({
-      ...updates,
-      dueDate:
-        updates.dueDate === null
-          ? null
-          : updates.dueDate
-            ? new Date(updates.dueDate)
-            : undefined,
-      storyPoints: updates.storyPoints === null ? null : updates.storyPoints,
-      updatedAt: new Date(),
-    })
+    .set(payload)
     .where(eq(tasks.id, id))
     .returning();
 

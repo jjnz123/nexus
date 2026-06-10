@@ -27,7 +27,20 @@ function formatDueDate(value: string | Date | null) {
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-export function TaskCard({
+type TaskCardPreviewProps = {
+  task: BoardTask;
+  taskKey: string;
+  labelsById: Map<string, TaskLabel>;
+  cardFields?: BoardCardFields;
+  staleDays?: number;
+  childTaskCount?: number;
+  parentKey?: string | null;
+  onClick?: () => void;
+  className?: string;
+  dragHandleProps?: React.HTMLAttributes<HTMLElement>;
+};
+
+export function TaskCardPreview({
   task,
   taskKey,
   labelsById,
@@ -36,30 +49,9 @@ export function TaskCard({
   childTaskCount = 0,
   parentKey,
   onClick,
-}: {
-  task: BoardTask;
-  taskKey: string;
-  labelsById: Map<string, TaskLabel>;
-  cardFields?: BoardCardFields;
-  staleDays?: number;
-  childTaskCount?: number;
-  parentKey?: string | null;
-  onClick: () => void;
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: task.id,
-    data: {
-      type: "task",
-      taskId: task.id,
-      columnId: task.columnId,
-    },
-  });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
-
+  className,
+  dragHandleProps,
+}: TaskCardPreviewProps) {
   const showDueDate = cardFields.dueDate;
   const dueLabel = showDueDate ? formatDueDate(task.dueDate) : null;
   const labels = task.labelIds.map((id) => labelsById.get(id)).filter(Boolean) as TaskLabel[];
@@ -67,26 +59,30 @@ export function TaskCard({
 
   return (
     <article
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
       className={cn(
-        "group cursor-grab touch-none rounded-lg border bg-card p-3 shadow-sm transition hover:border-primary/50 hover:shadow-md active:cursor-grabbing",
-        isDragging && "opacity-60",
-        stale && "border-amber-500/40"
+        "group rounded-lg border bg-card p-3 shadow-sm transition hover:border-primary/50 hover:shadow-md",
+        stale && "border-amber-500/40",
+        className
       )}
+      {...dragHandleProps}
     >
       <div className="mb-2 flex items-start justify-between gap-2">
-        <button
-          type="button"
-          onClick={onClick}
-          onPointerDown={(event) => event.stopPropagation()}
-          className="text-left"
-        >
-          <p className="text-xs text-muted-foreground">{taskKey}</p>
-          <h4 className="line-clamp-2 text-sm font-medium">{task.title}</h4>
-        </button>
+        {onClick ? (
+          <button
+            type="button"
+            onClick={onClick}
+            onPointerDown={(event) => event.stopPropagation()}
+            className="text-left"
+          >
+            <p className="text-xs text-muted-foreground">{taskKey}</p>
+            <h4 className="line-clamp-2 text-sm font-medium">{task.title}</h4>
+          </button>
+        ) : (
+          <div className="text-left">
+            <p className="text-xs text-muted-foreground">{taskKey}</p>
+            <h4 className="line-clamp-2 text-sm font-medium">{task.title}</h4>
+          </div>
+        )}
         <span
           className="rounded p-1 text-muted-foreground opacity-40 group-hover:opacity-100"
           aria-hidden
@@ -150,5 +146,56 @@ export function TaskCard({
         </div>
       ) : null}
     </article>
+  );
+}
+
+export function TaskCard({
+  task,
+  taskKey,
+  labelsById,
+  cardFields = DEFAULT_BOARD_CARD_FIELDS,
+  staleDays = DEFAULT_STALE_DAYS,
+  childTaskCount = 0,
+  parentKey,
+  onClick,
+}: {
+  task: BoardTask;
+  taskKey: string;
+  labelsById: Map<string, TaskLabel>;
+  cardFields?: BoardCardFields;
+  staleDays?: number;
+  childTaskCount?: number;
+  parentKey?: string | null;
+  onClick: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: task.id,
+    data: {
+      type: "task",
+      taskId: task.id,
+      columnId: task.columnId,
+    },
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className={cn(isDragging && "opacity-40")}>
+      <TaskCardPreview
+        task={task}
+        taskKey={taskKey}
+        labelsById={labelsById}
+        cardFields={cardFields}
+        staleDays={staleDays}
+        childTaskCount={childTaskCount}
+        parentKey={parentKey}
+        onClick={onClick}
+        className="cursor-grab touch-none active:cursor-grabbing"
+        dragHandleProps={{ ...attributes, ...listeners }}
+      />
+    </div>
   );
 }
