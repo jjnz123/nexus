@@ -48,7 +48,7 @@ Editors can create and manage the library; viewers can browse and launch.
 A **Jira-inspired** task board with tickets, hierarchy, roadmap planning, and configurable fields:
 
 - Multiple **projects**, each with ticket keys (e.g. `OPS-001`); **last selected project persists** across reloads
-- **Kanban board** (horizontal columns) with **cross-column drag-and-drop** (drag anywhere on the card; optimistic updates with rollback on failure), **WIP limit enforcement** when moving tickets, and configurable **default ticket types** (Story + Task by default).
+- **Kanban board** (horizontal columns) with **cross-column drag-and-drop** (drag anywhere on the card; optimistic updates with server persistence and rollback on failure; empty columns supported), **WIP limit enforcement** when moving tickets, and configurable **default ticket types** (Story + Task by default).
 - **Backlog modal** — full-screen table (key, title, type, parent, assignee, priority, due date, points, status); search/filter; rank via drag handle; drag rows onto board columns or use **Move to board** dropdown.
 - **Issues view** — sortable columns, column visibility, quick filters, row selection, and bulk actions (assign, move, priority, delete).
 - **View switcher** — jump between Board, Issues, and Roadmap from the page header.

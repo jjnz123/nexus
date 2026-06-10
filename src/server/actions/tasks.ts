@@ -416,12 +416,18 @@ export async function updateTask(input: unknown) {
   const nextParentId =
     updates.parentId !== undefined ? updates.parentId : existing.parentId;
 
-  await validateTaskParent({
-    childId: id,
-    childType: nextType,
-    parentId: nextParentId,
-    projectId: existing.projectId,
-  });
+  const parentOrTypeChanged =
+    (updates.type !== undefined && updates.type !== existing.type) ||
+    (updates.parentId !== undefined && updates.parentId !== existing.parentId);
+
+  if (parentOrTypeChanged) {
+    await validateTaskParent({
+      childId: id,
+      childType: nextType,
+      parentId: nextParentId,
+      projectId: existing.projectId,
+    });
+  }
 
   const payload = Object.fromEntries(
     Object.entries(updates).filter(([, value]) => value !== undefined)
@@ -477,7 +483,6 @@ export async function updateTask(input: unknown) {
     }
   }
 
-  revalidatePath("/tasks");
   void indexTaskById(task.id, session.user.id).catch(() => undefined);
   await logAudit({
     action: "tasks.update",
@@ -509,6 +514,8 @@ export async function reorderTasks(
   const session = await requireAuth();
   requireSessionPermission(session, "tasks:edit");
 
+  if (!items.length) return { success: true };
+
   for (const item of items) {
     await db
       .update(tasks)
@@ -516,7 +523,6 @@ export async function reorderTasks(
       .where(eq(tasks.id, item.id));
   }
 
-  revalidatePath("/tasks");
   return { success: true };
 }
 
@@ -577,7 +583,6 @@ export async function setTaskLabels(taskId: string, labelIds: string[]) {
       labelIds.map((labelId) => ({ taskId, labelId }))
     );
   }
-  revalidatePath("/tasks");
   return { success: true };
 }
 

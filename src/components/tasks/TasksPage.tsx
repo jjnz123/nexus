@@ -126,51 +126,70 @@ function wouldExceedWipLimit(
 }
 
 function dropIntoColumn(tasks: BoardTask[], activeTaskId: string, targetColumnId: string, overId: string) {
-  const taskById = new Map(tasks.map((task) => [task.id, task]));
-  const activeTask = taskById.get(activeTaskId);
+  const activeTask = tasks.find((task) => task.id === activeTaskId);
   if (!activeTask) return tasks;
 
   const sourceColumnId = activeTask.columnId;
   const grouped = splitTasksByColumn(tasks);
 
-  const sourceList = [...(grouped[sourceColumnId] ?? [])].sort(
-    (a, b) => a.sortOrder - b.sortOrder
-  );
-  const targetList =
-    sourceColumnId === targetColumnId
-      ? sourceList
-      : [...(grouped[targetColumnId] ?? [])].sort((a, b) => a.sortOrder - b.sortOrder);
+  if (sourceColumnId === targetColumnId) {
+    const columnTasks = [...(grouped[sourceColumnId] ?? [])]
+      .filter((task) => task.id !== activeTaskId)
+      .sort((a, b) => a.sortOrder - b.sortOrder);
 
-  const filteredSource = sourceList.filter((item) => item.id !== activeTaskId);
+    let insertIndex = columnTasks.length;
+    if (!overId.startsWith("column-")) {
+      const overTaskIndex = columnTasks.findIndex((task) => task.id === overId);
+      if (overTaskIndex >= 0) insertIndex = overTaskIndex;
+    }
+
+    columnTasks.splice(insertIndex, 0, activeTask);
+    const reindexed = columnTasks.map((task, index) => ({
+      ...task,
+      columnId: targetColumnId,
+      sortOrder: index,
+    }));
+    const nextById = new Map(reindexed.map((task) => [task.id, task]));
+    return tasks.map((task) => nextById.get(task.id) ?? task);
+  }
+
+  const sourceList = [...(grouped[sourceColumnId] ?? [])]
+    .filter((task) => task.id !== activeTaskId)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+
+  const targetList = [...(grouped[targetColumnId] ?? [])]
+    .filter((task) => task.id !== activeTaskId)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
 
   let insertIndex = targetList.length;
-  const overTaskIndex = targetList.findIndex((item) => item.id === overId);
-  if (overTaskIndex >= 0) insertIndex = overTaskIndex;
+  if (!overId.startsWith("column-")) {
+    const overTaskIndex = targetList.findIndex((task) => task.id === overId);
+    if (overTaskIndex >= 0) insertIndex = overTaskIndex;
+  }
 
   const movedTask = { ...activeTask, columnId: targetColumnId };
+  targetList.splice(insertIndex, 0, movedTask);
 
-  const nextTarget = targetList.filter((item) => item.id !== activeTaskId);
-  nextTarget.splice(insertIndex, 0, movedTask);
+  const nextSource = sourceList.map((task, index) => ({ ...task, sortOrder: index }));
+  const nextTarget = targetList.map((task, index) => ({ ...task, sortOrder: index, columnId: targetColumnId }));
 
   const nextById = new Map<string, BoardTask>();
-  for (const [columnId, list] of Object.entries(grouped)) {
-    const finalList =
-      columnId === sourceColumnId
-        ? sourceColumnId === targetColumnId
-          ? nextTarget
-          : filteredSource
-        : columnId === targetColumnId
-          ? nextTarget
-          : list.sort((a, b) => a.sortOrder - b.sortOrder);
-
-    finalList.forEach((task, index) => {
-      nextById.set(task.id, {
-        ...task,
-        columnId: columnId === targetColumnId ? targetColumnId : task.columnId,
-        sortOrder: index,
-      });
-    });
+  for (const task of tasks) {
+    if (task.id === activeTaskId) continue;
+    if (task.columnId === sourceColumnId) {
+      const updated = nextSource.find((entry) => entry.id === task.id);
+      if (updated) nextById.set(task.id, updated);
+      continue;
+    }
+    if (task.columnId === targetColumnId) {
+      const updated = nextTarget.find((entry) => entry.id === task.id);
+      if (updated) nextById.set(task.id, updated);
+      continue;
+    }
+    nextById.set(task.id, task);
   }
+
+  nextById.set(activeTaskId, nextTarget.find((task) => task.id === activeTaskId) ?? movedTask);
 
   return tasks.map((task) => nextById.get(task.id) ?? task);
 }
@@ -465,21 +484,31 @@ export function TasksPage({
   };
 
   const onDragEnd = (event: DragEndEvent) => {
+    const lastHighlightedColumn = dragOverColumnId;
     setDragOverColumnId(null);
     if (!board) return;
     const { active, over, collisions } = event;
     const overId = over?.id ?? collisions?.[0]?.id;
-    if (!overId || active.id === overId) {
+    if (!overId && !lastHighlightedColumn) {
       setActiveDragId(null);
       return;
     }
 
     const activeId = String(active.id);
-    const targetColumnId = resolveDropTarget(overId, board.tasks);
+    if (overId && active.id === overId) {
+      setActiveDragId(null);
+      return;
+    }
+
+    const targetColumnId =
+      resolveDropTarget(overId, board.tasks) ?? lastHighlightedColumn;
     if (!targetColumnId) {
       setActiveDragId(null);
       return;
     }
+
+    const effectiveOverId =
+      overId != null ? String(overId) : `column-${targetColumnId}`;
 
     const activeTask = board.tasks.find((task) => task.id === activeId);
     const targetColumn = board.columns.find((column) => column.id === targetColumnId);
@@ -497,7 +526,7 @@ export function TasksPage({
       return;
     }
 
-    const nextTasks = dropIntoColumn(board.tasks, activeId, targetColumnId, String(overId));
+    const nextTasks = dropIntoColumn(board.tasks, activeId, targetColumnId, effectiveOverId);
     setBoard({ ...board, tasks: nextTasks });
     setActiveDragId(null);
 
@@ -513,6 +542,8 @@ export function TasksPage({
           );
         });
 
+        if (changedTasks.length === 0) return;
+
         await reorderTasks(
           changedTasks.map((task) => ({
             id: task.id,
@@ -520,6 +551,7 @@ export function TasksPage({
             sortOrder: task.sortOrder,
           }))
         );
+        await refreshBoard();
       } catch (error) {
         setBoard({ ...board, tasks: previousTasks });
         toast.error(error instanceof Error ? error.message : "Unable to reorder tasks");
