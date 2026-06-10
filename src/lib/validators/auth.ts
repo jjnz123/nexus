@@ -3,6 +3,10 @@ import { z } from "zod";
 export const userPermissionsSchema = z.object({
   useCustom: z.boolean().optional(),
   ai: z.boolean().optional(),
+  notesView: z.boolean().optional(),
+  notesEdit: z.boolean().optional(),
+  meetingsView: z.boolean().optional(),
+  meetingsEdit: z.boolean().optional(),
   bookmarksView: z.boolean().optional(),
   bookmarksEdit: z.boolean().optional(),
   tasksView: z.boolean().optional(),

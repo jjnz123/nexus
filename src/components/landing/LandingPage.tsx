@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useMemo, useState, useTransition } from "react";
 import { motion } from "framer-motion";
 import {
   Bot,
@@ -18,8 +19,16 @@ import { updateBookmarkPreferences } from "@/server/actions/preferences";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { BookmarkCard, BookmarkGroup, BookmarkTab } from "@/lib/db/schema";
+import { createAiConversation } from "@/server/actions/ai-chat";
 import {
   DEFAULT_HOME_DASHBOARD,
   parseHomeDashboard,
@@ -96,10 +105,13 @@ export function LandingPage({
   taskProjects = [],
 }: LandingPageProps) {
   const [query, setQuery] = useState("");
+  const [aiProjectId, setAiProjectId] = useState<string | null>(null);
   const [aiOpen, setAiOpen] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiPromptNonce, setAiPromptNonce] = useState(0);
   const [editMode, setEditMode] = useState(false);
+  const [isAiPending, startAiTransition] = useTransition();
+  const router = useRouter();
   const [dashboard, setDashboard] = useState<HomeDashboardConfig>(() =>
     parseHomeDashboard(initialHomeDashboard)
   );
@@ -170,11 +182,16 @@ export function LandingPage({
     event.preventDefault();
     if (!canUseAi) return;
     const prompt = normalizePrompt(query);
-    if (prompt) {
-      openAi({ prompt, send: true });
-      return;
-    }
-    openAi({ send: false });
+    startAiTransition(async () => {
+      try {
+        const conversation = await createAiConversation({ projectId: aiProjectId });
+        const params = new URLSearchParams({ conversation: conversation.id });
+        if (prompt) params.set("prompt", prompt);
+        router.push(`/chat?${params.toString()}`);
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to start AI chat");
+      }
+    });
   }
 
   const renderWidget = (id: HomeWidgetId) => {
@@ -207,9 +224,29 @@ export function LandingPage({
                       placeholder="How can I help you today?"
                     />
                   </div>
-                  <Button type="submit">
+                  {canViewTasks && taskProjects.length ? (
+                    <Select
+                      value={aiProjectId ?? "general"}
+                      onValueChange={(value) =>
+                        setAiProjectId(value === "general" ? null : value)
+                      }
+                    >
+                      <SelectTrigger className="w-full sm:w-[200px]">
+                        <SelectValue placeholder="Project context" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="general">General</SelectItem>
+                        {taskProjects.map((project) => (
+                          <SelectItem key={project.id} value={project.id}>
+                            {project.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : null}
+                  <Button type="submit" disabled={isAiPending}>
                     <Bot className="mr-2 h-4 w-4" />
-                    Ask AI
+                    {isAiPending ? "Opening…" : "Ask AI"}
                   </Button>
                 </form>
                 {canViewBookmarks &&

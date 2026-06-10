@@ -6,6 +6,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/lib/db";
 import {
   projects,
+  projectMembers,
   taskColumns,
   tasks,
   taskLabels,
@@ -39,6 +40,7 @@ import {
   bulkDeleteTasksSchema,
 } from "@/lib/validators/tasks";
 import { createNotification } from "./users";
+import { listAccessibleProjects, assertProjectViewAccess } from "@/lib/project-access";
 import { logAudit } from "@/server/audit";
 import { indexTaskById, indexTaskAttachment } from "@/lib/rag/indexer";
 import { deleteRagSource } from "@/lib/rag/store";
@@ -132,7 +134,9 @@ async function validateTaskParent({
 export async function getProjects() {
   const session = await requireAuth();
   requireSessionPermission(session, "tasks:view");
-  return db.select().from(projects).orderBy(asc(projects.name));
+  return listAccessibleProjects(session.user.id, session.user.role, {
+    permissions: session.user.permissions,
+  });
 }
 
 export async function createProject(input: unknown) {
@@ -144,6 +148,13 @@ export async function createProject(input: unknown) {
     .insert(projects)
     .values({ key: data.key, name: data.name })
     .returning();
+
+  await db.insert(projectMembers).values({
+    projectId: project.id,
+    userId: session.user.id,
+    canView: true,
+    canEdit: true,
+  });
 
   const defaultColumns = ["Backlog", "To Do", "In Progress", "Done"];
   for (let i = 0; i < defaultColumns.length; i++) {
@@ -177,6 +188,7 @@ export async function getProjectBoard(projectId: string) {
     .where(eq(projects.id, projectId))
     .limit(1);
   if (!project) throw new Error("Project not found");
+  await assertProjectViewAccess(session.user.id, session.user.role, projectId);
 
   const columns = await db
     .select()

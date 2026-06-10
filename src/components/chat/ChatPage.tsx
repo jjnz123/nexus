@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { Bot, FolderOpen, Sparkles, Wrench } from "lucide-react";
+import { Bot, Sparkles, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ChatComposer } from "@/components/chat/ChatComposer";
@@ -82,6 +82,7 @@ export function ChatPage({
   userPermissions,
   initialEnabledSkills,
   kanbanProjects = [],
+  initialPrompt = null,
 }: {
   initialProjects: PortalProjectSummary[];
   initialConversations: AiConversation[];
@@ -93,6 +94,7 @@ export function ChatPage({
   userPermissions: UserPermissionOverrides | null;
   initialEnabledSkills: string[];
   kanbanProjects?: PortalProjectSummary[];
+  initialPrompt?: string | null;
 }) {
   const { stream } = useAiStream();
   const [projects, setProjects] = useState(initialProjects);
@@ -114,6 +116,9 @@ export function ChatPage({
   const [searchFilters, setSearchFilters] = useState<RagSearchFilters>({});
   const [sidebarCollapsed, setSidebarCollapsed] = useState(initialSidebarCollapsed);
   const [filesOpen, setFilesOpen] = useState(false);
+  const [fileManagerTab, setFileManagerTab] = useState<"project" | "conversation">("conversation");
+  const [fileManagerProjectId, setFileManagerProjectId] = useState<string | null>(null);
+  const [fileManagerConversationId, setFileManagerConversationId] = useState<string | null>(null);
   const [skillsOpen, setSkillsOpen] = useState(false);
   const [enabledSkillNames, setEnabledSkillNames] = useState(initialEnabledSkills);
   const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
@@ -178,6 +183,9 @@ export function ChatPage({
   useEffect(() => {
     const projectId = activeConversation?.projectId ?? null;
     setSearchFilters((prev) => ({ ...prev, kanbanProjectId: projectId }));
+    if (projectId === null) {
+      setSearchScopes(["files"]);
+    }
   }, [activeConversation?.projectId]);
 
   useEffect(() => {
@@ -341,6 +349,20 @@ export function ChatPage({
   useEffect(() => {
     projectIdRef.current = activeProjectId;
   }, [activeProjectId]);
+
+  const openProjectFiles = (projectId: string) => {
+    setFileManagerTab("project");
+    setFileManagerProjectId(projectId);
+    setFileManagerConversationId(activeConversationId);
+    setFilesOpen(true);
+  };
+
+  const openConversationFiles = (conversationId: string) => {
+    setFileManagerTab("conversation");
+    setFileManagerProjectId(activeProjectId);
+    setFileManagerConversationId(conversationId);
+    setFilesOpen(true);
+  };
 
   const handleSidebarCollapsedChange = (collapsed: boolean) => {
     setSidebarCollapsed(collapsed);
@@ -591,6 +613,16 @@ export function ChatPage({
   }, [messages]);
 
   const didAutoCreate = useRef(false);
+  const didSendInitialPrompt = useRef(false);
+
+  useEffect(() => {
+    if (!initialPrompt || didSendInitialPrompt.current || !activeConversationId || isStreaming) {
+      return;
+    }
+    didSendInitialPrompt.current = true;
+    setInput(initialPrompt);
+    void sendMessage(initialPrompt);
+  }, [activeConversationId, initialPrompt, isStreaming, sendMessage]);
 
   useEffect(() => {
     if (didAutoCreate.current || activeConversationId) return;
@@ -618,10 +650,6 @@ export function ChatPage({
             <Wrench className="mr-1 h-4 w-4" />
             Skills
           </Button>
-          <Button size="sm" variant="outline" onClick={() => setFilesOpen(true)}>
-            <FolderOpen className="mr-1 h-4 w-4" />
-            Files
-          </Button>
         </div>
       </div>
 
@@ -640,7 +668,8 @@ export function ChatPage({
           onCreateConversation={handleCreateConversation}
           onRenameConversation={handleRenameConversation}
           onDeleteConversation={handleDeleteConversation}
-          onOpenFiles={() => setFilesOpen(true)}
+          onOpenProjectFiles={openProjectFiles}
+          onOpenConversationFiles={openConversationFiles}
         />
 
         <div className="flex min-w-0 flex-1 flex-col">
@@ -720,7 +749,8 @@ export function ChatPage({
                   filters={searchFilters}
                   kanbanProjects={kanbanProjects}
                   lockedProjectId={lockedProject?.id ?? null}
-                  lockedProjectName={lockedProject?.name ?? null}
+                  lockedProjectName={lockedProject?.name ?? (activeConversation?.projectId ? null : "General")}
+                  generalOnly={!activeConversation?.projectId}
                   onScopesChange={setSearchScopes}
                   onFiltersChange={setSearchFilters}
                 />
@@ -761,8 +791,9 @@ export function ChatPage({
       <ChatFileManager
         open={filesOpen}
         onOpenChange={setFilesOpen}
-        projectId={activeProjectId}
-        conversationId={activeConversationId}
+        projectId={fileManagerProjectId ?? activeProjectId}
+        conversationId={fileManagerConversationId ?? activeConversationId}
+        defaultTab={fileManagerTab}
       />
 
       <ChatSkillsPanel

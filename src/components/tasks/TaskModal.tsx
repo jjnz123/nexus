@@ -498,7 +498,7 @@ export function TaskModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="top-[4vh] flex h-[min(92vh,calc(100vh-2.5rem))] max-h-[92vh] translate-y-0 flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl">
+      <DialogContent className="top-[4vh] flex h-[min(92vh,calc(100vh-2.5rem))] max-h-[92vh] translate-y-0 flex-col gap-0 overflow-hidden p-0 sm:max-w-7xl">
         <DialogHeader className="shrink-0 space-y-3 border-b px-6 py-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="space-y-2">

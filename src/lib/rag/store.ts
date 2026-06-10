@@ -311,11 +311,15 @@ function buildAccessFilter(input: RagSearchInput, sql: ReturnType<typeof getSqlC
 
   const projectScope = buildProjectScopeFilter(input.aiProjectId, sql);
 
-  const notesScope = input.scopes.includes("notes")
+  const isGeneralConversation = !input.aiProjectId && Boolean(input.aiConversationId);
+
+  const notesScope =
+    input.scopes.includes("notes") && !isGeneralConversation
     ? sql`(source_type = ${RAG_SOURCE_TYPES.USER_NOTE} AND user_id = ${input.userId} ${projectScope})`
     : sql`FALSE`;
 
-  const meetingsScope = input.scopes.includes("meetings")
+  const meetingsScope =
+    !isGeneralConversation && input.scopes.includes("meetings")
     ? input.meetingId
       ? sql`(source_type IN ${sql([
           RAG_SOURCE_TYPES.MEETING_TRANSCRIPT,
@@ -330,7 +334,9 @@ function buildAccessFilter(input: RagSearchInput, sql: ReturnType<typeof getSqlC
     : sql`FALSE`;
 
   const tasksScope =
-    input.scopes.includes("tasks") && input.includeOrgTasks
+    !isGeneralConversation &&
+    input.scopes.includes("tasks") &&
+    input.includeOrgTasks
       ? sql`(source_type IN ${sql([RAG_SOURCE_TYPES.TASK, RAG_SOURCE_TYPES.TASK_ATTACHMENT])} AND scope = 'org' ${projectScope})`
       : sql`FALSE`;
 

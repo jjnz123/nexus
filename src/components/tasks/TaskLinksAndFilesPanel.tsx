@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition, useEffect } from "react";
 import { format } from "date-fns";
 import {
+  CheckCircle2,
   ChevronDown,
   ChevronRight,
   ExternalLink,
@@ -20,6 +21,7 @@ import {
   addTaskUrlLink,
   deleteTaskAttachment,
 } from "@/server/actions/tasks";
+import { getTaskAttachmentRagStatuses } from "@/server/actions/rag-status";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,6 +75,37 @@ export function TaskLinksAndFilesPanel({
   const [urlTitle, setUrlTitle] = useState("");
   const [urlValue, setUrlValue] = useState("");
   const [isPending, startTransition] = useTransition();
+  const [ragStatuses, setRagStatuses] = useState<Record<string, "indexed" | "failed" | "pending">>(
+    {}
+  );
+
+  const indexableAttachmentIds = useMemo(
+    () =>
+      attachments
+        .filter((item) => item.kind === "file" || item.kind === "email")
+        .map((item) => item.id),
+    [attachments]
+  );
+
+  useEffect(() => {
+    if (!indexableAttachmentIds.length) {
+      setRagStatuses({});
+      return;
+    }
+
+    let cancelled = false;
+    const load = async () => {
+      const statuses = await getTaskAttachmentRagStatuses(indexableAttachmentIds);
+      if (!cancelled) setRagStatuses(statuses);
+    };
+
+    void load();
+    const timer = window.setInterval(() => void load(), 4000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [indexableAttachmentIds]);
 
   const urlLinks = useMemo(
     () => attachments.filter((item) => item.kind === "url"),
@@ -333,6 +366,11 @@ export function TaskLinksAndFilesPanel({
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="truncate text-sm font-medium">{current.filename}</p>
+                        {ragStatuses[current.id] === "indexed" ? (
+                          <span title="Indexed for AI search">
+                            <CheckCircle2 className="h-4 w-4 shrink-0 text-green-500" />
+                          </span>
+                        ) : null}
                         <Badge variant="secondary" className="h-5 text-[10px]">
                           v{current.version}
                         </Badge>

@@ -6,7 +6,7 @@ import { eq, and, isNull, isNotNull, desc, count, lt } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users, notifications } from "@/lib/db/schema";
 import { requireAuth } from "@/lib/auth";
-import { requireSessionPermission } from "@/lib/permissions";
+import { requireSessionPermission, getLockedDownPermissions } from "@/lib/permissions";
 import {
   createUserSchema,
   updateUserSchema,
@@ -35,7 +35,7 @@ export async function createUser(input: unknown) {
       passwordHash,
       role: data.role,
       status: "pending",
-      permissions: data.permissions ?? {},
+      permissions: data.permissions ?? getLockedDownPermissions(),
     })
     .returning({
       id: users.id,

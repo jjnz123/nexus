@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { FileText, FolderOpen, ImageIcon, MessageSquare, Pencil, Search, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
@@ -217,12 +217,15 @@ export function ChatFileManager({
   onOpenChange,
   projectId,
   conversationId,
+  defaultTab = "conversation",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   projectId: string | null;
   conversationId: string | null;
+  defaultTab?: "project" | "conversation";
 }) {
+  const [activeTab, setActiveTab] = useState(defaultTab);
   const [projectFiles, setProjectFiles] = useState<AiProjectFile[]>([]);
   const [conversationFiles, setConversationFiles] = useState<AiConversationFile[]>([]);
   const [search, setSearch] = useState("");
@@ -238,6 +241,10 @@ export function ChatFileManager({
     () => filterFiles(conversationFiles, search),
     [conversationFiles, search]
   );
+
+  useEffect(() => {
+    if (open) setActiveTab(defaultTab);
+  }, [open, defaultTab]);
 
   const refresh = () => {
     startTransition(async () => {
@@ -316,7 +323,7 @@ export function ChatFileManager({
           />
         </div>
 
-        <Tabs defaultValue={projectId ? "project" : "conversation"}>
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "project" | "conversation")}>
           <TabsList>
             {projectId ? (
               <TabsTrigger value="project" className="gap-1">

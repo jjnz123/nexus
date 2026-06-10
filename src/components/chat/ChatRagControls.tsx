@@ -45,6 +45,7 @@ export function ChatRagControls({
   kanbanProjects,
   lockedProjectId = null,
   lockedProjectName,
+  generalOnly = false,
   onScopesChange,
   onFiltersChange,
 }: {
@@ -53,6 +54,7 @@ export function ChatRagControls({
   kanbanProjects: Array<{ id: string; name: string }>;
   lockedProjectId?: string | null;
   lockedProjectName?: string | null;
+  generalOnly?: boolean;
   onScopesChange: (scopes: RagSearchScope[]) => void;
   onFiltersChange: (filters: RagSearchFilters) => void;
 }) {
@@ -88,8 +90,15 @@ export function ChatRagControls({
         <span className="text-xs font-medium text-muted-foreground">Knowledge search</span>
         {(Object.keys(SCOPE_LABELS) as RagSearchScope[]).map((scope) => {
           const active = scopes.includes(scope);
+          const disabled = generalOnly && scope !== "files";
           return (
-            <button key={scope} type="button" onClick={() => toggle(scope)} className="focus:outline-none">
+            <button
+              key={scope}
+              type="button"
+              disabled={disabled}
+              onClick={() => toggle(scope)}
+              className="focus:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+            >
               <Badge
                 variant={active ? "default" : "outline"}
                 className={cn("cursor-pointer text-xs", !active && "opacity-60")}
@@ -101,9 +110,11 @@ export function ChatRagControls({
         })}
 
         <div className="ml-auto flex items-center gap-2">
-          {lockedProjectId ? (
+          {lockedProjectId || generalOnly ? (
             <Badge variant="secondary" className="text-[10px]">
-              Project: {lockedProjectName ?? "This project"}
+              {generalOnly
+                ? "General — conversation files only"
+                : `Project: ${lockedProjectName ?? "This project"}`}
             </Badge>
           ) : null}
           {filtersActive ? <Badge variant="secondary">Filters on</Badge> : null}

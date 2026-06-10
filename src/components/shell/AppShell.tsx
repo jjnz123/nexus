@@ -14,7 +14,7 @@ import {
   StickyNote,
   type LucideIcon,
 } from "lucide-react";
-import { hasPermission, type UserPermissionOverrides } from "@/lib/permissions";
+import { hasPermission, type Permission, type UserPermissionOverrides } from "@/lib/permissions";
 import type { UserRole } from "@/lib/db/schema";
 import { CollapsibleSideRail, SideNavLink } from "@/components/ui/collapsible-side-rail";
 import { ProfileMenu } from "./ProfileMenu";
@@ -24,12 +24,12 @@ const navItems: {
   href: string;
   label: string;
   icon: LucideIcon;
-  perm?: "ai:use" | "bookmarks:view" | "tasks:view" | "monitoring:view";
+  perm?: Permission;
 }[] = [
   { href: "/", label: "Home", icon: Home },
-  { href: "/notes", label: "Notes", icon: StickyNote },
+  { href: "/notes", label: "Notes", icon: StickyNote, perm: "notes:view" },
   { href: "/chat", label: "AI Chat", icon: Bot, perm: "ai:use" },
-  { href: "/meetings", label: "Meetings", icon: Mic, perm: "ai:use" },
+  { href: "/meetings", label: "Meetings", icon: Mic, perm: "meetings:view" },
   { href: "/bookmarks", label: "Bookmarks", icon: Bookmark, perm: "bookmarks:view" },
   { href: "/tasks", label: "Tasks", icon: CheckSquare, perm: "tasks:view" },
   { href: "/monitoring", label: "Monitoring", icon: Activity, perm: "monitoring:view" },

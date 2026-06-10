@@ -8,8 +8,10 @@ import { createUser, updateUser } from "@/server/actions/users";
 import type { UserRole, UserStatus } from "@/lib/db/schema";
 import {
   getDefaultPermissionsForRole,
+  getLockedDownPermissions,
   type UserPermissionOverrides,
 } from "@/lib/permissions";
+import { UserProjectAccessPanel } from "@/components/admin/UserProjectAccessPanel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -56,7 +58,11 @@ const permissionFields: {
   label: string;
   description: string;
 }[] = [
-  { key: "ai", label: "AI assistant", description: "Ask AI on home and audit analysis" },
+  { key: "ai", label: "AI Chat", description: "Use AI Chat workspace and home AI search" },
+  { key: "notesView", label: "View notes", description: "Open Notes workspace" },
+  { key: "notesEdit", label: "Edit notes", description: "Create and edit notes" },
+  { key: "meetingsView", label: "View meetings", description: "Open Meeting Assistant" },
+  { key: "meetingsEdit", label: "Edit meetings", description: "Create and manage meetings" },
   { key: "bookmarksView", label: "View bookmarks", description: "See bookmarks page and home favourites" },
   { key: "bookmarksEdit", label: "Edit bookmarks", description: "Create, import, export, and bulk edit" },
   { key: "tasksView", label: "View tasks", description: "See tasks and home overdue widget" },
@@ -91,6 +97,10 @@ function resolvePermissions(
     return {
       useCustom: true,
       ai: stored.ai ?? false,
+      notesView: stored.notesView ?? false,
+      notesEdit: stored.notesEdit ?? false,
+      meetingsView: stored.meetingsView ?? false,
+      meetingsEdit: stored.meetingsEdit ?? false,
       bookmarksView: stored.bookmarksView ?? false,
       bookmarksEdit: stored.bookmarksEdit ?? false,
       tasksView: stored.tasksView ?? false,
@@ -112,7 +122,9 @@ function initialState(user?: UserRow): UserFormState {
     disabled: user?.disabled ?? false,
     password: "",
     sendWelcomeEmail: true,
-    permissions: resolvePermissions(role, user?.permissions),
+    permissions: user
+      ? resolvePermissions(role, user.permissions)
+      : getLockedDownPermissions(),
   };
 }
 
@@ -157,7 +169,7 @@ export function UserManagement({ users }: { users: UserRow[] }) {
     setState((prev) => ({
       ...prev,
       permissions: useCustom
-        ? { ...prev.permissions, useCustom: true }
+        ? { ...getLockedDownPermissions(), ...prev.permissions, useCustom: true }
         : getDefaultPermissionsForRole(prev.role),
     }));
   };
@@ -232,7 +244,7 @@ export function UserManagement({ users }: { users: UserRow[] }) {
               Add User
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+          <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
             <DialogHeader>
               <DialogTitle>{title}</DialogTitle>
               <DialogDescription>
@@ -383,6 +395,13 @@ export function UserManagement({ users }: { users: UserRow[] }) {
                   </div>
                 )}
               </div>
+
+              {editing ? (
+                <div className="space-y-2 border-t pt-3">
+                  <p className="text-sm font-medium">Project sharing</p>
+                  <UserProjectAccessPanel userId={editing.id} enabled={Boolean(editing.id)} />
+                </div>
+              ) : null}
 
               <div className="flex justify-end">
                 <Button onClick={onSubmit} disabled={isPending}>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Extension } from "@tiptap/core";
 import { TextStyle } from "@tiptap/extension-text-style";
 import Color from "@tiptap/extension-color";
@@ -132,6 +132,7 @@ export function RichTextEditor({
   className?: string;
   onHeightChange?: (height: number) => void;
 }) {
+  const [, setRevision] = useState(0);
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -147,13 +148,15 @@ export function RichTextEditor({
     editorProps: {
       attributes: {
         class:
-          "prose prose-sm dark:prose-invert max-w-none min-h-[120px] px-3 py-2 focus:outline-none",
+          "tiptap-content max-w-none min-h-[120px] px-3 py-2 text-sm focus:outline-none",
       },
     },
     onUpdate: ({ editor: current }) => {
       const html = current.getHTML();
       onChange(html === "<p></p>" ? "" : html);
     },
+    onSelectionUpdate: () => setRevision((current) => current + 1),
+    onTransaction: () => setRevision((current) => current + 1),
   });
 
   useEffect(() => {

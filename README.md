@@ -54,7 +54,7 @@ A **Jira-inspired** task board with tickets, hierarchy, roadmap planning, and co
 - **Issues view** — sortable columns, column visibility, quick filters, row selection, and bulk actions (assign, move, priority, delete).
 - **View switcher** — jump between Board, Issues, and Roadmap from the page header.
 - **Roadmap** — tree-ordered hierarchy (children directly under parents); inline bulk editing with draft/commit workflow; **insert rows between lines**; parent picker shows full ticket names and respects hierarchy rules.
-- **Tickets** — tabbed detail modal (Overview, Specification, Links & files, Discussion) with **top-anchored layout**; Overview **Description** uses a **rich text editor** (bold, italic, underline, headings, lists, font size, text colour) with **resizable height persisted per user**; **Save and close** alongside Save; **Links & files** supports drag-and-drop uploads, URL links, `.eml` emails, **attachment preview modal** (PDF, Office docs, images, plain text), and **attachment versioning**; **hierarchy rules** configurable per project
+- **Tickets** — tabbed detail modal (wider layout) with rich text description (lists/headings), **RAG indexed** green tick on attachments, attachment preview, and more.
 - **Project settings** — tabbed layout (General, Board, Roadmap, Hierarchy, Fields & Display); columns, labels, **board card fields** (parent, due date, stale indicator, child subtasks), **visible board types**, **bug visibility default** (show bugs / hide bugs / always show all types), and clearer **hierarchy rules** UI.
 
 ### Monitoring
@@ -73,8 +73,8 @@ A background worker runs checks continuously so the dashboard stays current.
 
 When an xAI API key is configured, users with permission can:
 
-- Chat with **Grok** from the home page search bar or AI drawer.
-- Use the full **AI Chat** workspace at `/chat` with **shared kanban projects** (same list as Tasks and Notes), conversations, project- and conversation-level file knowledge bases (**semantic RAG** scoped to the conversation’s project for files, notes, meetings, and tasks when `OPENAI_API_KEY` is set), **persistent scoped search toggles** (Files / Notes / Meetings / Tasks), **metadata filters** (meeting date range, note language, meeting labels), per-conversation **Skills**, **Sources** and **Referenced files** panels (collapsed by default), **edit last message** and **fork from any assistant reply** (tabbed branches), a **vertical history bar** with hover previews that float above the chat, and **compact skill activity** (Web/X search, tasks, etc. shown as one-line chips; expand for source links only—the final answer stays full). **Enter** adds a new line; **Shift+Enter** sends.
+- Chat with **Grok** from the home page search bar — conversations are saved in **AI Chat** (default **General** project; optional project context selector).
+- Use the full **AI Chat** workspace at `/chat` with **shared kanban projects**, per-project file icons in the sidebar, per-conversation file icons in the conversation list, project badges on conversations, and **General** conversations limited to **conversation files only** (no cross-project knowledge search). Includes project-scoped RAG, edit last message, fork tabs, collapsed sources, **Enter** = new line / **Shift+Enter** = send.
 - Get **AI-suggested metadata** when creating bookmarks (title, description, tags, icon).
 - **Analyse audit logs** in the admin panel (summaries, anomalies, follow-ups).
 
@@ -105,7 +105,7 @@ At `/meetings` (requires `ai:use`):
 
 Admins manage the portal itself:
 
-- **Users** — create pending accounts, assign roles, elevate status (`pending` → `member` / `administrator`), send welcome emails, disable users, and override permissions per person.
+- **Users** — create pending accounts, assign roles, elevate status, send welcome emails, disable users, set **per-module view/edit permissions**, and **share projects** (view/edit per project).
 - **System settings** — AI model choice, header subtitle, meeting recording format/bitrate, and **send test email** to verify SMTP2go.
 - **Knowledge base** — RAG chunk browser, index health, 7/30-day retrieval analytics, pipeline debug test search (vector/keyword/fused scores), reindex, and staged backfill progress (`?tab=knowledge`).
 - **Audit logs** — review who did what, filter, export, or ask AI to summarise activity.
@@ -127,14 +127,16 @@ It runs on your network or server—you control the data, users, and backups.
 
 ## User roles
 
-Access is controlled by role. Admins can also set **custom permissions** per user (e.g. view bookmarks but not edit tasks).
+Access is controlled by role. Admins can set **custom permissions** per user for each module (view/edit) and **share specific projects**. New users default to **no module or project access** until an admin grants it.
 
 | Role | Typical access |
 |------|----------------|
-| **Admin** | Everything, including user management and system settings |
-| **Editor** | Edit bookmarks, tasks, and monitoring configuration |
-| **User** | Edit bookmarks and tasks; view monitoring |
-| **Viewer** | Read-only access to bookmarks, tasks, and monitoring |
+| **Admin** | Everything, including user management, all projects, and system settings |
+| **Editor** | Role defaults when custom permissions are off |
+| **User** | Role defaults when custom permissions are off |
+| **Viewer** | Read-only role defaults when custom permissions are off |
+
+Set `BETA_MODE=true` or `SHOW_DETAILED_ERRORS=true` (and matching `NEXT_PUBLIC_*` vars for client UI) to show detailed error messages during beta testing.
 
 ---
 

@@ -13,7 +13,8 @@ import {
   type PortalProjectSummary,
 } from "@/lib/db/schema";
 import { requireAuth } from "@/lib/auth";
-import { hasPermission, requireSessionPermission } from "@/lib/permissions";
+import { requireSessionPermission } from "@/lib/permissions";
+import { listAccessibleProjects, assertProjectViewAccess } from "@/lib/project-access";
 import {
   aiAdminSearchSchema,
   aiConversationSchema,
@@ -36,29 +37,24 @@ async function assertConversationOwner(conversationId: string, userId: string) {
   return row;
 }
 
-async function assertKanbanProject(projectId: string) {
+async function assertKanbanProject(
+  projectId: string,
+  session: Awaited<ReturnType<typeof requireAuth>>
+) {
   const [row] = await db
     .select({ id: projects.id })
     .from(projects)
     .where(eq(projects.id, projectId))
     .limit(1);
   if (!row) throw new Error("Project not found");
+  await assertProjectViewAccess(session.user.id, session.user.role, projectId);
   return row;
 }
 
 async function getPortalProjects(session: Awaited<ReturnType<typeof requireAuth>>) {
-  if (!hasPermission(session.user.role, "tasks:view", session.user.permissions)) {
-    return [] as PortalProjectSummary[];
-  }
-
-  return db
-    .select({
-      id: projects.id,
-      key: projects.key,
-      name: projects.name,
-    })
-    .from(projects)
-    .orderBy(asc(projects.name));
+  return listAccessibleProjects(session.user.id, session.user.role, {
+    permissions: session.user.permissions,
+  });
 }
 
 export async function getAiWorkspace() {
@@ -83,7 +79,7 @@ export async function createAiConversation(input: unknown) {
   const data = aiConversationSchema.parse(input);
 
   if (data.projectId) {
-    await assertKanbanProject(data.projectId);
+    await assertKanbanProject(data.projectId, session);
   }
 
   const [conversation] = await db
@@ -144,7 +140,7 @@ export async function setActiveAiSelection(projectId: string | null, conversatio
   const session = await requireAuth();
   requireSessionPermission(session, "ai:use");
 
-  if (projectId) await assertKanbanProject(projectId);
+  if (projectId) await assertKanbanProject(projectId, session);
   if (conversationId) await assertConversationOwner(conversationId, session.user.id);
 
   await updateBookmarkPreferences({

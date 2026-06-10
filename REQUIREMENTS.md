@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v4.4.1
+**Current release:** v4.5.0
 
 ## 1. Overview
 
@@ -69,15 +69,18 @@ Internal operations portal for bookmarks, kanban tasks, network monitoring, and 
 
 ### 2.3 Per-User Permission Overrides
 
-Admins can override role defaults per user:
+Admins can override role defaults per user (view and edit per module):
 
 - AI assistant (`ai:use`)
-- Bookmarks view (`bookmarks:view`)
-- Bookmarks edit (`bookmarks:edit`)
-- Tasks view (`tasks:view`)
-- Tasks edit (`tasks:edit`)
-- Monitoring view (`monitoring:view`)
-- Monitoring configure (`monitoring:configure`)
+- Notes view / edit (`notes:view`, `notes:edit`)
+- Meetings view / edit (`meetings:view`, `meetings:edit`)
+- Bookmarks view / edit (`bookmarks:view`, `bookmarks:edit`)
+- Tasks view / edit (`tasks:view`, `tasks:edit`)
+- Monitoring view / configure (`monitoring:view`, `monitoring:configure`)
+
+**New users** default to **locked-down custom permissions** (no module access) until an admin grants access.
+
+**Project sharing:** admins assign per-user **view** or **edit** membership on specific kanban projects via `project_members`. Users only see projects they belong to (admins see all). Shared project data (notes, AI chat, meetings, tasks) is accessible only when the user also has the corresponding module permission.
 
 Admin-only permissions (not overridable via custom flags):
 
@@ -89,14 +92,14 @@ Admin-only permissions (not overridable via custom flags):
 | Route prefix | Required permission |
 |--------------|---------------------|
 | `/chat` | `ai:use` |
-| `/meetings` | `ai:use` |
-| `/meetings/archived` | `ai:use` |
+| `/meetings` | `meetings:view` |
+| `/meetings/archived` | `meetings:view` |
 | `/admin` | `admin:access` |
 | `/bookmarks` | `bookmarks:view` |
 | `/tasks` | `tasks:view` |
 | `/monitoring` | `monitoring:view` |
 | `/settings` | All authenticated users |
-| `/notes` | All authenticated users |
+| `/notes` | `notes:view` |
 | `/` | All authenticated users |
 
 ## 3. Global Application Shell
@@ -155,11 +158,15 @@ Available on all authenticated app routes.
 
 Requires `ai:use` permission.
 
-- Unified search input
+- Unified search input with **project context selector** (default **General**)
 - Live bookmark filtering as user types (title, description, group, tab)
 - Display up to 6 bookmark matches with launch action
-- Submit opens AI chat drawer
+- Submit creates a persisted **AI Chat** conversation in the selected project and redirects to `/chat` with the prompt (General conversations follow General RAG rules — see §4.7)
 - `ai:` prefix skips bookmark filtering and sends prompt to AI
+
+### 4.2.1 BETA / detailed errors
+
+When `BETA_MODE=true` or `SHOW_DETAILED_ERRORS=true` (server) and matching `NEXT_PUBLIC_*` vars (client), error boundaries and toasts may show detailed messages and stack traces instead of generic failures.
 
 ### 4.3 Operations Summary Widgets
 
@@ -209,8 +216,8 @@ Requires `ai:use`. Also linked from the sidebar as **AI Chat**.
 
 Three-panel workspace (full-bleed within app shell):
 
-- **Left** — Collapsible projects and conversations sidebar (icon-only mode with hover expand)
-- **Center** — Main chat area with header (conversation title, Skills and Files actions), active skill chips above composer, and file manager access
+- **Left** — Collapsible projects and conversations sidebar (icon-only mode with hover expand); **project files** icon on each project row; **conversation files** icon on each conversation row; project badge on conversation items
+- **Center** — Main chat area with header (conversation title, Skills), active skill chips above composer
 - **Right** — Vertical history indicator bar (one marker per user/assistant message)
 
 ### Collapsible Sidebar
@@ -218,12 +225,12 @@ Three-panel workspace (full-bleed within app shell):
 - Manual collapse/expand toggle (always visible; icon reflects next action); state persisted in user preferences (`chat_sidebar_collapsed`)
 - Fixed **56px icon column** — icons stay aligned when collapsing; only labels animate out
 - Hover over collapsed sidebar smoothly expands full labels and lists (no DOM swap / flicker)
-- Quick access to file manager from sidebar header
+- **General** conversations: RAG scopes locked to conversation files only (no notes/meetings/tasks/cross-project search)
 
 ### Projects & Conversations
 
 - Conversations belong to a shared kanban **Project** (from `projects`, same as Tasks and Notes) or **General** when no project is selected
-- Project list mirrors Tasks/Notes (`getProjects()`; requires `tasks:view`); managed in Tasks, not created inside AI Chat
+- Project list filtered by **project membership** (`project_members`); admins see all projects
 - **General** pseudo-project for conversations without a project
 - Create, rename, delete, and **search** conversations within the active project
 - Last message preview and relative timestamp on each conversation
@@ -512,12 +519,12 @@ Requires `tasks:edit`.
 ### 6.10 Ticket Detail Modal
 
 - Deep-linkable via `/tasks/[KEY]` (e.g. `/tasks/OPS-001`)
-- **Top-anchored dialog** — fixed height with internal scroll; tab changes do not shift modal position
+- **Top-anchored dialog** — fixed height with internal scroll; **wider modal** (`max-w-7xl`); tab changes do not shift modal position
 - **Tabbed layout** — Overview, Specification, Links & files, Discussion
 - Header: ticket key badge, type/status badges, inline title edit
 - Field visibility/order driven by project ticket field settings for the ticket type
 - Edit all ticket fields (see §6.3)
-- **Links & files tab** — drag-and-drop zone (files + `.eml` emails); external URL links; file attachments with version history, per-version download, and **Preview** button opening a modal (PDF iframe, DOCX/XLSX client-side conversion, images, plain text; PPTX download fallback); linked issues panel
+- **Links & files tab** — drag-and-drop zone (files + `.eml` emails); external URL links; file attachments with version history, per-version download, **Preview** button, and **green indexed tick** when attachment is indexed in RAG (`rag_index_state.status = indexed`); linked issues panel
 - **Overview tab** — two-column issue-tracker layout: **Description** (TipTap rich text: bold, italic, underline, headings, lists, font size, colour; resizable editor height persisted in `user_preferences.tasks_workspace`), child subtasks, and Discussion on the left; **right sidebar** for type, status, assignee, priority, due date, story points, parent (filtered by hierarchy rules), labels, and checklist
 - **Specification tab** — details, acceptance criteria, definition of done
 - **Discussion tab** — full-height threaded comments (same panel as Overview)
@@ -596,10 +603,10 @@ Requires `admin:access`. Tab selection via query param: `?tab=users|settings|kno
 ### 10.1 User Management
 
 - List all users: name, email, role, access mode, status
-- Create user: email, name, password, role, optional custom permissions
-- Edit user: update details, optional password reset, disable account
+- Create user: email, name, password, role — defaults to **locked-down permissions** (no modules)
+- Edit user: update details, optional password reset, disable account, **per-module view/edit toggles**, **project sharing** (view/edit per project via `UserProjectAccessPanel`)
 - Roles: admin, editor, user, viewer
-- Custom permission overrides per user
+- Custom permission overrides per user (when `useCustom` is enabled)
 
 ### 10.2 System Settings
 
@@ -819,7 +826,7 @@ Full RAG pipeline across AI Chat files, Notes, Meetings, and Tasks (Phases 1–4
 - **Hybrid search:** vector similarity + PostgreSQL full-text search, fused with reciprocal rank fusion (RRF)
 - **Query rewriting:** Grok expands user queries before embedding (improved entity-preserving prompt when `XAI_API_KEY` set)
 - **Re-ranking:** fused score ordering before context budget trim
-- **Scoped search in `/chat`:** persistent Files / Notes / Meetings / Tasks toggles above composer (saved in browser localStorage); when a conversation belongs to a project, retrieval is automatically limited to that project’s notes, meetings, tasks, and files
+- **Scoped search in `/chat`:** persistent Files / Notes / Meetings / Tasks toggles above composer (saved in browser localStorage); when a conversation belongs to a project, retrieval is automatically limited to that project’s notes, meetings, tasks, and files. **General** conversations (no project) are restricted to **conversation files only** — notes, meetings, tasks, and cross-project file search are disabled at retrieval and in the UI
 - **Metadata filters in `/chat`:** meeting date range, meeting label, note language — applied at retrieval without query syntax (kanban project filter is implicit from the conversation when set)
 - **Meeting Q&A:** uses RAG retrieval for long meetings instead of full transcript injection
 - Context budget ~12KB; citations with deep links and source category; deduplicated **Referenced files** list persisted on assistant messages; retrieval logged to `rag_retrieval_logs` and `rag_retrieval_runs` (timings, scores, used-in-context flag)
@@ -831,7 +838,7 @@ Full RAG pipeline across AI Chat files, Notes, Meetings, and Tasks (Phases 1–4
 ### Infrastructure
 
 - Docker Postgres image: `pgvector/pgvector:pg16`
-- Migrations: `0015_rag_pgvector.sql`, `0016_rag_phases_2_4.sql`, `0017_rag_observability.sql`, `0018_color_theme.sql`, `0024_ai_conversation_tabs.sql`
+- Migrations: `0015_rag_pgvector.sql`, `0016_rag_phases_2_4.sql`, `0017_rag_observability.sql`, `0018_color_theme.sql`, `0024_ai_conversation_tabs.sql`, `0025_user_access_and_project_members.sql`
 
 ## 17. Out of Scope / Known Gaps
 

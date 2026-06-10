@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { formatDistanceToNow } from "date-fns";
 import {
   Folder,
@@ -7,10 +8,12 @@ import {
   LayoutGrid,
   MessageSquare,
   MessageSquarePlus,
+  Paperclip,
   Search,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   CollapsibleSideRail,
   SIDE_RAIL_ICON_WIDTH,
@@ -84,7 +87,8 @@ export function ChatSidebar({
   onCreateConversation,
   onRenameConversation,
   onDeleteConversation,
-  onOpenFiles,
+  onOpenProjectFiles,
+  onOpenConversationFiles,
 }: {
   projects: PortalProjectSummary[];
   conversations: AiConversation[];
@@ -99,9 +103,15 @@ export function ChatSidebar({
   onCreateConversation: () => void;
   onRenameConversation: (conversation: AiConversation) => void;
   onDeleteConversation: (conversation: AiConversation) => void;
-  onOpenFiles: () => void;
+  onOpenProjectFiles: (projectId: string) => void;
+  onOpenConversationFiles: (conversationId: string) => void;
 }) {
   const query = search.trim().toLowerCase();
+  const projectNameById = useMemo(
+    () => new Map(projects.map((project) => [project.id, project.name])),
+    [projects]
+  );
+
   const filteredConversations = conversations.filter((c) => {
     const inProject =
       activeProjectId === null ? c.projectId === null : c.projectId === activeProjectId;
@@ -112,6 +122,11 @@ export function ChatSidebar({
       (c.lastMessagePreview ?? "").toLowerCase().includes(query)
     );
   });
+
+  function projectLabel(conversation: AiConversation) {
+    if (!conversation.projectId) return "General";
+    return projectNameById.get(conversation.projectId) ?? "Project";
+  }
 
   return (
     <CollapsibleSideRail
@@ -128,34 +143,6 @@ export function ChatSidebar({
         const labelsVisible = railLabels;
         return (
           <>
-            <div className="flex shrink-0 items-center border-b">
-              <div
-                className="flex shrink-0 items-center justify-center py-2"
-                style={{ width: SIDE_RAIL_ICON_WIDTH }}
-              >
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-8 w-8"
-                  onClick={onOpenFiles}
-                  title="Files"
-                >
-                  <FolderOpen className="h-4 w-4" />
-                </Button>
-              </div>
-              <div
-                className={cn(
-                  "flex min-w-0 flex-1 items-center justify-end overflow-hidden pr-2 transition-[max-width,opacity] duration-200",
-                  labelsVisible ? "max-w-[200px] opacity-100" : "max-w-0 opacity-0"
-                )}
-              >
-                <Button size="sm" variant="ghost" className="h-8 gap-1 px-2" onClick={onOpenFiles}>
-                  <FolderOpen className="h-4 w-4" />
-                  Files
-                </Button>
-              </div>
-            </div>
-
             <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
               <div className={cn("shrink-0 border-b", labelsVisible ? "space-y-3 p-3" : "py-2")}>
                 {labelsVisible ? (
@@ -186,6 +173,21 @@ export function ChatSidebar({
                       active={activeProjectId === project.id}
                       showLabels={labelsVisible}
                       onClick={() => onSelectProject(project.id)}
+                      actions={
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          title="Project files"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onOpenProjectFiles(project.id);
+                          }}
+                        >
+                          <FolderOpen className="h-3.5 w-3.5" />
+                        </Button>
+                      }
                     />
                   ))}
                 </div>
@@ -249,26 +251,43 @@ export function ChatSidebar({
                             "border-primary/30 bg-accent"
                         )}
                       >
-                        <button
-                          type="button"
-                          className="flex w-full items-start gap-2 text-left"
-                          onClick={() => onSelectConversation(conversation.id)}
-                        >
-                          <MessageSquare className="mt-0.5 h-4 w-4 shrink-0" />
-                          <span className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium">{conversation.title}</p>
-                            <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
-                              {conversation.lastMessagePreview || "No messages yet"}
-                            </p>
-                            {conversation.lastMessageAt ? (
-                              <p className="mt-1 text-[10px] text-muted-foreground">
-                                {formatDistanceToNow(new Date(conversation.lastMessageAt), {
-                                  addSuffix: true,
-                                })}
+                        <div className="flex items-start gap-1">
+                          <button
+                            type="button"
+                            className="flex min-w-0 flex-1 items-start gap-2 text-left"
+                            onClick={() => onSelectConversation(conversation.id)}
+                          >
+                            <MessageSquare className="mt-0.5 h-4 w-4 shrink-0" />
+                            <span className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <p className="truncate text-sm font-medium">{conversation.title}</p>
+                                <Badge variant="outline" className="text-[10px] font-normal">
+                                  {projectLabel(conversation)}
+                                </Badge>
+                              </div>
+                              <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                                {conversation.lastMessagePreview || "No messages yet"}
                               </p>
-                            ) : null}
-                          </span>
-                        </button>
+                              {conversation.lastMessageAt ? (
+                                <p className="mt-1 text-[10px] text-muted-foreground">
+                                  {formatDistanceToNow(new Date(conversation.lastMessageAt), {
+                                    addSuffix: true,
+                                  })}
+                                </p>
+                              ) : null}
+                            </span>
+                          </button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 shrink-0 opacity-0 transition group-hover:opacity-100"
+                            title="Conversation files"
+                            onClick={() => onOpenConversationFiles(conversation.id)}
+                          >
+                            <Paperclip className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                         <div className="mt-1 flex gap-1 opacity-0 transition group-hover:opacity-100">
                           <Button
                             size="sm"

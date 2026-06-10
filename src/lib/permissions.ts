@@ -4,6 +4,10 @@ import { isRestrictedToSettings, type SessionUserContext } from "@/lib/auth/user
 export type UserPermissionOverrides = {
   useCustom?: boolean;
   ai?: boolean;
+  notesView?: boolean;
+  notesEdit?: boolean;
+  meetingsView?: boolean;
+  meetingsEdit?: boolean;
   bookmarksView?: boolean;
   bookmarksEdit?: boolean;
   tasksView?: boolean;
@@ -21,6 +25,10 @@ export type Permission =
   | "monitoring:configure"
   | "monitoring:view"
   | "ai:use"
+  | "notes:view"
+  | "notes:edit"
+  | "meetings:view"
+  | "meetings:edit"
   | "admin:access";
 
 const rolePermissions: Record<UserRole, Permission[]> = {
@@ -33,6 +41,10 @@ const rolePermissions: Record<UserRole, Permission[]> = {
     "monitoring:configure",
     "monitoring:view",
     "ai:use",
+    "notes:view",
+    "notes:edit",
+    "meetings:view",
+    "meetings:edit",
     "admin:access",
   ],
   editor: [
@@ -43,6 +55,10 @@ const rolePermissions: Record<UserRole, Permission[]> = {
     "monitoring:configure",
     "monitoring:view",
     "ai:use",
+    "notes:view",
+    "notes:edit",
+    "meetings:view",
+    "meetings:edit",
   ],
   user: [
     "bookmarks:edit",
@@ -51,14 +67,22 @@ const rolePermissions: Record<UserRole, Permission[]> = {
     "tasks:view",
     "monitoring:view",
     "ai:use",
+    "notes:view",
+    "notes:edit",
+    "meetings:view",
+    "meetings:edit",
   ],
-  viewer: ["bookmarks:view", "tasks:view", "monitoring:view"],
+  viewer: ["bookmarks:view", "tasks:view", "monitoring:view", "notes:view", "meetings:view"],
 };
 
 const permissionOverrideKey: Partial<
   Record<Permission, keyof UserPermissionOverrides>
 > = {
   "ai:use": "ai",
+  "notes:view": "notesView",
+  "notes:edit": "notesEdit",
+  "meetings:view": "meetingsView",
+  "meetings:edit": "meetingsEdit",
   "bookmarks:view": "bookmarksView",
   "bookmarks:edit": "bookmarksEdit",
   "tasks:view": "tasksView",
@@ -132,7 +156,8 @@ export function canAccessRoute(
   if (path.startsWith("/monitoring"))
     return hasPermission(role, "monitoring:view", overrides);
   if (path.startsWith("/chat")) return hasPermission(role, "ai:use", overrides);
-  if (path.startsWith("/meetings")) return hasPermission(role, "ai:use", overrides);
+  if (path.startsWith("/meetings")) return hasPermission(role, "meetings:view", overrides);
+  if (path.startsWith("/notes")) return hasPermission(role, "notes:view", overrides);
   if (path.startsWith("/settings")) return true;
   if (path === "/" && context && isRestrictedToSettings({ role, ...context, permissions: overrides })) {
     return false;
@@ -146,12 +171,34 @@ export function getDefaultPermissionsForRole(
   return {
     useCustom: false,
     ai: roleHasPermission(role, "ai:use"),
+    notesView: roleHasPermission(role, "notes:view"),
+    notesEdit: roleHasPermission(role, "notes:edit"),
+    meetingsView: roleHasPermission(role, "meetings:view"),
+    meetingsEdit: roleHasPermission(role, "meetings:edit"),
     bookmarksView: roleHasPermission(role, "bookmarks:view"),
     bookmarksEdit: roleHasPermission(role, "bookmarks:edit"),
     tasksView: roleHasPermission(role, "tasks:view"),
     tasksEdit: roleHasPermission(role, "tasks:edit"),
     monitoringView: roleHasPermission(role, "monitoring:view"),
     monitoringConfigure: roleHasPermission(role, "monitoring:configure"),
+  };
+}
+
+/** Default for newly created users — no module access until an admin grants it. */
+export function getLockedDownPermissions(): UserPermissionOverrides {
+  return {
+    useCustom: true,
+    ai: false,
+    notesView: false,
+    notesEdit: false,
+    meetingsView: false,
+    meetingsEdit: false,
+    bookmarksView: false,
+    bookmarksEdit: false,
+    tasksView: false,
+    tasksEdit: false,
+    monitoringView: false,
+    monitoringConfigure: false,
   };
 }
 
@@ -164,6 +211,10 @@ export function getEffectivePermissions(
   return {
     useCustom: true,
     ai: overrides.ai ?? false,
+    notesView: overrides.notesView ?? false,
+    notesEdit: overrides.notesEdit ?? false,
+    meetingsView: overrides.meetingsView ?? false,
+    meetingsEdit: overrides.meetingsEdit ?? false,
     bookmarksView: overrides.bookmarksView ?? false,
     bookmarksEdit: overrides.bookmarksEdit ?? false,
     tasksView: overrides.tasksView ?? false,
