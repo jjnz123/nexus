@@ -143,10 +143,24 @@
       "breakpoints": true
     },
     {
+      "idx": 22,
+      "version": "7",
+      "when": 1781007600000,
+      "tag": "0022_add_bug_task_type",
+      "breakpoints": true
+    },
+    {
       "idx": 23,
       "version": "7",
       "when": 1781008000000,
       "tag": "0023_align_ai_chat_projects",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1781008800000,
+      "tag": "0024_ai_conversation_tabs",
       "breakpoints": true
     }
   ]
