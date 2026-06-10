@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { format } from "date-fns";
 import { motion } from "framer-motion";
-import { Check, Copy, FileText, RotateCcw, Sparkles } from "lucide-react";
+import { Check, Copy, FileText, GitBranch, Pencil, RotateCcw, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { MarkdownMessage } from "@/components/ai/MarkdownMessage";
@@ -60,6 +60,10 @@ export function ChatMessageBubble({
   streamingReferencedFiles = [],
   showRegenerate = false,
   onRegenerate,
+  showEdit = false,
+  onEdit,
+  showFork = false,
+  onFork,
   registerRef,
 }: {
   message: AiMessage;
@@ -69,6 +73,10 @@ export function ChatMessageBubble({
   streamingReferencedFiles?: ReferencedFile[];
   showRegenerate?: boolean;
   onRegenerate?: () => void;
+  showEdit?: boolean;
+  onEdit?: () => void;
+  showFork?: boolean;
+  onFork?: () => void;
   registerRef?: (el: HTMLDivElement | null) => void;
 }) {
   const [copied, setCopied] = useState(false);
@@ -131,6 +139,21 @@ export function ChatMessageBubble({
           </>
         ) : null}
 
+        {isUser && message.content && !isStreaming && showEdit && onEdit ? (
+          <div className="mt-2 flex gap-1 opacity-0 transition group-hover:opacity-100">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs text-primary-foreground/80 hover:text-primary-foreground"
+              onClick={onEdit}
+            >
+              <Pencil className="mr-1 h-3 w-3" />
+              Edit
+            </Button>
+          </div>
+        ) : null}
+
         {!isUser && message.content && !isStreaming ? (
           <div className="mt-2 flex gap-1 opacity-0 transition group-hover:opacity-100">
             <Button
@@ -153,6 +176,18 @@ export function ChatMessageBubble({
               >
                 <RotateCcw className="mr-1 h-3 w-3" />
                 Regenerate
+              </Button>
+            ) : null}
+            {showFork && onFork ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs text-muted-foreground"
+                onClick={onFork}
+              >
+                <GitBranch className="mr-1 h-3 w-3" />
+                Fork
               </Button>
             ) : null}
           </div>

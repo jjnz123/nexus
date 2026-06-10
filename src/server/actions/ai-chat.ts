@@ -95,13 +95,24 @@ export async function createAiConversation(input: unknown) {
     })
     .returning();
 
+  await db
+    .update(aiConversations)
+    .set({ tabGroupId: conversation.id })
+    .where(eq(aiConversations.id, conversation.id));
+
+  const [withTabGroup] = await db
+    .select()
+    .from(aiConversations)
+    .where(eq(aiConversations.id, conversation.id))
+    .limit(1);
+
   await updateBookmarkPreferences({
     activeAiProjectId: data.projectId ?? null,
     activeAiConversationId: conversation.id,
   });
 
   revalidatePath("/chat");
-  return conversation;
+  return withTabGroup ?? { ...conversation, tabGroupId: conversation.id };
 }
 
 export async function renameAiConversation(id: string, title: string) {
@@ -284,6 +295,98 @@ export async function deleteMessageAfter(messageId: string) {
 
   revalidatePath("/chat");
   return { success: true };
+}
+
+export async function getConversationTabGroup(tabGroupId: string) {
+  const session = await requireAuth();
+  requireSessionPermission(session, "ai:use");
+
+  return db
+    .select()
+    .from(aiConversations)
+    .where(
+      and(eq(aiConversations.tabGroupId, tabGroupId), eq(aiConversations.userId, session.user.id))
+    )
+    .orderBy(asc(aiConversations.createdAt));
+}
+
+export async function forkConversationAtMessage(conversationId: string, messageId: string) {
+  const session = await requireAuth();
+  requireSessionPermission(session, "ai:use");
+  const source = await assertConversationOwner(conversationId, session.user.id);
+
+  const [targetMessage] = await db
+    .select()
+    .from(aiMessages)
+    .where(and(eq(aiMessages.id, messageId), eq(aiMessages.conversationId, conversationId)))
+    .limit(1);
+
+  if (!targetMessage) throw new Error("Message not found");
+
+  const history = await db
+    .select()
+    .from(aiMessages)
+    .where(eq(aiMessages.conversationId, conversationId))
+    .orderBy(asc(aiMessages.createdAt));
+
+  const forkIndex = history.findIndex((message) => message.id === messageId);
+  if (forkIndex < 0) throw new Error("Message not found");
+
+  const messagesToCopy = history.slice(0, forkIndex + 1);
+  const tabGroupId = source.tabGroupId ?? source.id;
+  const forkNumber =
+    (
+      await db
+        .select({ id: aiConversations.id })
+        .from(aiConversations)
+        .where(
+          and(
+            eq(aiConversations.tabGroupId, tabGroupId),
+            eq(aiConversations.userId, session.user.id)
+          )
+        )
+    ).length + 1;
+
+  const preview = previewText(targetMessage.content, 40);
+  const title =
+    targetMessage.role === "assistant"
+      ? `Fork · ${preview}`
+      : `Fork ${forkNumber} · ${preview}`;
+
+  const [forked] = await db
+    .insert(aiConversations)
+    .values({
+      userId: session.user.id,
+      projectId: source.projectId,
+      title,
+      tabGroupId,
+      forkFromMessageId: messageId,
+      enabledSkills: source.enabledSkills,
+      lastMessagePreview: source.lastMessagePreview,
+      lastMessageAt: messagesToCopy.at(-1)?.createdAt ?? new Date(),
+    })
+    .returning();
+
+  if (messagesToCopy.length) {
+    await db.insert(aiMessages).values(
+      messagesToCopy.map((message) => ({
+        conversationId: forked.id,
+        role: message.role,
+        content: message.content,
+        attachments: message.attachments ?? [],
+        metadata: message.metadata ?? {},
+        createdAt: message.createdAt,
+      }))
+    );
+  }
+
+  await updateBookmarkPreferences({
+    activeAiProjectId: forked.projectId,
+    activeAiConversationId: forked.id,
+  });
+
+  revalidatePath("/chat");
+  return forked;
 }
 
 export async function searchAiHistoryAdmin(input: unknown) {

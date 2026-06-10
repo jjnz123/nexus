@@ -438,6 +438,10 @@ export const aiConversations = pgTable(
     lastMessagePreview: text("last_message_preview"),
     lastMessageAt: timestamp("last_message_at"),
     enabledSkills: jsonb("enabled_skills").$type<string[] | null>(),
+    tabGroupId: uuid("tab_group_id"),
+    forkFromMessageId: uuid("fork_from_message_id").references((): AnyPgColumn => aiMessages.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -445,6 +449,7 @@ export const aiConversations = pgTable(
     index("ai_conversations_user_idx").on(table.userId),
     index("ai_conversations_project_idx").on(table.projectId),
     index("ai_conversations_last_message_at_idx").on(table.lastMessageAt),
+    index("ai_conversations_tab_group_idx").on(table.tabGroupId),
   ]
 );
 

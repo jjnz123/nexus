@@ -363,7 +363,9 @@ export async function retrieveChatKnowledge(input: {
     query: input.query,
     scopes: input.scopes,
     includeOrgTasks: input.includeOrgTasks,
-    filters: input.filters,
+    filters: input.projectId
+      ? { ...input.filters, kanbanProjectId: input.projectId }
+      : input.filters,
     projectId: input.projectId,
     conversationId: input.conversationId,
     projectFiles: input.projectFiles,

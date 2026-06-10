@@ -256,6 +256,14 @@ function buildMetadataFilter(input: RagSearchInput, sql: ReturnType<typeof getSq
   return clause;
 }
 
+function buildProjectScopeFilter(
+  aiProjectId: string | null | undefined,
+  sql: ReturnType<typeof getSqlClient>
+) {
+  if (!aiProjectId) return sql``;
+  return sql`AND kanban_project_id = ${aiProjectId}`;
+}
+
 function buildAccessFilter(input: RagSearchInput, sql: ReturnType<typeof getSqlClient>) {
   const sourceTypes = scopesToSourceTypes(input.scopes);
   if (!sourceTypes.length) return sql`AND FALSE`;
@@ -301,8 +309,10 @@ function buildAccessFilter(input: RagSearchInput, sql: ReturnType<typeof getSqlC
       `
     : sql`FALSE`;
 
+  const projectScope = buildProjectScopeFilter(input.aiProjectId, sql);
+
   const notesScope = input.scopes.includes("notes")
-    ? sql`(source_type = ${RAG_SOURCE_TYPES.USER_NOTE} AND user_id = ${input.userId})`
+    ? sql`(source_type = ${RAG_SOURCE_TYPES.USER_NOTE} AND user_id = ${input.userId} ${projectScope})`
     : sql`FALSE`;
 
   const meetingsScope = input.scopes.includes("meetings")
@@ -311,17 +321,17 @@ function buildAccessFilter(input: RagSearchInput, sql: ReturnType<typeof getSqlC
           RAG_SOURCE_TYPES.MEETING_TRANSCRIPT,
           RAG_SOURCE_TYPES.MEETING_SUMMARY,
           RAG_SOURCE_TYPES.MEETING_ACTION_ITEM,
-        ])} AND user_id = ${input.userId} AND meeting_id = ${input.meetingId})`
+        ])} AND user_id = ${input.userId} AND meeting_id = ${input.meetingId} ${projectScope})`
       : sql`(source_type IN ${sql([
           RAG_SOURCE_TYPES.MEETING_TRANSCRIPT,
           RAG_SOURCE_TYPES.MEETING_SUMMARY,
           RAG_SOURCE_TYPES.MEETING_ACTION_ITEM,
-        ])} AND user_id = ${input.userId} AND coalesce(metadata->>'archived', 'false') = 'false')`
+        ])} AND user_id = ${input.userId} AND coalesce(metadata->>'archived', 'false') = 'false' ${projectScope})`
     : sql`FALSE`;
 
   const tasksScope =
     input.scopes.includes("tasks") && input.includeOrgTasks
-      ? sql`(source_type IN ${sql([RAG_SOURCE_TYPES.TASK, RAG_SOURCE_TYPES.TASK_ATTACHMENT])} AND scope = 'org')`
+      ? sql`(source_type IN ${sql([RAG_SOURCE_TYPES.TASK, RAG_SOURCE_TYPES.TASK_ATTACHMENT])} AND scope = 'org' ${projectScope})`
       : sql`FALSE`;
 
   return sql`

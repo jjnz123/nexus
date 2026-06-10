@@ -43,12 +43,16 @@ export function ChatRagControls({
   scopes,
   filters,
   kanbanProjects,
+  lockedProjectId = null,
+  lockedProjectName,
   onScopesChange,
   onFiltersChange,
 }: {
   scopes: RagSearchScope[];
   filters: RagSearchFilters;
   kanbanProjects: Array<{ id: string; name: string }>;
+  lockedProjectId?: string | null;
+  lockedProjectName?: string | null;
   onScopesChange: (scopes: RagSearchScope[]) => void;
   onFiltersChange: (filters: RagSearchFilters) => void;
 }) {
@@ -97,6 +101,11 @@ export function ChatRagControls({
         })}
 
         <div className="ml-auto flex items-center gap-2">
+          {lockedProjectId ? (
+            <Badge variant="secondary" className="text-[10px]">
+              Project: {lockedProjectName ?? "This project"}
+            </Badge>
+          ) : null}
           {filtersActive ? <Badge variant="secondary">Filters on</Badge> : null}
           <Button
             type="button"
@@ -114,7 +123,7 @@ export function ChatRagControls({
 
       {filtersOpen ? (
         <div className="grid gap-3 rounded-lg border bg-background p-3 sm:grid-cols-2 lg:grid-cols-4">
-          {kanbanProjects.length ? (
+          {kanbanProjects.length && !lockedProjectId ? (
             <div className="space-y-1.5">
               <Label className="text-xs">Kanban project</Label>
               <Select

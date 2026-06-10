@@ -83,7 +83,7 @@ export function ChatComposer({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
+            if (e.key === "Enter" && e.shiftKey) {
               e.preventDefault();
               if (canSend) onSend();
             }
@@ -125,7 +125,7 @@ export function ChatComposer({
         </div>
       </div>
       <p className="mt-2 text-center text-[11px] text-muted-foreground">
-        Enter to send · Shift+Enter for new line · Attach images, PDFs, or text files
+        Enter for new line · Shift+Enter to send · Attach images, PDFs, or text files
       </p>
     </div>
   );

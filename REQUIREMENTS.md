@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v4.3.0
+**Current release:** v4.4.0
 
 ## 1. Overview
 
@@ -232,8 +232,11 @@ Three-panel workspace (full-bleed within app shell):
 ### Chat Interface
 
 - Streaming Grok responses via `/api/ai/chat` with messages persisted to PostgreSQL
-- User vs assistant bubbles with markdown (assistant), copy, and regenerate (latest assistant reply)
-- **File transparency** — when RAG retrieves files, the model is instructed to name filenames in its answer; assistant messages show a collapsible **Referenced files** panel (icon, filename, source category: project / conversation / ticket attachment, optional preview) plus enhanced **Sources** citations
+- User vs assistant bubbles with markdown (assistant), copy, **edit last user message** (reloads composer and truncates from that point), regenerate (latest assistant reply), and **fork** (branch from any past assistant reply into a new tab)
+- **Composer keyboard:** Enter = new line; Shift+Enter = send
+- **Conversation tabs** — forked branches share a tab group above the chat (Main + forks); switch tabs to continue alternate paths; close fork tabs individually
+- **Project-scoped knowledge** — RAG retrieval for notes, meetings, tasks, and project files is limited to the conversation’s kanban project (badge shown in knowledge controls; manual project filter hidden when locked)
+- **File transparency** — when RAG retrieves files, the model is instructed to name filenames in its answer; assistant messages show collapsible **Referenced files** and **Sources** panels (hidden by default; expand to view links and categories—no hover excerpt popups)
 - **Attachments** — images, PDFs, and text files via `/api/uploads`; thumbnails for images, file cards for documents
 - Starter prompt chips on empty conversation
 - Stop streaming mid-generation (partial assistant reply saved when content exists)
@@ -272,7 +275,7 @@ Three-panel workspace (full-bleed within app shell):
 
 ### Data Model
 
-- `ai_conversations` — title, link to shared kanban `projects.id`, last message preview/at, `enabled_skills` (jsonb)
+- `ai_conversations` — title, link to shared kanban `projects.id`, last message preview/at, `enabled_skills` (jsonb), `tab_group_id` (fork tab group), `fork_from_message_id` (nullable branch point)
 - `ai_messages` — role, content, attachments (jsonb), metadata (jsonb: skill events, citations, referenced files), timestamps
 - `ai_project_files` — kanban project knowledge base files with text preview cache
 - `ai_conversation_files` — conversation-scoped files with text preview cache
@@ -803,7 +806,7 @@ Full RAG pipeline across AI Chat files, Notes, Meetings, and Tasks (Phases 1–4
 - Retrieved file chunks carry metadata: `filename`, `mimeType`, `sourceCategory` (`project_file`, `conversation_file`, `ticket_attachment`), optional `pageLabel`
 - Context block lists retrieved filenames and instructs the model to name them when used
 - Assistant message metadata stores deduplicated `referencedFiles[]` alongside `citations[]`
-- UI: **Referenced files** panel (collapsible after 3 items) + **Sources** with category badges
+- UI: **Referenced files** panel (collapsed by default) + **Sources** list (collapsed by default; category badges; no hover excerpt popups)
 
 ### Ingestion
 
@@ -816,10 +819,10 @@ Full RAG pipeline across AI Chat files, Notes, Meetings, and Tasks (Phases 1–4
 - **Hybrid search:** vector similarity + PostgreSQL full-text search, fused with reciprocal rank fusion (RRF)
 - **Query rewriting:** Grok expands user queries before embedding (improved entity-preserving prompt when `XAI_API_KEY` set)
 - **Re-ranking:** fused score ordering before context budget trim
-- **Scoped search in `/chat`:** persistent Files / Notes / Meetings / Tasks toggles above composer (saved in browser localStorage)
-- **Metadata filters in `/chat`:** kanban project, meeting date range, meeting label, note language — applied at retrieval without query syntax
+- **Scoped search in `/chat`:** persistent Files / Notes / Meetings / Tasks toggles above composer (saved in browser localStorage); when a conversation belongs to a project, retrieval is automatically limited to that project’s notes, meetings, tasks, and files
+- **Metadata filters in `/chat`:** meeting date range, meeting label, note language — applied at retrieval without query syntax (kanban project filter is implicit from the conversation when set)
 - **Meeting Q&A:** uses RAG retrieval for long meetings instead of full transcript injection
-- Context budget ~12KB; citations with deep links, source category, and hover excerpts; deduplicated **Referenced files** list persisted on assistant messages; retrieval logged to `rag_retrieval_logs` and `rag_retrieval_runs` (timings, scores, used-in-context flag)
+- Context budget ~12KB; citations with deep links and source category; deduplicated **Referenced files** list persisted on assistant messages; retrieval logged to `rag_retrieval_logs` and `rag_retrieval_runs` (timings, scores, used-in-context flag)
 
 ### Admin
 
@@ -828,7 +831,7 @@ Full RAG pipeline across AI Chat files, Notes, Meetings, and Tasks (Phases 1–4
 ### Infrastructure
 
 - Docker Postgres image: `pgvector/pgvector:pg16`
-- Migrations: `0015_rag_pgvector.sql`, `0016_rag_phases_2_4.sql`, `0017_rag_observability.sql`, `0018_color_theme.sql`
+- Migrations: `0015_rag_pgvector.sql`, `0016_rag_phases_2_4.sql`, `0017_rag_observability.sql`, `0018_color_theme.sql`, `0024_ai_conversation_tabs.sql`
 
 ## 17. Out of Scope / Known Gaps
 

@@ -68,40 +68,31 @@ export function ReferencedFiles({ files }: { files: ReferencedFile[] }) {
 
   if (!files.length) return null;
 
-  const previewCount = 3;
-  const visibleFiles = expanded ? files : files.slice(0, previewCount);
-  const hiddenCount = files.length - previewCount;
-
   return (
     <div className="mt-3 rounded-lg border bg-muted/20 p-3">
-      <div className="mb-2 flex items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-medium text-muted-foreground">
           Referenced files ({files.length})
         </p>
-        {files.length > previewCount ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-6 px-2 text-[11px] text-muted-foreground"
-            onClick={() => setExpanded((value) => !value)}
-          >
-            {expanded ? "Show less" : `Show all (${files.length})`}
-            <ChevronDown
-              className={cn("ml-1 h-3 w-3 transition", expanded && "rotate-180")}
-            />
-          </Button>
-        ) : null}
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-6 px-2 text-[11px] text-muted-foreground"
+          onClick={() => setExpanded((value) => !value)}
+        >
+          {expanded ? "Hide" : "Show"}
+          <ChevronDown
+            className={cn("ml-1 h-3 w-3 transition", expanded && "rotate-180")}
+          />
+        </Button>
       </div>
-      <ul className="space-y-1">
-        {visibleFiles.map((file) => (
-          <ReferencedFileRow key={`${file.sourceCategory}:${file.id}`} file={file} />
-        ))}
-      </ul>
-      {!expanded && hiddenCount > 0 ? (
-        <p className="mt-2 text-[11px] text-muted-foreground">
-          +{hiddenCount} more file{hiddenCount === 1 ? "" : "s"}
-        </p>
+      {expanded ? (
+        <ul className="mt-2 space-y-1">
+          {files.map((file) => (
+            <ReferencedFileRow key={`${file.sourceCategory}:${file.id}`} file={file} />
+          ))}
+        </ul>
       ) : null}
     </div>
   );

@@ -5,6 +5,7 @@ import { Bot, FolderOpen, Sparkles, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ChatComposer } from "@/components/chat/ChatComposer";
+import { ChatConversationTabs } from "@/components/chat/ChatConversationTabs";
 import { ChatFileManager } from "@/components/chat/ChatFileManager";
 import { ChatMessageBubble } from "@/components/chat/ChatMessageBubble";
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
@@ -40,7 +41,9 @@ import {
   createAiConversation,
   deleteAiConversation,
   deleteMessageAfter,
+  forkConversationAtMessage,
   getConversationMessages,
+  getConversationTabGroup,
   getAiWorkspace,
   renameAiConversation,
   setActiveAiSelection,
@@ -114,12 +117,14 @@ export function ChatPage({
   const [skillsOpen, setSkillsOpen] = useState(false);
   const [enabledSkillNames, setEnabledSkillNames] = useState(initialEnabledSkills);
   const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
+  const [tabConversations, setTabConversations] = useState<AiConversation[]>([]);
   const [, startTransition] = useTransition();
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const messagesRef = useRef(messages);
   const conversationIdRef = useRef(activeConversationId);
+  const conversationProjectIdRef = useRef<string | null>(initialProjectId);
   const enabledSkillNamesRef = useRef(enabledSkillNames);
   const searchScopesRef = useRef(searchScopes);
   const searchFiltersRef = useRef(searchFilters);
@@ -159,6 +164,38 @@ export function ChatPage({
     () => conversations.find((c) => c.id === activeConversationId) ?? null,
     [conversations, activeConversationId]
   );
+
+  const lockedProject = useMemo(() => {
+    const projectId = activeConversation?.projectId ?? null;
+    if (!projectId) return null;
+    return projects.find((project) => project.id === projectId) ?? null;
+  }, [activeConversation?.projectId, projects]);
+
+  useEffect(() => {
+    conversationProjectIdRef.current = activeConversation?.projectId ?? null;
+  }, [activeConversation?.projectId]);
+
+  useEffect(() => {
+    const projectId = activeConversation?.projectId ?? null;
+    setSearchFilters((prev) => ({ ...prev, kanbanProjectId: projectId }));
+  }, [activeConversation?.projectId]);
+
+  useEffect(() => {
+    const tabGroupId = activeConversation?.tabGroupId;
+    if (!tabGroupId) {
+      setTabConversations(activeConversation ? [activeConversation] : []);
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        const tabs = await getConversationTabGroup(tabGroupId);
+        setTabConversations(tabs);
+      } catch {
+        setTabConversations(activeConversation ? [activeConversation] : []);
+      }
+    });
+  }, [activeConversation?.id, activeConversation?.tabGroupId]);
 
   const syncEnabledSkills = useCallback(
     (conversation: AiConversation | null) => {
@@ -333,7 +370,7 @@ export function ChatPage({
           (content) => setStreamingContent(content),
           controller.signal,
           {
-            projectId: projectIdRef.current,
+            projectId: conversationProjectIdRef.current,
             conversationId,
             enabledSkillNames: enabledSkillNamesRef.current,
             searchScopes: searchScopesRef.current,
@@ -424,6 +461,87 @@ export function ChatPage({
     [isStreaming, runStream]
   );
 
+  const editLastUserMessage = useCallback(
+    async (userMessageId: string) => {
+      const conversationId = conversationIdRef.current;
+      if (!conversationId || isStreaming) return;
+
+      try {
+        const targetIndex = messagesRef.current.findIndex((m) => m.id === userMessageId);
+        if (targetIndex < 0) return;
+
+        const message = messagesRef.current[targetIndex];
+        if (message.role !== "user") return;
+
+        setInput(message.content);
+        setAttachments(message.attachments ?? []);
+        await deleteMessageAfter(userMessageId);
+        setMessages(messagesRef.current.slice(0, targetIndex));
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to edit message");
+      }
+    },
+    [isStreaming]
+  );
+
+  const forkFromMessage = useCallback(
+    async (messageId: string) => {
+      const conversationId = conversationIdRef.current;
+      if (!conversationId || isStreaming) return;
+
+      startTransition(async () => {
+        try {
+          const forked = await forkConversationAtMessage(conversationId, messageId);
+          setConversations((prev) => [forked, ...prev.filter((c) => c.id !== forked.id)]);
+          const tabs = await getConversationTabGroup(forked.tabGroupId ?? forked.id);
+          setTabConversations(tabs);
+          setActiveProjectId(forked.projectId);
+          syncEnabledSkills(forked);
+          const rows = await getConversationMessages(forked.id);
+          setMessages(rows);
+          setActiveConversationId(forked.id);
+          toast.success("Conversation forked");
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : "Failed to fork conversation");
+        }
+      });
+    },
+    [isStreaming, syncEnabledSkills]
+  );
+
+  const handleCloseForkTab = useCallback(
+    (conversationId: string) => {
+      const tab = tabConversations.find((item) => item.id === conversationId);
+      if (!tab?.forkFromMessageId) return;
+      if (!window.confirm(`Close fork "${tab.title}"?`)) return;
+
+      startTransition(async () => {
+        try {
+          await deleteAiConversation(conversationId);
+          setConversations((prev) => prev.filter((c) => c.id !== conversationId));
+
+          const remaining = tabConversations.filter((item) => item.id !== conversationId);
+          setTabConversations(remaining);
+
+          if (activeConversationId === conversationId) {
+            const fallback = remaining[0];
+            if (fallback) {
+              selectConversation(fallback.id);
+            } else {
+              setActiveConversationId(null);
+              setMessages([]);
+            }
+          }
+
+          toast.success("Fork closed");
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : "Failed to close fork");
+        }
+      });
+    },
+    [activeConversationId, selectConversation, tabConversations]
+  );
+
   const stopStreaming = () => {
     abortRef.current?.abort();
   };
@@ -461,6 +579,13 @@ export function ChatPage({
   const lastAssistantId = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i -= 1) {
       if (messages[i].role === "assistant") return messages[i].id;
+    }
+    return null;
+  }, [messages]);
+
+  const lastUserMessageId = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      if (messages[i].role === "user") return messages[i].id;
     }
     return null;
   }, [messages]);
@@ -525,6 +650,12 @@ export function ChatPage({
             </div>
           ) : (
             <>
+              <ChatConversationTabs
+                tabs={tabConversations}
+                activeConversationId={activeConversationId}
+                onSelect={selectConversation}
+                onClose={handleCloseForkTab}
+              />
               <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
                 {displayMessages.length === 0 ? (
                   <div className="flex h-full flex-col items-center justify-center gap-6 py-8 text-center">
@@ -569,6 +700,14 @@ export function ChatPage({
                           !isStreaming
                         }
                         onRegenerate={() => void regenerateFrom(message.id)}
+                        showEdit={
+                          message.role === "user" &&
+                          message.id === lastUserMessageId &&
+                          !isStreaming
+                        }
+                        onEdit={() => void editLastUserMessage(message.id)}
+                        showFork={message.role === "assistant" && message.id !== "streaming" && !isStreaming}
+                        onFork={() => void forkFromMessage(message.id)}
                       />
                     ))}
                   </div>
@@ -580,6 +719,8 @@ export function ChatPage({
                   scopes={searchScopes}
                   filters={searchFilters}
                   kanbanProjects={kanbanProjects}
+                  lockedProjectId={lockedProject?.id ?? null}
+                  lockedProjectName={lockedProject?.name ?? null}
                   onScopesChange={setSearchScopes}
                   onFiltersChange={setSearchFilters}
                 />
