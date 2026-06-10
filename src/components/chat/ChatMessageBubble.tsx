@@ -105,12 +105,7 @@ export function ChatMessageBubble({
           isUser ? "bg-primary text-primary-foreground" : "border bg-card"
         )}
       >
-        {!isUser ? (
-          <SkillEvents
-            skills={skills}
-            defaultCollapsed={!isStreaming && Boolean(message.content)}
-          />
-        ) : null}
+        {!isUser ? <SkillEvents skills={skills} /> : null}
 
         {isUser ? (
           <>
@@ -123,7 +118,7 @@ export function ChatMessageBubble({
           <>
             {message.content ? <MarkdownMessage content={message.content} /> : null}
             <RagCitations citations={citations} />
-            {isStreaming && !message.content ? (
+            {isStreaming && !message.content && !skills.length ? (
               <span className="text-muted-foreground animate-pulse">Thinking…</span>
             ) : null}
           </>

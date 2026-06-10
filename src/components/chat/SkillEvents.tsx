@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   CheckCircle2,
-  ChevronDown,
   ChevronRight,
   ExternalLink,
   Loader2,
@@ -16,6 +15,21 @@ import { Button } from "@/components/ui/button";
 import type { AiSkillEvent } from "@/lib/db/schema";
 import { cn } from "@/lib/utils";
 
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/\*(.*?)\*/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function truncate(text: string, max = 40): string {
+  const clean = stripMarkdown(text);
+  if (clean.length <= max) return clean;
+  return `${clean.slice(0, max)}…`;
+}
+
 function SearchSkillBody({
   result,
   source,
@@ -23,47 +37,50 @@ function SearchSkillBody({
   result: Record<string, unknown>;
   source: "Web" | "X";
 }) {
-  const summary = String(result.summary ?? "");
   const citations = (result.citations as string[] | undefined) ?? [];
   const query = result.query ? String(result.query) : null;
 
+  if (!query && !citations.length) {
+    return <p className="text-muted-foreground">No results.</p>;
+  }
+
   return (
-    <div className="space-y-2 text-muted-foreground">
+    <div className="space-y-1 text-muted-foreground">
       {query ? (
-        <p>
+        <p className="truncate">
           Query: <span className="text-foreground">{query}</span>
         </p>
       ) : null}
-      {summary ? <p className="whitespace-pre-wrap leading-relaxed">{summary}</p> : null}
       {citations.length ? (
-        <div className="space-y-1">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-            {source} sources
-          </p>
-          <ul className="space-y-1">
-            {citations.slice(0, 8).map((url) => (
-              <li key={url}>
-                <a
-                  href={url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 break-all text-primary hover:underline"
-                >
-                  {url}
-                  <ExternalLink className="h-3 w-3 shrink-0" />
-                </a>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
+        <ul className="space-y-0.5">
+          {citations.slice(0, 6).map((url) => (
+            <li key={url}>
+              <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 truncate text-primary hover:underline"
+                title={url}
+              >
+                <span className="truncate">{url.replace(/^https?:\/\//, "")}</span>
+                <ExternalLink className="h-2.5 w-2.5 shrink-0" />
+              </a>
+            </li>
+          ))}
+          {citations.length > 6 ? (
+            <li className="text-[10px]">+{citations.length - 6} more</li>
+          ) : null}
+        </ul>
+      ) : (
+        <p className="text-[10px] uppercase tracking-wide">{source} search completed</p>
+      )}
     </div>
   );
 }
 
 function SkillResultBody({ skill }: { skill: AiSkillEvent }) {
   if (skill.status === "running") {
-    return <p className="text-muted-foreground">Running…</p>;
+    return <p className="text-muted-foreground">In progress…</p>;
   }
 
   if (skill.error) {
@@ -149,146 +166,110 @@ function SkillResultBody({ skill }: { skill: AiSkillEvent }) {
   }
 
   return (
-    <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words text-muted-foreground">
+    <pre className="max-h-32 overflow-auto whitespace-pre-wrap break-words text-muted-foreground">
       {JSON.stringify(result, null, 2)}
     </pre>
   );
 }
 
 function skillSummary(skill: AiSkillEvent): string | null {
-  if (skill.status === "running") return "Running…";
-  if (skill.error) return skill.error;
+  if (skill.status === "running") return "…";
+  if (skill.error) return truncate(skill.error, 48);
+
   const result = skill.result as Record<string, unknown> | undefined;
   if (!result) return null;
 
   if (skill.name === "web_search" || skill.name === "x_search") {
-    const summary = String(result.summary ?? "").trim();
-    if (summary) return summary.split("\n")[0]?.slice(0, 120) ?? null;
+    const citations = (result.citations as string[] | undefined) ?? [];
+    const query = result.query ? truncate(String(result.query), 32) : null;
+    const sourceCount = `${citations.length} src`;
+    return query ? `${query} · ${sourceCount}` : sourceCount;
   }
 
   if (skill.name === "create_task" || skill.name === "update_task") {
     const taskKey = String(result.taskKey ?? "");
-    return taskKey ? `Task ${taskKey}` : null;
+    return taskKey ? taskKey : null;
   }
 
   if (skill.name === "search_bookmarks") {
     const count = ((result.results as unknown[]) ?? []).length;
-    return count ? `${count} bookmark${count === 1 ? "" : "s"} found` : "No bookmarks matched";
+    return count ? `${count} hit${count === 1 ? "" : "s"}` : "none";
+  }
+
+  if (skill.name === "check_monitor_status") {
+    if (Array.isArray(result.matches)) {
+      const count = result.matches.length;
+      return count ? `${count} device${count === 1 ? "" : "s"}` : "none";
+    }
+    return `${String(result.up ?? 0)}/${String(result.total ?? 0)} up`;
   }
 
   return null;
 }
 
-function SkillEventCard({
-  skill,
-  defaultCollapsed,
-}: {
-  skill: AiSkillEvent;
-  defaultCollapsed: boolean;
-}) {
-  const isRunning = skill.status === "running";
-  const [expanded, setExpanded] = useState(!defaultCollapsed || isRunning);
+function SkillStatusIcon({ skill }: { skill: AiSkillEvent }) {
+  if (skill.status === "running") {
+    return <Loader2 className="h-3 w-3 shrink-0 animate-spin text-primary" />;
+  }
+  if (skill.status === "success") {
+    return <CheckCircle2 className="h-3 w-3 shrink-0 text-emerald-600" />;
+  }
+  if (skill.status === "error") {
+    return <XCircle className="h-3 w-3 shrink-0 text-destructive" />;
+  }
+  return <Wrench className="h-3 w-3 shrink-0 text-muted-foreground" />;
+}
 
-  useEffect(() => {
-    if (defaultCollapsed && !isRunning) {
-      setExpanded(false);
-    }
-  }, [defaultCollapsed, isRunning]);
-
+function SkillEventCard({ skill }: { skill: AiSkillEvent }) {
+  const [expanded, setExpanded] = useState(false);
   const summary = skillSummary(skill);
-  const canCollapse = !isRunning && defaultCollapsed;
 
   return (
     <div
       className={cn(
-        "rounded-xl border px-3 py-2.5 text-xs shadow-sm",
+        "rounded-md border border-border/50 bg-muted/20 text-[11px]",
         skill.status === "error" && "border-destructive/30 bg-destructive/5",
-        skill.status === "success" && "border-emerald-500/20 bg-emerald-500/5",
         skill.status === "running" && "border-primary/20 bg-primary/5"
       )}
     >
-      <div className="flex items-start gap-2">
-        {canCollapse ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="mt-0.5 h-6 w-6 shrink-0 p-0 text-muted-foreground hover:text-foreground"
-            onClick={() => setExpanded((value) => !value)}
-            aria-expanded={expanded}
-            aria-label={expanded ? "Collapse skill details" : "Expand skill details"}
-          >
-            {expanded ? (
-              <ChevronDown className="h-3.5 w-3.5" />
-            ) : (
-              <ChevronRight className="h-3.5 w-3.5" />
-            )}
-          </Button>
-        ) : (
-          <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center">
-            {skill.status === "running" ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-            ) : skill.status === "success" ? (
-              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-            ) : skill.status === "error" ? (
-              <XCircle className="h-3.5 w-3.5 text-destructive" />
-            ) : (
-              <Wrench className="h-3.5 w-3.5 text-primary" />
-            )}
-          </span>
-        )}
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="h-auto min-h-0 w-full justify-start gap-1.5 px-2 py-1 font-normal hover:bg-transparent"
+        onClick={() => setExpanded((value) => !value)}
+        aria-expanded={expanded}
+        aria-label={expanded ? "Collapse skill details" : "Expand skill details"}
+      >
+        <SkillStatusIcon skill={skill} />
+        <span className="shrink-0 font-medium">{skill.label}</span>
+        {!expanded && summary ? (
+          <span className="min-w-0 truncate text-muted-foreground">· {summary}</span>
+        ) : null}
+        <ChevronRight
+          className={cn(
+            "ml-auto h-3 w-3 shrink-0 text-muted-foreground transition-transform",
+            expanded && "rotate-90"
+          )}
+        />
+      </Button>
 
-        <div className="min-w-0 flex-1">
-          <div className="mb-1 flex flex-wrap items-center gap-2">
-            {canCollapse ? (
-              <>
-                {skill.status === "success" ? (
-                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                ) : skill.status === "error" ? (
-                  <XCircle className="h-3.5 w-3.5 text-destructive" />
-                ) : (
-                  <Wrench className="h-3.5 w-3.5 text-primary" />
-                )}
-              </>
-            ) : null}
-            <span className="font-medium">{skill.label}</span>
-            <Badge variant="outline" className="h-5 px-1.5 text-[10px] capitalize">
-              {skill.status}
-            </Badge>
-          </div>
-
-          {!expanded && summary ? (
-            <p className="truncate text-muted-foreground">{summary}</p>
-          ) : null}
-
-          {expanded || isRunning ? (
-            <div className={cn(canCollapse && "mt-1.5")}>
-              <SkillResultBody skill={skill} />
-            </div>
-          ) : null}
+      {expanded ? (
+        <div className="border-t border-border/40 px-2 pb-1.5 pt-1">
+          <SkillResultBody skill={skill} />
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }
 
-export function SkillEvents({
-  skills,
-  defaultCollapsed = false,
-}: {
-  skills: AiSkillEvent[];
-  defaultCollapsed?: boolean;
-}) {
+export function SkillEvents({ skills }: { skills: AiSkillEvent[] }) {
   if (!skills.length) return null;
 
   return (
-    <div className="mb-3 space-y-2">
+    <div className="mb-2 space-y-1">
       {skills.map((skill, index) => (
-        <SkillEventCard
-          key={`${skill.name}-${index}`}
-          skill={skill}
-          defaultCollapsed={defaultCollapsed}
-        />
+        <SkillEventCard key={`${skill.name}-${index}`} skill={skill} />
       ))}
     </div>
   );

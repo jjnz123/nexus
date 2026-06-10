@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v3.6.0
+**Current release:** v3.6.1
 
 ## 1. Overview
 
@@ -246,8 +246,8 @@ Three-panel workspace (full-bleed within app shell):
 - Web Search and X Search use the xAI Responses API (`web_search` / `x_search` tools); require `ai:use`
 - **Per-conversation skill toggles** — Skills panel to enable/disable each skill; stored in `enabled_skills` on the conversation (`null` = all permitted skills; `[]` = none)
 - Active skills shown as chips above the composer; header **Skills** button opens management dialog
-- Skill usage shown inline in assistant messages with Grok-style result cards (status, structured results)
-- **Collapsed by default** once the assistant's final answer is displayed; users can expand to view full skill output (Web/X search show summary + citations, not raw JSON)
+- Skill usage shown as **compact one-line chips** in assistant messages (label, status icon, short metadata); click to expand for structured details (Web/X search show query + source URLs only—not the model-facing summary)
+- **Always collapsed by default** during streaming and after the answer; only the final markdown reply is shown at full size
 - Skill results persisted in message `metadata` jsonb
 - Only enabled skills are sent to the model as tools
 - Extensible skill registry in `src/lib/ai/skills/`
