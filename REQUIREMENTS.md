@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v4.2.0
+**Current release:** v4.2.1
 
 ## 1. Overview
 
@@ -266,7 +266,7 @@ Three-panel workspace (full-bleed within app shell):
 
 - Scrollable timeline with a marker for **every** user and assistant message
 - Click marker → smooth scroll to that message (Framer Motion highlight)
-- Hover marker → preview card (excerpt, sender, timestamp)
+- Hover marker → preview card (excerpt, sender, timestamp) rendered via portal with fixed positioning so it is not clipped by chat scroll containers
 - Distinct colors for user vs Grok markers
 - Active message tracked via scroll intersection
 

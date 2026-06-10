@@ -42,7 +42,7 @@ function SidebarRow({
   return (
     <div
       className={cn(
-        "group flex items-center rounded-md",
+        "group flex w-full items-center rounded-md",
         active && "bg-accent",
         showLabels ? "pr-1" : "justify-center"
       )}
@@ -62,9 +62,7 @@ function SidebarRow({
         >
           <Icon className="h-4 w-4 shrink-0" />
         </span>
-        <SideRailLabel show={showLabels} className="flex-1">
-          {label}
-        </SideRailLabel>
+        <SideRailLabel show={showLabels}>{label}</SideRailLabel>
       </button>
       {showLabels && actions ? (
         <div className="flex shrink-0 items-center opacity-0 transition group-hover:opacity-100">
@@ -167,8 +165,8 @@ export function ChatSidebar({
               </div>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto">
-              <div className={cn("border-b", labelsVisible ? "space-y-3 p-3" : "py-2")}>
+            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+              <div className={cn("shrink-0 border-b", labelsVisible ? "space-y-3 p-3" : "py-2")}>
                 {labelsVisible ? (
                   <div className="flex items-center justify-between">
                     <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -233,7 +231,7 @@ export function ChatSidebar({
                 </div>
               </div>
 
-              <div className={cn("flex min-h-0 flex-col", labelsVisible ? "p-3" : "py-2")}>
+              <div className={cn("flex shrink-0 flex-col", labelsVisible ? "p-3" : "py-2")}>
                 {labelsVisible ? (
                   <div className="mb-2 flex items-center justify-between">
                     <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">

@@ -16,11 +16,13 @@ export function SideRailLabel({
   children: ReactNode;
   className?: string;
 }) {
+  if (!show) return null;
+
   return (
     <span
       className={cn(
-        "min-w-0 truncate transition-[max-width,opacity] duration-200 ease-in-out",
-        show ? "max-w-[200px] opacity-100" : "max-w-0 opacity-0",
+        "min-w-0 flex-1 truncate transition-[max-width,opacity] duration-200 ease-in-out",
+        "max-w-[200px] opacity-100",
         className
       )}
     >
@@ -106,8 +108,9 @@ export function CollapsibleSideRail({
         <div
           className={cn(
             "flex min-w-0 flex-1 items-center gap-2 overflow-hidden pr-2 transition-[max-width,opacity] duration-200 ease-in-out",
-            showLabels ? "max-w-[200px] opacity-100" : "max-w-0 opacity-0"
+            showLabels ? "max-w-none flex-1 opacity-100" : "max-w-0 flex-none opacity-0 pointer-events-none"
           )}
+          aria-hidden={!showLabels}
         >
           {headerIcon ? (
             <span className="flex shrink-0 items-center justify-center">{headerIcon}</span>
