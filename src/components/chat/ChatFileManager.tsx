@@ -31,6 +31,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { AiConversationFile, AiProjectFile } from "@/lib/db/schema";
 import { RAG_SOURCE_TYPES } from "@/lib/rag/types";
+import { ragStatusKey } from "@/lib/rag/status-key";
 import {
   getProjectMeetingsForChat,
   getProjectTaskAttachmentsForChat,
@@ -51,7 +52,6 @@ import {
   getAiFileRagStatuses,
   getMeetingRagStatuses,
   getTaskAttachmentRagStatuses,
-  ragStatusKey,
   type RagIndexStatus,
 } from "@/server/actions/rag-status";
 

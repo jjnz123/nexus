@@ -1,11 +1,12 @@
 "use server";
 
-import { and, eq, inArray, or, sql } from "drizzle-orm";
+import { and, eq, inArray, or } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { ragIndexState, type RagSourceType } from "@/lib/db/schema";
 import { requireAuth } from "@/lib/auth";
 import { requireSessionPermission } from "@/lib/permissions";
 import { RAG_SOURCE_TYPES } from "@/lib/rag/types";
+import { ragStatusKey } from "@/lib/rag/status-key";
 
 export type RagIndexStatus = "indexed" | "failed" | "pending";
 
@@ -13,10 +14,6 @@ export type RagStatusSource = {
   sourceType: RagSourceType;
   sourceId: string;
 };
-
-export function ragStatusKey(sourceType: RagSourceType, sourceId: string) {
-  return `${sourceType}:${sourceId}`;
-}
 
 export async function getRagIndexStatuses(sources: RagStatusSource[]) {
   await requireAuth();
