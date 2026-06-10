@@ -12,6 +12,7 @@ import {
   primaryKey,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
+import type { ColorTheme } from "@/lib/theme";
 
 export const userRoleEnum = pgEnum("user_role", [
   "admin",
@@ -184,6 +185,7 @@ export const userPreferences = pgTable("user_preferences", {
   activeAiConversationId: uuid("active_ai_conversation_id"),
   chatSidebarCollapsed: boolean("chat_sidebar_collapsed").notNull().default(false),
   appSidebarCollapsed: boolean("app_sidebar_collapsed").notNull().default(false),
+  colorTheme: text("color_theme").$type<ColorTheme>().notNull().default("dark"),
   notesWorkspace: jsonb("notes_workspace")
     .$type<{
       openTabIds: string[];

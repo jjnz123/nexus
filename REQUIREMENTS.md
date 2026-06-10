@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v3.5.8
+**Current release:** v3.6.0
 
 ## 1. Overview
 
@@ -558,6 +558,7 @@ All authenticated users.
 - View email (read-only)
 - Update display name
 - Change password (requires current password; minimum 8 characters)
+- **Appearance:** select **Dark** or **Light** color theme (stored in `user_preferences.color_theme`, synced via cookie for SSR)
 
 Admin system settings remain under `/admin?tab=settings`.
 
@@ -794,7 +795,7 @@ Full RAG pipeline across AI Chat files, Notes, Meetings, and Tasks (Phases 1–4
 ### Infrastructure
 
 - Docker Postgres image: `pgvector/pgvector:pg16`
-- Migrations: `0015_rag_pgvector.sql`, `0016_rag_phases_2_4.sql`, `0017_rag_observability.sql`
+- Migrations: `0015_rag_pgvector.sql`, `0016_rag_phases_2_4.sql`, `0017_rag_observability.sql`, `0018_color_theme.sql`
 
 ## 17. Out of Scope / Known Gaps
 

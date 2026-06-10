@@ -5,6 +5,8 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { userPreferences } from "@/lib/db/schema";
 import { requireAuth } from "@/lib/auth";
+import { COLOR_THEMES } from "@/lib/theme";
+import { setThemeCookie } from "@/lib/theme-server";
 
 const homeOrderSchema = z.object({
   cardIds: z.array(z.string().uuid()).max(50),
@@ -82,4 +84,18 @@ export async function updateHomeFavouriteOrder(input: unknown) {
     .where(eq(userPreferences.userId, session.user.id));
 
   return { success: true };
+}
+
+export async function updateColorTheme(input: unknown) {
+  const session = await requireAuth();
+  const theme = z.enum(COLOR_THEMES).parse(input);
+  await getOrCreatePrefs(session.user.id);
+
+  await db
+    .update(userPreferences)
+    .set({ colorTheme: theme, updatedAt: new Date() })
+    .where(eq(userPreferences.userId, session.user.id));
+
+  await setThemeCookie(theme);
+  return { theme };
 }

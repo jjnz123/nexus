@@ -94,6 +94,7 @@ At `/meetings` (requires `ai:use`):
 
 - **Account status:** `pending`, `member`, or `administrator` — new users start as **pending** with access limited to Profile Settings until elevated.
 - **Two-factor authentication:** mandatory for non-administrators — choose **authenticator app (TOTP)** or **email codes** in Profile Settings (`/settings`). Optional for admins; enforced at sign-in when enabled. Only one method at a time.
+- **Appearance:** choose **Dark** or **Light** theme in Profile Settings (`/settings`); preference is saved per user and applied on every visit.
 - **SMTP2go** integration for welcome/invite emails and admin alerts when pending users sign in for the first time (`SMTP2GO_*` env vars).
 
 ### Administration

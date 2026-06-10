@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Providers } from "@/components/providers";
+import { getThemeFromCookie } from "@/lib/theme-server";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -18,13 +19,15 @@ export const metadata: Metadata = {
   description: "Personal internal operations portal",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const theme = await getThemeFromCookie();
+
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className={theme} suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} min-h-screen antialiased`}
       >

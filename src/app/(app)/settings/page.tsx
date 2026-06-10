@@ -3,8 +3,11 @@ import { auth } from "@/lib/auth";
 import { isAdminUser, isPendingUser, mustSetupTwoFactor } from "@/lib/auth/user-access";
 import { isEmailConfigured } from "@/lib/email";
 import { ProfileSettings } from "@/components/settings/ProfileSettings";
+import { AppearanceSettings } from "@/components/settings/AppearanceSettings";
 import { EmailTwoFactorSettings } from "@/components/settings/EmailTwoFactorSettings";
 import { TwoFactorSettings } from "@/components/settings/TwoFactorSettings";
+import { getBookmarkPreferences } from "@/server/actions/preferences";
+import { normalizeColorTheme } from "@/lib/theme";
 
 export default async function SettingsPage() {
   const session = await auth();
@@ -17,6 +20,9 @@ export default async function SettingsPage() {
     email2faEnabled: session.user.email2faEnabled,
     permissions: session.user.permissions,
   };
+
+  const prefs = await getBookmarkPreferences();
+  const colorTheme = normalizeColorTheme(prefs.colorTheme);
 
   return (
     <div className="space-y-6">
@@ -33,6 +39,7 @@ export default async function SettingsPage() {
         </div>
       ) : null}
       <ProfileSettings initialName={session.user.name} email={session.user.email} />
+      <AppearanceSettings initialTheme={colorTheme} />
       <TwoFactorSettings
         initialRequired={!isAdminUser(ctx)}
         initialEnabled={session.user.totpEnabled}
