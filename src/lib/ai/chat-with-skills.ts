@@ -4,7 +4,6 @@ import {
   aiConversationFiles,
   aiConversations,
   aiProjectFiles,
-  aiProjects,
 } from "@/lib/db/schema";
 import { retrieveChatKnowledge } from "@/lib/rag/retriever";
 import type { RagCitation, RagSearchScope, ReferencedFile } from "@/lib/db/schema";
@@ -57,11 +56,10 @@ async function loadKnowledgeContext(
 ) {
   const projectFiles = projectId
     ? await db
-        .select({ file: aiProjectFiles, project: aiProjects })
+        .select({ file: aiProjectFiles })
         .from(aiProjectFiles)
-        .innerJoin(aiProjects, eq(aiProjectFiles.projectId, aiProjects.id))
         .where(eq(aiProjectFiles.projectId, projectId))
-        .then((rows) => rows.filter((r) => r.project.userId === user.id).map((r) => r.file))
+        .then((rows) => rows.map((r) => r.file))
     : [];
 
   const conversationFiles = conversationId

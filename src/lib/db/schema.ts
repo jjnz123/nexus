@@ -418,19 +418,11 @@ export type RagSearchScope = "files" | "notes" | "meetings" | "tasks";
 
 export type RagChunkMetadata = Record<string, unknown>;
 
-export const aiProjects = pgTable(
-  "ai_projects",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    userId: uuid("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    name: text("name").notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
-  },
-  (table) => [index("ai_projects_user_idx").on(table.userId)]
-);
+export type PortalProjectSummary = {
+  id: string;
+  key: string;
+  name: string;
+};
 
 export const aiConversations = pgTable(
   "ai_conversations",
@@ -439,8 +431,8 @@ export const aiConversations = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    projectId: uuid("project_id").references(() => aiProjects.id, {
-      onDelete: "cascade",
+    projectId: uuid("project_id").references((): AnyPgColumn => projects.id, {
+      onDelete: "set null",
     }),
     title: text("title").notNull().default("New conversation"),
     lastMessagePreview: text("last_message_preview"),
@@ -481,7 +473,7 @@ export const aiProjectFiles = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     projectId: uuid("project_id")
       .notNull()
-      .references(() => aiProjects.id, { onDelete: "cascade" }),
+      .references((): AnyPgColumn => projects.id, { onDelete: "cascade" }),
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
@@ -539,7 +531,7 @@ export const ragChunks = pgTable(
     contentHash: text("content_hash"),
     title: text("title").notNull(),
     mimeType: text("mime_type"),
-    aiProjectId: uuid("ai_project_id").references(() => aiProjects.id, {
+    aiProjectId: uuid("ai_project_id").references((): AnyPgColumn => projects.id, {
       onDelete: "cascade",
     }),
     aiConversationId: uuid("ai_conversation_id").references(() => aiConversations.id, {
@@ -907,7 +899,6 @@ export type UserPreferences = typeof userPreferences.$inferSelect;
 export type UserBookmarkFavourite = typeof userBookmarkFavourites.$inferSelect;
 export type BookmarkLaunch = typeof bookmarkLaunches.$inferSelect;
 export type FaviconCache = typeof faviconCache.$inferSelect;
-export type AiProject = typeof aiProjects.$inferSelect;
 export type AiConversation = typeof aiConversations.$inferSelect;
 export type AiMessage = typeof aiMessages.$inferSelect;
 export type AiProjectFile = typeof aiProjectFiles.$inferSelect;

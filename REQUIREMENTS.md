@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v4.2.1
+**Current release:** v4.3.0
 
 ## 1. Overview
 
@@ -222,8 +222,8 @@ Three-panel workspace (full-bleed within app shell):
 
 ### Projects & Conversations
 
-- Conversations belong to a parent **Project** (or **General** when no project is selected)
-- Create, rename, and delete **Projects** (user-owned; separate from kanban `projects`)
+- Conversations belong to a shared kanban **Project** (from `projects`, same as Tasks and Notes) or **General** when no project is selected
+- Project list mirrors Tasks/Notes (`getProjects()`; requires `tasks:view`); managed in Tasks, not created inside AI Chat
 - **General** pseudo-project for conversations without a project
 - Create, rename, delete, and **search** conversations within the active project
 - Last message preview and relative timestamp on each conversation
@@ -272,10 +272,9 @@ Three-panel workspace (full-bleed within app shell):
 
 ### Data Model
 
-- `ai_projects` — user-owned project folders
-- `ai_conversations` — title, project link, last message preview/at, `enabled_skills` (jsonb)
+- `ai_conversations` — title, link to shared kanban `projects.id`, last message preview/at, `enabled_skills` (jsonb)
 - `ai_messages` — role, content, attachments (jsonb), metadata (jsonb: skill events, citations, referenced files), timestamps
-- `ai_project_files` — project knowledge base files with text preview cache
+- `ai_project_files` — kanban project knowledge base files with text preview cache
 - `ai_conversation_files` — conversation-scoped files with text preview cache
 - User preferences: `active_ai_project_id`, `active_ai_conversation_id`, `active_kanban_project_id`, `chat_sidebar_collapsed`, `app_sidebar_collapsed`
 

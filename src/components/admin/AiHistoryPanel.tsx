@@ -38,9 +38,8 @@ type UserOption = {
 
 type ProjectOption = {
   id: string;
+  key: string;
   name: string;
-  userId: string;
-  userName: string;
 };
 
 type SearchResult = Awaited<ReturnType<typeof searchAiHistoryAdmin>>["results"][number];
@@ -231,7 +230,7 @@ export function AiHistoryPanel({
                   <SelectItem value="all">All projects</SelectItem>
                   {projects.map((project) => (
                     <SelectItem key={project.id} value={project.id}>
-                      {project.name} · {project.userName}
+                      {project.key} — {project.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

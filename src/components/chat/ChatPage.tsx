@@ -26,8 +26,8 @@ import type {
   AiConversation,
   AiMessage,
   AiMessageAttachment,
-  AiProject,
   AiSkillEvent,
+  PortalProjectSummary,
   RagCitation,
   RagSearchScope,
   ReferencedFile,
@@ -38,14 +38,11 @@ import {
   appendAssistantMessage,
   appendUserMessage,
   createAiConversation,
-  createAiProject,
   deleteAiConversation,
-  deleteAiProject,
   deleteMessageAfter,
   getConversationMessages,
   getAiWorkspace,
   renameAiConversation,
-  renameAiProject,
   setActiveAiSelection,
   updateConversationEnabledSkills,
 } from "@/server/actions/ai-chat";
@@ -83,7 +80,7 @@ export function ChatPage({
   initialEnabledSkills,
   kanbanProjects = [],
 }: {
-  initialProjects: AiProject[];
+  initialProjects: PortalProjectSummary[];
   initialConversations: AiConversation[];
   initialMessages: AiMessage[];
   initialProjectId: string | null;
@@ -92,7 +89,7 @@ export function ChatPage({
   userRole: UserRole;
   userPermissions: UserPermissionOverrides | null;
   initialEnabledSkills: string[];
-  kanbanProjects?: Array<{ id: string; name: string }>;
+  kanbanProjects?: PortalProjectSummary[];
 }) {
   const { stream } = useAiStream();
   const [projects, setProjects] = useState(initialProjects);
@@ -253,59 +250,6 @@ export function ChatPage({
       syncEnabledSkills(conversation);
     }
     loadConversation(conversationId);
-  };
-
-  const handleCreateProject = () => {
-    const name = window.prompt("Project name")?.trim();
-    if (!name) return;
-    startTransition(async () => {
-      try {
-        const project = await createAiProject({ name });
-        setProjects((prev) => [...prev, project].sort((a, b) => a.name.localeCompare(b.name)));
-        setActiveProjectId(project.id);
-        await setActiveAiSelection(project.id, activeConversationId);
-        toast.success("Project created");
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Failed to create project");
-      }
-    });
-  };
-
-  const handleRenameProject = (project: AiProject) => {
-    const name = window.prompt("Project name", project.name)?.trim();
-    if (!name || name === project.name) return;
-    startTransition(async () => {
-      try {
-        const updated = await renameAiProject(project.id, name);
-        setProjects((prev) =>
-          prev.map((p) => (p.id === project.id ? updated : p)).sort((a, b) => a.name.localeCompare(b.name))
-        );
-        toast.success("Project renamed");
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Failed to rename project");
-      }
-    });
-  };
-
-  const handleDeleteProject = (project: AiProject) => {
-    if (!window.confirm(`Delete project "${project.name}" and all its conversations?`)) return;
-    startTransition(async () => {
-      try {
-        await deleteAiProject(project.id);
-        setProjects((prev) => prev.filter((p) => p.id !== project.id));
-        setConversations((prev) => prev.filter((c) => c.projectId !== project.id));
-        if (activeProjectId === project.id) {
-          setActiveProjectId(null);
-        }
-        if (conversations.some((c) => c.projectId === project.id && c.id === activeConversationId)) {
-          setActiveConversationId(null);
-          setMessages([]);
-        }
-        toast.success("Project deleted");
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Failed to delete project");
-      }
-    });
   };
 
   const handleCreateConversation = () => {
@@ -568,9 +512,6 @@ export function ChatPage({
           onSearchChange={setSearch}
           onSelectProject={selectProject}
           onSelectConversation={selectConversation}
-          onCreateProject={handleCreateProject}
-          onRenameProject={handleRenameProject}
-          onDeleteProject={handleDeleteProject}
           onCreateConversation={handleCreateConversation}
           onRenameConversation={handleRenameConversation}
           onDeleteConversation={handleDeleteConversation}

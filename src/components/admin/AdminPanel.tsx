@@ -23,9 +23,8 @@ type UserRow = {
 
 type AiProjectOption = {
   id: string;
+  key: string;
   name: string;
-  userId: string;
-  userName: string;
 };
 
 export function AdminPanel({

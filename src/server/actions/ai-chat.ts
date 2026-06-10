@@ -6,18 +6,18 @@ import { db } from "@/lib/db";
 import {
   aiConversations,
   aiMessages,
-  aiProjects,
+  projects,
   users,
   type AiMessageAttachment,
   type AiMessageMetadata,
+  type PortalProjectSummary,
 } from "@/lib/db/schema";
 import { requireAuth } from "@/lib/auth";
-import { requireSessionPermission } from "@/lib/permissions";
+import { hasPermission, requireSessionPermission } from "@/lib/permissions";
 import {
   aiAdminSearchSchema,
   aiConversationSchema,
   aiMessageSchema,
-  aiProjectSchema,
 } from "@/lib/validators/ai-chat";
 import { updateBookmarkPreferences } from "@/server/actions/preferences";
 
@@ -36,72 +36,45 @@ async function assertConversationOwner(conversationId: string, userId: string) {
   return row;
 }
 
-async function assertProjectOwner(projectId: string, userId: string) {
+async function assertKanbanProject(projectId: string) {
   const [row] = await db
-    .select()
-    .from(aiProjects)
-    .where(and(eq(aiProjects.id, projectId), eq(aiProjects.userId, userId)))
+    .select({ id: projects.id })
+    .from(projects)
+    .where(eq(projects.id, projectId))
     .limit(1);
   if (!row) throw new Error("Project not found");
   return row;
+}
+
+async function getPortalProjects(session: Awaited<ReturnType<typeof requireAuth>>) {
+  if (!hasPermission(session.user.role, "tasks:view", session.user.permissions)) {
+    return [] as PortalProjectSummary[];
+  }
+
+  return db
+    .select({
+      id: projects.id,
+      key: projects.key,
+      name: projects.name,
+    })
+    .from(projects)
+    .orderBy(asc(projects.name));
 }
 
 export async function getAiWorkspace() {
   const session = await requireAuth();
   requireSessionPermission(session, "ai:use");
 
-  const projects = await db
-    .select()
-    .from(aiProjects)
-    .where(eq(aiProjects.userId, session.user.id))
-    .orderBy(asc(aiProjects.name));
+  const [projectRows, conversations] = await Promise.all([
+    getPortalProjects(session),
+    db
+      .select()
+      .from(aiConversations)
+      .where(eq(aiConversations.userId, session.user.id))
+      .orderBy(desc(aiConversations.lastMessageAt), desc(aiConversations.updatedAt)),
+  ]);
 
-  const conversations = await db
-    .select()
-    .from(aiConversations)
-    .where(eq(aiConversations.userId, session.user.id))
-    .orderBy(desc(aiConversations.lastMessageAt), desc(aiConversations.updatedAt));
-
-  return { projects, conversations };
-}
-
-export async function createAiProject(input: unknown) {
-  const session = await requireAuth();
-  requireSessionPermission(session, "ai:use");
-  const data = aiProjectSchema.parse(input);
-
-  const [project] = await db
-    .insert(aiProjects)
-    .values({ userId: session.user.id, name: data.name.trim() })
-    .returning();
-
-  revalidatePath("/chat");
-  return project;
-}
-
-export async function renameAiProject(id: string, name: string) {
-  const session = await requireAuth();
-  requireSessionPermission(session, "ai:use");
-  await assertProjectOwner(id, session.user.id);
-
-  const [project] = await db
-    .update(aiProjects)
-    .set({ name: name.trim(), updatedAt: new Date() })
-    .where(eq(aiProjects.id, id))
-    .returning();
-
-  revalidatePath("/chat");
-  return project;
-}
-
-export async function deleteAiProject(id: string) {
-  const session = await requireAuth();
-  requireSessionPermission(session, "ai:use");
-  await assertProjectOwner(id, session.user.id);
-
-  await db.delete(aiProjects).where(eq(aiProjects.id, id));
-  revalidatePath("/chat");
-  return { success: true };
+  return { projects: projectRows, conversations };
 }
 
 export async function createAiConversation(input: unknown) {
@@ -110,7 +83,7 @@ export async function createAiConversation(input: unknown) {
   const data = aiConversationSchema.parse(input);
 
   if (data.projectId) {
-    await assertProjectOwner(data.projectId, session.user.id);
+    await assertKanbanProject(data.projectId);
   }
 
   const [conversation] = await db
@@ -160,7 +133,7 @@ export async function setActiveAiSelection(projectId: string | null, conversatio
   const session = await requireAuth();
   requireSessionPermission(session, "ai:use");
 
-  if (projectId) await assertProjectOwner(projectId, session.user.id);
+  if (projectId) await assertKanbanProject(projectId);
   if (conversationId) await assertConversationOwner(conversationId, session.user.id);
 
   await updateBookmarkPreferences({
@@ -348,8 +321,9 @@ export async function searchAiHistoryAdmin(input: unknown) {
       messageCreatedAt: aiMessages.createdAt,
       conversationId: aiConversations.id,
       conversationTitle: aiConversations.title,
-      projectId: aiProjects.id,
-      projectName: aiProjects.name,
+      projectId: projects.id,
+      projectName: projects.name,
+      projectKey: projects.key,
       userId: users.id,
       userName: users.name,
       userEmail: users.email,
@@ -357,7 +331,7 @@ export async function searchAiHistoryAdmin(input: unknown) {
     .from(aiMessages)
     .innerJoin(aiConversations, eq(aiMessages.conversationId, aiConversations.id))
     .innerJoin(users, eq(aiConversations.userId, users.id))
-    .leftJoin(aiProjects, eq(aiConversations.projectId, aiProjects.id))
+    .leftJoin(projects, eq(aiConversations.projectId, projects.id))
     .where(whereClause)
     .orderBy(desc(aiMessages.createdAt))
     .limit(limit);
@@ -373,11 +347,15 @@ export async function getAdminConversationMessages(conversationId: string) {
     .select({
       conversation: aiConversations,
       user: { id: users.id, name: users.name, email: users.email },
-      project: aiProjects,
+      project: {
+        id: projects.id,
+        key: projects.key,
+        name: projects.name,
+      },
     })
     .from(aiConversations)
     .innerJoin(users, eq(aiConversations.userId, users.id))
-    .leftJoin(aiProjects, eq(aiConversations.projectId, aiProjects.id))
+    .leftJoin(projects, eq(aiConversations.projectId, projects.id))
     .where(eq(aiConversations.id, conversationId))
     .limit(1);
 
@@ -398,12 +376,10 @@ export async function getAiProjectsForAdminFilter() {
 
   return db
     .select({
-      id: aiProjects.id,
-      name: aiProjects.name,
-      userId: aiProjects.userId,
-      userName: users.name,
+      id: projects.id,
+      key: projects.key,
+      name: projects.name,
     })
-    .from(aiProjects)
-    .innerJoin(users, eq(aiProjects.userId, users.id))
-    .orderBy(asc(aiProjects.name));
+    .from(projects)
+    .orderBy(asc(projects.name));
 }

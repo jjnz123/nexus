@@ -7,7 +7,7 @@ import {
   aiConversationFiles,
   aiConversations,
   aiProjectFiles,
-  aiProjects,
+  projects,
 } from "@/lib/db/schema";
 import { requireAuth } from "@/lib/auth";
 import { requireSessionPermission } from "@/lib/permissions";
@@ -21,11 +21,11 @@ import {
   aiRenameFileSchema,
 } from "@/lib/validators/ai-files";
 
-async function assertProjectOwner(projectId: string, userId: string) {
+async function assertKanbanProject(projectId: string) {
   const [row] = await db
-    .select()
-    .from(aiProjects)
-    .where(and(eq(aiProjects.id, projectId), eq(aiProjects.userId, userId)))
+    .select({ id: projects.id })
+    .from(projects)
+    .where(eq(projects.id, projectId))
     .limit(1);
   if (!row) throw new Error("Project not found");
   return row;
@@ -44,7 +44,7 @@ async function assertConversationOwner(conversationId: string, userId: string) {
 export async function getAiProjectFiles(projectId: string) {
   const session = await requireAuth();
   requireSessionPermission(session, "ai:use");
-  await assertProjectOwner(projectId, session.user.id);
+  await assertKanbanProject(projectId);
 
   return db
     .select()
@@ -69,7 +69,7 @@ export async function addAiProjectFile(input: unknown) {
   const session = await requireAuth();
   requireSessionPermission(session, "ai:use");
   const data = aiProjectFileInputSchema.parse(input);
-  await assertProjectOwner(data.projectId, session.user.id);
+  await assertKanbanProject(data.projectId);
 
   const displayName = data.displayName?.trim() || data.filename;
   const textPreview = await extractTextPreview(data.path, data.mimeType, data.filename);
