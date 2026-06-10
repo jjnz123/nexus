@@ -120,6 +120,13 @@
       "when": 1781003600000,
       "tag": "0018_color_theme",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1781004400000,
+      "tag": "0019_tasks_notes_projects",
+      "breakpoints": true
     }
   ]
 }
