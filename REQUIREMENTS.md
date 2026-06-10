@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v4.6.1
+**Current release:** v4.6.2
 
 ## 1. Overview
 
@@ -753,8 +753,8 @@ Requires `ai:use`. Transcription requires `OPENAI_API_KEY`; summarization requir
 
 - Create meeting with **title**, **date/time** (defaults to now), and optional **project** link
 - **Create a new Tasks project** inline from the meeting form when the user has `tasks:edit`
-- **Select audio input device** before recording (enumerates `audioinput` devices after microphone permission; choice persisted in localStorage)
-- **Record** in browser (MediaRecorder via global `RecordingProvider`; format/bitrate configurable in Admin → System Settings, default **96 kbps Opus WebM**) or **upload** audio file (up to 200MB upload; **Whisper transcription limited to 25MB**)
+- **Select audio input device** before recording (choice persisted in localStorage; **System default** uses macOS input setting e.g. Loopback Audio). `getUserMedia` is called **only** when the user clicks Start recording — never on app load or section navigation
+- **Record** in browser (MediaRecorder via global `RecordingProvider` at app-shell level; survives SPA navigation). Active recordings continue when visiting Notes, AI Chat, Tasks, etc. Header recording indicator remains visible with live dB meters
 - **Header recording indicator** (pulsing mic icon next to notifications) while recording — dropdown shows duration, channel count, project, meeting title, live dB meters, stop action, and link to meeting detail
 - States: `recording` → `processing` → `ready` (or `failed`)
 - Background processing: Whisper transcription → Grok summary + action item extraction

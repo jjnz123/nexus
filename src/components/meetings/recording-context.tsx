@@ -18,7 +18,7 @@ import {
   type RecordingSettings,
 } from "@/lib/recording";
 import { formatRecordingDuration } from "@/lib/recording/meters";
-import { useAudioDevices } from "@/lib/recording/use-audio-devices";
+import { useAudioDevices, type AudioInputDevice } from "@/lib/recording/use-audio-devices";
 import { useAudioLevels, type AudioLevelSnapshot } from "@/lib/recording/use-audio-levels";
 
 export type ActiveRecording = {
@@ -38,11 +38,9 @@ type RecordingContextValue = {
   durationLabel: string;
   channelCount: number;
   levels: AudioLevelSnapshot;
-  devices: ReturnType<typeof useAudioDevices>["devices"];
+  devices: AudioInputDevice[];
   selectedDeviceId: string;
   setSelectedDeviceId: (id: string) => void;
-  permissionGranted: boolean;
-  requestPermission: () => Promise<boolean>;
   recordingSettings: RecordingSettings;
   startRecording: (input: {
     meetingId: string;
@@ -72,9 +70,16 @@ export function RecordingProvider({
   const [durationMs, setDurationMs] = useState(0);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [channelCount, setChannelCount] = useState(1);
+
+  const streamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
   const stopHandlerRef = useRef<StopHandler | null>(null);
+  const buildAudioConstraintsRef = useRef(audioDevices.buildAudioConstraints);
+  const refreshDevicesRef = useRef(audioDevices.refreshDevices);
+
+  buildAudioConstraintsRef.current = audioDevices.buildAudioConstraints;
+  refreshDevicesRef.current = audioDevices.refreshDevices;
 
   const levels = useAudioLevels(stream, Boolean(activeRecording));
 
@@ -88,11 +93,6 @@ export function RecordingProvider({
     const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
   }, [activeRecording]);
-
-  const cleanupStream = useCallback(() => {
-    stream?.getTracks().forEach((track) => track.stop());
-    setStream(null);
-  }, [stream]);
 
   const stopRecording = useCallback(() => {
     mediaRecorderRef.current?.stop();
@@ -111,20 +111,16 @@ export function RecordingProvider({
         return;
       }
 
-      const granted = audioDevices.permissionGranted || (await audioDevices.requestPermission());
-      if (!granted) {
-        toast.error("Microphone access denied");
-        return;
-      }
-
       try {
         const mediaStream = await navigator.mediaDevices.getUserMedia({
-          audio: audioDevices.buildAudioConstraints(),
+          audio: buildAudioConstraintsRef.current(),
         });
         const track = mediaStream.getAudioTracks()[0];
         const settings = track?.getSettings();
         setChannelCount(settings?.channelCount ?? 1);
+        streamRef.current = mediaStream;
         setStream(mediaStream);
+        void refreshDevicesRef.current();
 
         const recorder = new MediaRecorder(mediaStream, buildMediaRecorderOptions(recordingSettings));
         chunksRef.current = [];
@@ -137,7 +133,8 @@ export function RecordingProvider({
         recorder.onstop = () => {
           const mimeType = recorder.mimeType || recordingSettings.recordingAudioMimeType;
           const blob = new Blob(chunksRef.current, { type: mimeType });
-          mediaStream.getTracks().forEach((t) => t.stop());
+          streamRef.current?.getTracks().forEach((t) => t.stop());
+          streamRef.current = null;
           setStream(null);
           setActiveRecording(null);
           mediaRecorderRef.current = null;
@@ -161,11 +158,13 @@ export function RecordingProvider({
           startedAt: Date.now(),
         });
       } catch {
-        cleanupStream();
-        toast.error("Unable to start recording — check your audio input device");
+        streamRef.current?.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+        setStream(null);
+        toast.error("Microphone access denied or unavailable — check your audio input device");
       }
     },
-    [audioDevices, cleanupStream, recordingSettings]
+    [recordingSettings]
   );
 
   const value: RecordingContextValue = {
@@ -178,8 +177,6 @@ export function RecordingProvider({
     devices: audioDevices.devices,
     selectedDeviceId: audioDevices.selectedDeviceId,
     setSelectedDeviceId: audioDevices.setSelectedDeviceId,
-    permissionGranted: audioDevices.permissionGranted,
-    requestPermission: audioDevices.requestPermission,
     recordingSettings,
     startRecording,
     stopRecording,

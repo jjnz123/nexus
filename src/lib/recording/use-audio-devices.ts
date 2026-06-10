@@ -9,46 +9,29 @@ export type AudioInputDevice = {
   label: string;
 };
 
+/** Never calls getUserMedia — enumeration only until recording starts. */
 export function useAudioDevices() {
   const [devices, setDevices] = useState<AudioInputDevice[]>([]);
   const [selectedDeviceId, setSelectedDeviceIdState] = useState<string>(() => {
     if (typeof window === "undefined") return "";
     return window.localStorage.getItem(STORAGE_KEY) ?? "";
   });
-  const [permissionGranted, setPermissionGranted] = useState(false);
 
   const refreshDevices = useCallback(async () => {
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.enumerateDevices) return;
     const list = await navigator.mediaDevices.enumerateDevices();
     const inputs = list
       .filter((d) => d.kind === "audioinput")
-      .map((d) => ({
+      .map((d, index) => ({
         deviceId: d.deviceId,
-        label: d.label || `Microphone ${d.deviceId.slice(0, 6) || "default"}`,
+        label: d.label || `Audio input ${index + 1}`,
       }));
     setDevices(inputs);
-    if (!selectedDeviceId && inputs[0]) {
-      setSelectedDeviceIdState(inputs[0].deviceId);
-    }
-  }, [selectedDeviceId]);
-
-  const requestPermission = useCallback(async () => {
-    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) return false;
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach((t) => t.stop());
-      setPermissionGranted(true);
-      await refreshDevices();
-      return true;
-    } catch {
-      setPermissionGranted(false);
-      return false;
-    }
-  }, [refreshDevices]);
+  }, []);
 
   useEffect(() => {
-    void requestPermission();
-  }, [requestPermission]);
+    void refreshDevices();
+  }, [refreshDevices]);
 
   useEffect(() => {
     if (typeof navigator === "undefined" || !navigator.mediaDevices) return;
@@ -60,23 +43,27 @@ export function useAudioDevices() {
   function setSelectedDeviceId(deviceId: string) {
     setSelectedDeviceIdState(deviceId);
     if (typeof window !== "undefined") {
-      window.localStorage.setItem(STORAGE_KEY, deviceId);
+      if (deviceId) {
+        window.localStorage.setItem(STORAGE_KEY, deviceId);
+      } else {
+        window.localStorage.removeItem(STORAGE_KEY);
+      }
     }
   }
 
+  /** Respects macOS system default when no device is selected (e.g. Loopback Audio). */
   function buildAudioConstraints(): MediaTrackConstraints | boolean {
     if (selectedDeviceId) {
-      return { deviceId: { exact: selectedDeviceId } };
+      return { deviceId: { ideal: selectedDeviceId } };
     }
-    return true;
+    return { deviceId: "default" };
   }
 
   return {
     devices,
     selectedDeviceId,
     setSelectedDeviceId,
-    permissionGranted,
-    requestPermission,
+    refreshDevices,
     buildAudioConstraints,
   };
 }

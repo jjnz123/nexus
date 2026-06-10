@@ -85,8 +85,8 @@ Leave the API key unset to run Nexus without AI features.
 At `/meetings` (requires `meetings:view`):
 
 - **Create** meetings with title, **date/time** (defaults to now), and optional **project** — or **create a new project** inline (`tasks:edit`).
-- **Choose audio input device** (microphone, Loopback, BlackHole, etc.) before recording.
-- **Record** or upload meeting audio — a **recording indicator** in the header shows duration, channels, project, and live dB meters while recording is active.
+- **Choose audio input device** before recording (defaults to macOS system input; optional specific device). Microphone permission is requested **only** when you click Start recording — not on app load or navigation.
+- **Record** or upload meeting audio — recording continues in the background while you navigate elsewhere; the header indicator shows duration, channels, project, and live dB meters.
 - **Transcribe** with OpenAI Whisper (`OPENAI_API_KEY`).
 - **Summarize** and extract **action items** with Grok.
 - **Ask questions** about the meeting in a scoped chat interface.
