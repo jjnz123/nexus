@@ -87,7 +87,7 @@ At `/meetings` (requires `meetings:view`):
 - **Create** meetings with title, **date/time** (defaults to now), and optional **project** — or **create a new project** inline (`tasks:edit`).
 - **Choose audio input device** before recording (defaults to macOS system input; optional specific device). Microphone permission is requested **only** when you click Start recording — not on app load or navigation.
 - **Record** or upload meeting audio — recording continues in the background while you navigate elsewhere; long recordings upload in small chunks with retry and a progress bar; if upload fails, you can **retry** or **download** the recording from the meeting page. The **header mic icon** is always visible (grey when idle, red when recording) with a link to your last meeting when idle.
-- **Transcribe** with OpenAI Whisper (`OPENAI_API_KEY`).
+- **Transcribe** with OpenAI Whisper (`OPENAI_API_KEY`) — long recordings are split automatically with ffmpeg and transcribed segment-by-segment (supports 2hr+ meetings).
 - **Summarize** and extract **action items** with Grok.
 - **Ask questions** about the meeting in a scoped chat interface.
 - **Edit** title, date/time, and project from the meeting detail view.

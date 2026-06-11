@@ -38,7 +38,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { WHISPER_MAX_BYTES } from "@/lib/uploads";
 import { uploadFileChunked } from "@/lib/uploads/chunked-upload";
 import type { RecordingSettings } from "@/lib/recording";
 
@@ -131,12 +130,6 @@ export function MeetingDetailView({
   }, [meeting.id, meeting.status]);
 
   async function uploadBlob(blob: Blob, filename: string, mimeType = blob.type || "audio/webm") {
-    if (blob.size > WHISPER_MAX_BYTES) {
-      toast.warning(
-        `This recording is ${Math.round(blob.size / 1024 / 1024)}MB. Whisper accepts at most 25MB — transcription may fail unless you compress it.`
-      );
-    }
-
     setIsUploading(true);
     setUploadProgress(0);
     setPendingRecording(null);
@@ -209,11 +202,6 @@ export function MeetingDetailView({
 
   function onFileSelected(file: File | null) {
     if (!file) return;
-    if (file.size > WHISPER_MAX_BYTES) {
-      toast.warning(
-        `This file is ${Math.round(file.size / 1024 / 1024)}MB. Whisper accepts at most 25MB — transcription will fail unless you compress it.`
-      );
-    }
     void uploadBlob(file, file.name).catch((error) => {
       toast.error(error instanceof Error ? error.message : "Upload failed");
     });
@@ -424,7 +412,7 @@ export function MeetingDetailView({
         <Card>
           <CardHeader>
             <CardTitle>Capture audio</CardTitle>
-            <CardDescription>Record in the browser or upload an audio file (max 25MB for Whisper).</CardDescription>
+            <CardDescription>Record in the browser or upload an audio file. Long recordings are split automatically during transcription.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <AudioInputSelect id="meeting-audio-input" />
@@ -508,7 +496,7 @@ export function MeetingDetailView({
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <div>
               <p className="font-medium text-foreground">Processing your meeting</p>
-              <p className="mt-1">Transcribing with Whisper and summarizing with Grok…</p>
+              <p className="mt-1">Transcribing with Whisper and summarizing with Grok… Long recordings may take several minutes.</p>
               <p className="mt-2 text-xs">This page updates automatically when finished.</p>
             </div>
           </CardContent>

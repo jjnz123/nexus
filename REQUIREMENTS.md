@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v4.7.2
+**Current release:** v4.7.3
 
 ## 1. Overview
 
@@ -762,8 +762,8 @@ Requires `ai:use`. Transcription requires `OPENAI_API_KEY`; summarization requir
 - **Record** in browser (MediaRecorder via global `RecordingProvider` at app-shell level; survives SPA navigation). Active recordings continue when visiting Notes, AI Chat, Tasks, etc. Header recording indicator remains visible with live dB meters. MediaRecorder emits 10s timeslices for long sessions; audio uploads use **chunked POST** to `/api/uploads/chunk` (2MB chunks with retry) to avoid proxy timeouts on long recordings
 - **Header recording indicator** — always visible next to notifications (grey when idle with link to last meeting; red with live meters when recording)
 - States: `recording` → `processing` → `ready` (or `failed`)
-- Background processing: Whisper transcription → Grok summary + action item extraction
-- Processing view shows spinner and **auto-refreshes** when transcription completes
+- Background processing: **chunked OpenAI Whisper transcription** (ffmpeg splits audio into &lt;24MB segments when needed; merged transcript) → Grok summary + action item extraction. Requires `ffmpeg` in the app container.
+- Processing view shows spinner and **auto-refreshes** when transcription completes; long recordings may take several minutes
 
 ### 15.2 Meeting detail
 
