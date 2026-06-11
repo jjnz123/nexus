@@ -48,6 +48,7 @@ import { RAG_SOURCE_TYPES } from "@/lib/rag/types";
 import {
   assertValidTaskParent,
   parseProjectHierarchyRules,
+  resolveChildTypeForParent,
   type HierarchyRules,
 } from "@/lib/tasks/hierarchy";
 import type { TaskType } from "@/components/tasks/types";
@@ -961,8 +962,28 @@ export async function createChildTask(input: unknown) {
   const [parent] = await db.select().from(tasks).where(eq(tasks.id, data.parentTaskId)).limit(1);
   if (!parent) throw new Error("Parent task not found");
 
+  const rules = await loadProjectHierarchyRules(parent.projectId);
+  const childType = resolveChildTypeForParent(parent.type, rules);
+  if (!childType) {
+    const existing = await db
+      .select()
+      .from(taskSubtasks)
+      .where(eq(taskSubtasks.taskId, data.parentTaskId));
+    const [subtask] = await db
+      .insert(taskSubtasks)
+      .values({
+        taskId: data.parentTaskId,
+        title: data.title,
+        sortOrder: existing.length,
+      })
+      .returning();
+    revalidatePath("/tasks");
+    void indexTaskById(data.parentTaskId, session.user.id).catch(() => undefined);
+    return { checklistFallback: true as const, subtaskId: subtask.id, title: subtask.title };
+  }
+
   await validateTaskParent({
-    childType: "task",
+    childType,
     parentId: parent.id,
     projectId: parent.projectId,
   });
@@ -971,7 +992,7 @@ export async function createChildTask(input: unknown) {
     projectId: parent.projectId,
     columnId: parent.columnId,
     title: data.title,
-    type: "task",
+    type: childType,
     parentId: parent.id,
     priority: parent.priority,
   });
@@ -984,6 +1005,7 @@ export async function createChildTask(input: unknown) {
 
   revalidatePath("/tasks");
   return {
+    checklistFallback: false as const,
     id: child.id,
     key: `${project?.key ?? "TASK"}-${String(child.number).padStart(3, "0")}`,
     title: child.title,

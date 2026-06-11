@@ -46,6 +46,21 @@ export function isParentTypeAllowed(
   return getAllowedParentTypes(childType, rules).includes(parentType);
 }
 
+const SUBTASK_CHILD_TYPE_PREFERENCE: TaskType[] = ["task", "bug", "story", "feature"];
+
+/** Pick a child ticket type allowed under `parentType`, preferring task-like types first. */
+export function resolveChildTypeForParent(
+  parentType: TaskType,
+  rules: HierarchyRules = DEFAULT_HIERARCHY_RULES
+): TaskType | null {
+  for (const childType of SUBTASK_CHILD_TYPE_PREFERENCE) {
+    if (isParentTypeAllowed(childType, parentType, rules)) {
+      return childType;
+    }
+  }
+  return null;
+}
+
 export async function assertValidTaskParent({
   childId,
   childType,

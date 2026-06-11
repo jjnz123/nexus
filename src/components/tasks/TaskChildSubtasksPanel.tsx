@@ -27,10 +27,16 @@ export function TaskChildSubtasksPanel({
     if (!draft.trim()) return;
     startTransition(async () => {
       try {
-        await createChildTask({ parentTaskId, title: draft.trim() });
+        const result = await createChildTask({ parentTaskId, title: draft.trim() });
         setDraft("");
         await onChange();
-        toast.success("Subtask created");
+        if (result.checklistFallback) {
+          toast.success(
+            "Added to checklist — this project does not allow child tickets under this ticket type."
+          );
+        } else {
+          toast.success("Subtask created");
+        }
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Unable to create subtask");
       }

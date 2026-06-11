@@ -82,25 +82,18 @@ export async function createAiConversation(input: unknown) {
     await assertKanbanProject(data.projectId, session);
   }
 
+  const conversationId = crypto.randomUUID();
+
   const [conversation] = await db
     .insert(aiConversations)
     .values({
+      id: conversationId,
       userId: session.user.id,
       projectId: data.projectId ?? null,
       title: data.title?.trim() || "New conversation",
+      tabGroupId: conversationId,
     })
     .returning();
-
-  await db
-    .update(aiConversations)
-    .set({ tabGroupId: conversation.id })
-    .where(eq(aiConversations.id, conversation.id));
-
-  const [withTabGroup] = await db
-    .select()
-    .from(aiConversations)
-    .where(eq(aiConversations.id, conversation.id))
-    .limit(1);
 
   await updateBookmarkPreferences({
     activeAiProjectId: data.projectId ?? null,
@@ -108,7 +101,7 @@ export async function createAiConversation(input: unknown) {
   });
 
   revalidatePath("/chat");
-  return withTabGroup ?? { ...conversation, tabGroupId: conversation.id };
+  return conversation;
 }
 
 export async function renameAiConversation(id: string, title: string) {

@@ -30,6 +30,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { BookmarkCard, BookmarkGroup, BookmarkTab } from "@/lib/db/schema";
 import { createAiConversation } from "@/server/actions/ai-chat";
 import {
+  isStaleServerActionError,
+  staleServerActionMessage,
+} from "@/lib/server-action-errors";
+import {
   DEFAULT_HOME_DASHBOARD,
   parseHomeDashboard,
   type HomeDashboardConfig,
@@ -189,7 +193,13 @@ export function LandingPage({
         if (prompt) params.set("prompt", prompt);
         router.push(`/chat?${params.toString()}`);
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Failed to start AI chat");
+        toast.error(
+          isStaleServerActionError(error)
+            ? staleServerActionMessage()
+            : error instanceof Error
+              ? error.message
+              : "Failed to start AI chat"
+        );
       }
     });
   }

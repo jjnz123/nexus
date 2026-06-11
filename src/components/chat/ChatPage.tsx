@@ -50,6 +50,10 @@ import {
   updateConversationEnabledSkills,
 } from "@/server/actions/ai-chat";
 import { updateBookmarkPreferences } from "@/server/actions/preferences";
+import {
+  isStaleServerActionError,
+  staleServerActionMessage,
+} from "@/lib/server-action-errors";
 
 const STARTER_PROMPTS = [
   "Summarize what I should check on the home dashboard today",
@@ -308,7 +312,13 @@ export function ChatPage({
         await refreshWorkspace();
         toast.success("Conversation created");
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Failed to create conversation");
+        toast.error(
+          isStaleServerActionError(error)
+            ? staleServerActionMessage()
+            : error instanceof Error
+              ? error.message
+              : "Failed to create conversation"
+        );
       }
     });
   };
