@@ -1,5 +1,3 @@
-import { readFile } from "fs/promises";
-import path from "path";
 import { asc, eq } from "drizzle-orm";
 import type {
   AiConversationFile,
@@ -20,8 +18,7 @@ import {
   users,
 } from "@/lib/db/schema";
 import { db } from "@/lib/db";
-import { extractTextPreview } from "@/lib/ai/file-context";
-import { chooseChunkStrategy, chunkDocumentText, hashContent } from "@/lib/rag/chunking";
+import { extractDocumentText, extractDocumentTextPreview } from "@/lib/files/document-text";
 import { embedTexts } from "@/lib/rag/embeddings";
 import {
   deleteChunksForSource,
@@ -38,33 +35,14 @@ import {
   type RagIndexInput,
   type RagTextIndexInput,
 } from "@/lib/rag/types";
+import { chooseChunkStrategy, chunkDocumentText, hashContent } from "@/lib/rag/chunking";
 
 export async function extractFullText(
   filePath: string,
   mimeType: string,
   filename: string
 ): Promise<string | null> {
-  const uploadDir = process.env.UPLOAD_DIR ?? "./uploads";
-  const fullPath = path.join(uploadDir, filePath);
-
-  const isTextLike =
-    mimeType.startsWith("text/") ||
-    mimeType === "application/json" ||
-    mimeType === "application/csv" ||
-    /\.(txt|md|csv|json|log|yaml|yml)$/i.test(filename);
-
-  if (!isTextLike) return null;
-
-  try {
-    const raw = await readFile(fullPath);
-    if (raw.byteLength > RAG_FULL_TEXT_MAX_BYTES) {
-      return raw.subarray(0, RAG_FULL_TEXT_MAX_BYTES).toString("utf8");
-    }
-    const normalized = raw.toString("utf8").replace(/\r\n/g, "\n").trim();
-    return normalized || null;
-  } catch {
-    return null;
-  }
+  return extractDocumentText(filePath, mimeType, filename, RAG_FULL_TEXT_MAX_BYTES);
 }
 
 export async function indexTextContent(input: RagTextIndexInput) {
@@ -156,7 +134,7 @@ export async function indexTextContent(input: RagTextIndexInput) {
 export async function indexRagSource(input: RagIndexInput) {
   const fullText =
     (await extractFullText(input.filePath, input.mimeType, input.title)) ??
-    (await extractTextPreview(input.filePath, input.mimeType, input.title));
+    (await extractDocumentTextPreview(input.filePath, input.mimeType, input.title));
 
   if (!fullText?.trim()) {
     await deleteRagSourceFromStore(input.sourceType, input.sourceId);
@@ -337,7 +315,7 @@ export async function indexTaskAttachment(
 
   const fullText =
     (await extractFullText(attachment.path, attachment.mimeType, attachment.filename)) ??
-    (await extractTextPreview(attachment.path, attachment.mimeType, attachment.filename));
+    (await extractDocumentTextPreview(attachment.path, attachment.mimeType, attachment.filename));
 
   if (!fullText?.trim()) {
     await deleteRagSourceFromStore(RAG_SOURCE_TYPES.TASK_ATTACHMENT, attachment.id);

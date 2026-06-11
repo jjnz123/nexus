@@ -1,35 +1,12 @@
-import { readFile } from "fs/promises";
-import path from "path";
 import type { AiConversationFile, AiProjectFile } from "@/lib/db/schema";
-
-const TEXT_PREVIEW_MAX = 8000;
+import { extractDocumentTextPreview } from "@/lib/files/document-text";
 
 export async function extractTextPreview(
   filePath: string,
   mimeType: string,
   filename: string
 ): Promise<string | null> {
-  const uploadDir = process.env.UPLOAD_DIR ?? "./uploads";
-  const fullPath = path.join(uploadDir, filePath);
-
-  const isTextLike =
-    mimeType.startsWith("text/") ||
-    mimeType === "application/json" ||
-    mimeType === "application/csv" ||
-    /\.(txt|md|csv|json|log|yaml|yml)$/i.test(filename);
-
-  if (!isTextLike) return null;
-
-  try {
-    const raw = await readFile(fullPath, "utf8");
-    const normalized = raw.replace(/\r\n/g, "\n").trim();
-    if (!normalized) return null;
-    return normalized.length > TEXT_PREVIEW_MAX
-      ? `${normalized.slice(0, TEXT_PREVIEW_MAX)}…`
-      : normalized;
-  } catch {
-    return null;
-  }
+  return extractDocumentTextPreview(filePath, mimeType, filename);
 }
 
 export function buildFileContextBlock(

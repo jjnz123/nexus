@@ -134,8 +134,12 @@ body {
   margin: 0.5rem 0;
 }
 
-.tiptap-content li {
-  margin: 0.15rem 0;
+.tiptap-content li p {
+  margin: 0;
+}
+
+.tiptap-content li + li {
+  margin-top: 0.15rem;
 }
 
 .tiptap-content p {

@@ -109,7 +109,10 @@ function ToolbarButton({
       size="icon"
       variant={active ? "secondary" : "ghost"}
       className="h-8 w-8 shrink-0"
-      onClick={onClick}
+      onMouseDown={(event) => {
+        event.preventDefault();
+        onClick();
+      }}
       title={title}
     >
       {children}
@@ -138,6 +141,8 @@ export function RichTextEditor({
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
+        bulletList: { keepMarks: true },
+        orderedList: { keepMarks: true },
       }),
       Underline,
       TextStyle,
@@ -161,6 +166,7 @@ export function RichTextEditor({
 
   useEffect(() => {
     if (!editor) return;
+    if (editor.isFocused) return;
     const current = editor.getHTML();
     const normalized = value || "";
     const currentNormalized = current === "<p></p>" ? "" : current;

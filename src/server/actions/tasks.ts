@@ -993,6 +993,25 @@ export async function createChildTask(input: unknown) {
   };
 }
 
+export async function reindexTaskAttachment(attachmentId: string) {
+  const session = await requireAuth();
+  requireSessionPermission(session, "tasks:view");
+
+  const [attachment] = await db
+    .select()
+    .from(taskAttachments)
+    .where(eq(taskAttachments.id, attachmentId))
+    .limit(1);
+  if (!attachment || !attachment.path) throw new Error("Attachment not found");
+
+  const [task] = await db.select().from(tasks).where(eq(tasks.id, attachment.taskId)).limit(1);
+  if (!task) throw new Error("Task not found");
+  await assertProjectViewAccess(session.user.id, session.user.role, task.projectId);
+
+  await indexTaskAttachment(attachment, session.user.id);
+  return { success: true };
+}
+
 export async function deleteTaskAttachment(attachmentId: string) {
   const session = await requireAuth();
   requireSessionPermission(session, "tasks:edit");

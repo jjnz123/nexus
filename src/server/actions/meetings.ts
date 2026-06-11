@@ -61,6 +61,30 @@ export async function getMeetings(input?: unknown) {
   return rows;
 }
 
+export async function getLatestMeeting() {
+  const session = await requireActiveMember();
+  requireSessionPermission(session, "meetings:view");
+
+  const [row] = await db
+    .select({
+      id: meetings.id,
+      title: meetings.title,
+      meetingAt: meetings.meetingAt,
+    })
+    .from(meetings)
+    .where(and(eq(meetings.userId, session.user.id), isNull(meetings.archivedAt)))
+    .orderBy(desc(meetings.meetingAt))
+    .limit(1);
+
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    title: row.title,
+    meetingAt: row.meetingAt.toISOString(),
+  };
+}
+
 export async function getArchivedMeetings(input?: unknown) {
   return getMeetings({ ...(meetingSearchSchema.parse(input ?? {})), archived: true });
 }

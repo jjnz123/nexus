@@ -1,6 +1,6 @@
 "use server";
 
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { meetings, projects, taskAttachments, tasks } from "@/lib/db/schema";
 import { requireAuth } from "@/lib/auth";
@@ -85,7 +85,9 @@ export async function getProjectTaskAttachmentsForChat(projectId: string) {
     .where(
       and(
         eq(tasks.projectId, projectId),
-        inArray(taskAttachments.kind, ["file", "email"])
+        inArray(taskAttachments.kind, ["file", "email"]),
+        eq(taskAttachments.isCurrent, true),
+        isNotNull(taskAttachments.path)
       )
     )
     .orderBy(desc(taskAttachments.createdAt));

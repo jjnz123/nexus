@@ -20,6 +20,7 @@ import {
   addTaskEmailAttachment,
   addTaskUrlLink,
   deleteTaskAttachment,
+  reindexTaskAttachment,
 } from "@/server/actions/tasks";
 import { getTaskAttachmentRagStatuses } from "@/server/actions/rag-status";
 import { Badge } from "@/components/ui/badge";
@@ -68,6 +69,7 @@ export function TaskLinksAndFilesPanel({
   onChange: () => Promise<void> | void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const reindexedRef = useRef<Set<string>>(new Set());
   const [isDragging, setIsDragging] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [preview, setPreview] = useState<TaskAttachment | null>(null);
@@ -106,6 +108,14 @@ export function TaskLinksAndFilesPanel({
       window.clearInterval(timer);
     };
   }, [indexableAttachmentIds]);
+
+  useEffect(() => {
+    for (const id of indexableAttachmentIds) {
+      if (ragStatuses[id] !== "failed" || reindexedRef.current.has(id)) continue;
+      reindexedRef.current.add(id);
+      void reindexTaskAttachment(id).catch(() => undefined);
+    }
+  }, [indexableAttachmentIds, ragStatuses]);
 
   const urlLinks = useMemo(
     () => attachments.filter((item) => item.kind === "url"),

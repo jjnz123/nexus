@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v4.6.2
+**Current release:** v4.6.3
 
 ## 1. Overview
 
@@ -755,7 +755,7 @@ Requires `ai:use`. Transcription requires `OPENAI_API_KEY`; summarization requir
 - **Create a new Tasks project** inline from the meeting form when the user has `tasks:edit`
 - **Select audio input device** before recording (choice persisted in localStorage; **System default** uses macOS input setting e.g. Loopback Audio). `getUserMedia` is called **only** when the user clicks Start recording — never on app load or section navigation
 - **Record** in browser (MediaRecorder via global `RecordingProvider` at app-shell level; survives SPA navigation). Active recordings continue when visiting Notes, AI Chat, Tasks, etc. Header recording indicator remains visible with live dB meters
-- **Header recording indicator** (pulsing mic icon next to notifications) while recording — dropdown shows duration, channel count, project, meeting title, live dB meters, stop action, and link to meeting detail
+- **Header recording indicator** — always visible next to notifications (grey when idle with link to last meeting; red with live meters when recording)
 - States: `recording` → `processing` → `ready` (or `failed`)
 - Background processing: Whisper transcription → Grok summary + action item extraction
 - Processing view shows spinner and **auto-refreshes** when transcription completes
@@ -808,7 +808,7 @@ Full RAG pipeline across AI Chat files, Notes, Meetings, and Tasks (Phases 1–4
 | `user_note` | Title + content | Create, update, delete |
 | `meeting_transcript` / `meeting_summary` / `meeting_action_item` | Transcript, summary, action items | After processing, archive metadata update, delete |
 | `task` | Title, description, details, AC, DoD, subtasks, comments | Create, update, delete, comments, subtasks |
-| `task_attachment` | Ticket file/email attachment text | Upload, delete |
+| `task_attachment` | Ticket file/email attachment text (including **PDF** via `pdf-parse`) | Upload, delete; auto-reindex on prior failed status |
 
 ### File referencing in AI Chat
 
