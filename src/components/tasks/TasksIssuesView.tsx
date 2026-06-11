@@ -63,7 +63,14 @@ const COLUMN_DEFS: { id: IssueColumnId; label: string; defaultVisible: boolean }
   { id: "storyPoints", label: "Points", defaultVisible: false },
 ];
 
-const typeOrder: Record<TaskType, number> = { epic: 0, feature: 1, story: 2, task: 3, bug: 4 };
+const typeOrder: Record<TaskType, number> = {
+  epic: 0,
+  feature: 1,
+  story: 2,
+  task: 3,
+  subtask: 4,
+  bug: 5,
+};
 const priorityOrder: Record<TaskPriority, number> = {
   urgent: 0,
   high: 1,

@@ -8,10 +8,11 @@ export const DEFAULT_HIERARCHY_RULES: HierarchyRules = {
   feature: ["epic"],
   story: ["epic", "feature"],
   task: ["epic", "feature", "story", "task"],
+  subtask: ["story", "task"],
   bug: ["epic", "feature", "story", "task"],
 };
 
-const TASK_TYPES: TaskType[] = ["epic", "feature", "story", "task", "bug"];
+const TASK_TYPES: TaskType[] = ["epic", "feature", "story", "task", "subtask", "bug"];
 
 export function parseProjectHierarchyRules(
   settings: Record<string, unknown> | null | undefined
@@ -46,7 +47,7 @@ export function isParentTypeAllowed(
   return getAllowedParentTypes(childType, rules).includes(parentType);
 }
 
-const SUBTASK_CHILD_TYPE_PREFERENCE: TaskType[] = ["task", "bug", "story", "feature"];
+const SUBTASK_CHILD_TYPE_PREFERENCE: TaskType[] = ["subtask", "task", "bug", "story", "feature"];
 
 /** Pick a child ticket type allowed under `parentType`, preferring task-like types first. */
 export function resolveChildTypeForParent(

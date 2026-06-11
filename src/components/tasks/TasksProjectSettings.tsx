@@ -22,8 +22,10 @@ import {
   createColumn,
   createLabel,
   deleteColumn,
+  deleteLabel,
   reorderColumns,
   updateColumn,
+  updateLabel,
 } from "@/server/actions/tasks";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -33,6 +35,7 @@ import type { ProjectBoard } from "./types";
 import { TasksProjectBoardSettings } from "./TasksProjectBoardSettings";
 import { TasksProjectFieldSettings } from "./TasksProjectFieldSettings";
 import { TasksProjectHierarchySettings } from "./TasksProjectHierarchySettings";
+import { TasksProjectAccessSettings } from "./TasksProjectAccessSettings";
 
 function SortableColumnRow({
   column,
@@ -194,6 +197,31 @@ export function TasksProjectSettings({
     });
   };
 
+  const saveLabel = (labelId: string, name: string, color: string) => {
+    startTransition(async () => {
+      try {
+        await updateLabel({ id: labelId, name: name.trim(), color });
+        await onRefresh();
+        toast.success("Label updated");
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Unable to update label");
+      }
+    });
+  };
+
+  const removeLabel = (labelId: string, labelName: string) => {
+    if (!window.confirm(`Delete label "${labelName}"?`)) return;
+    startTransition(async () => {
+      try {
+        await deleteLabel(labelId);
+        await onRefresh();
+        toast.success("Label deleted");
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Unable to delete label");
+      }
+    });
+  };
+
   const onColumnDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -231,6 +259,7 @@ export function TasksProjectSettings({
           <TabsTrigger value="roadmap">Roadmap</TabsTrigger>
           <TabsTrigger value="hierarchy">Hierarchy</TabsTrigger>
           <TabsTrigger value="fields">Fields &amp; Display</TabsTrigger>
+          <TabsTrigger value="access">Access</TabsTrigger>
           <TabsTrigger value="workflow" disabled>
             Workflow
           </TabsTrigger>
@@ -248,16 +277,45 @@ export function TasksProjectSettings({
 
           <section className="space-y-3">
             <h3 className="text-lg font-semibold">Labels</h3>
-            <div className="flex flex-wrap gap-2">
+            <p className="text-sm text-muted-foreground">
+              Create coloured labels for tickets. Labels appear on board cards and in the ticket modal.
+            </p>
+            <div className="space-y-2">
               {board.labels.map((label) => (
-                <Badge
+                <div
                   key={label.id}
-                  variant="outline"
-                  className="border-transparent"
-                  style={{ backgroundColor: `${label.color}30`, color: label.color }}
+                  className="grid gap-2 rounded-lg border p-3 md:grid-cols-[1fr_140px_auto_auto]"
                 >
-                  {label.name}
-                </Badge>
+                  <Input
+                    defaultValue={label.name}
+                    onBlur={(event) => {
+                      const next = event.target.value.trim();
+                      if (next && next !== label.name) saveLabel(label.id, next, label.color);
+                    }}
+                  />
+                  <Input
+                    defaultValue={label.color}
+                    onBlur={(event) => {
+                      const next = event.target.value.trim();
+                      if (next && next !== label.color) saveLabel(label.id, label.name, next);
+                    }}
+                  />
+                  <Badge
+                    variant="outline"
+                    className="self-center border-transparent"
+                    style={{ backgroundColor: `${label.color}30`, color: label.color }}
+                  >
+                    Preview
+                  </Badge>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-destructive"
+                    onClick={() => removeLabel(label.id, label.name)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               ))}
             </div>
             <div className="grid gap-2 rounded-lg border p-3 md:grid-cols-[1fr_140px_auto]">
@@ -351,6 +409,10 @@ export function TasksProjectSettings({
 
         <TabsContent value="fields">
           <TasksProjectFieldSettings board={board} onRefresh={onRefresh} />
+        </TabsContent>
+
+        <TabsContent value="access">
+          <TasksProjectAccessSettings projectId={board.project.id} />
         </TabsContent>
 
         <TabsContent value="workflow">

@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { CheckCheck, Copy, Plus, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { CheckCheck, Copy, GitBranch, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   createSubtask,
@@ -10,7 +10,6 @@ import {
   toggleSubtask,
   updateTask,
 } from "@/server/actions/tasks";
-import { updateBookmarkPreferences } from "@/server/actions/preferences";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -33,10 +32,6 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
-import {
-  DEFAULT_TASKS_WORKSPACE,
-  type TasksWorkspacePrefs,
-} from "@/lib/preferences/workspace";
 import {
   isTicketFieldVisible,
   type ProjectTicketFieldSettings,
@@ -105,7 +100,6 @@ export function TaskModal({
   onOpenLinkedTask,
   onTaskSaved,
   onTaskDeleted,
-  tasksWorkspace = DEFAULT_TASKS_WORKSPACE,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -120,13 +114,8 @@ export function TaskModal({
   onOpenLinkedTask: (taskKey: string) => void;
   onTaskSaved: () => Promise<void> | void;
   onTaskDeleted?: () => void;
-  tasksWorkspace?: TasksWorkspacePrefs;
 }) {
   const [isPending, startTransition] = useTransition();
-  const heightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [descriptionHeight, setDescriptionHeight] = useState(
-    tasksWorkspace.descriptionHeight ?? DEFAULT_TASKS_WORKSPACE.descriptionHeight!
-  );
   const [activeTab, setActiveTab] = useState("overview");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -147,28 +136,6 @@ export function TaskModal({
   const [localAttachments, setLocalAttachments] = useState<TaskDetails["attachments"]>([]);
   const [localChildTasks, setLocalChildTasks] = useState<TaskDetails["childTasks"]>([]);
   const [localLinks, setLocalLinks] = useState<TaskDetails["links"]>([]);
-
-  useEffect(() => {
-    setDescriptionHeight(
-      tasksWorkspace.descriptionHeight ?? DEFAULT_TASKS_WORKSPACE.descriptionHeight!
-    );
-  }, [tasksWorkspace.descriptionHeight]);
-
-  const persistDescriptionHeight = useCallback((height: number) => {
-    setDescriptionHeight(height);
-    if (heightTimerRef.current) clearTimeout(heightTimerRef.current);
-    heightTimerRef.current = setTimeout(() => {
-      void updateBookmarkPreferences({
-        tasksWorkspace: { descriptionHeight: height },
-      });
-    }, 400);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (heightTimerRef.current) clearTimeout(heightTimerRef.current);
-    };
-  }, []);
 
   useEffect(() => {
     if (!taskDetails) return;
@@ -214,6 +181,16 @@ export function TaskModal({
     () => getAllowedParentTypes(taskType, hierarchyRules),
     [hierarchyRules, taskType]
   );
+
+  const parentTicket = useMemo(() => {
+    if (!taskDetails?.task.parentId) return null;
+    const parent = parentCandidates.find((candidate) => candidate.id === taskDetails.task.parentId);
+    if (!parent) return null;
+    return {
+      key: `${taskDetails.project.key}-${String(parent.number).padStart(3, "0")}`,
+      title: parent.title,
+    };
+  }, [parentCandidates, taskDetails]);
 
   const copyTaskUrl = async () => {
     if (!taskKey || typeof window === "undefined") return;
@@ -524,6 +501,16 @@ export function TaskModal({
                         {statusColumn.name}
                       </Badge>
                     ) : null}
+                    {parentTicket ? (
+                      <button
+                        type="button"
+                        onClick={() => onOpenLinkedTask(parentTicket.key)}
+                        className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+                      >
+                        <GitBranch className="h-3.5 w-3.5" />
+                        Parent: {parentTicket.key} – {parentTicket.title}
+                      </button>
+                    ) : null}
                   </>
                 ) : null}
               </DialogTitle>
@@ -575,8 +562,8 @@ export function TaskModal({
                               value={description}
                               onChange={setDescription}
                               placeholder="Summary of the work…"
-                              minHeight={descriptionHeight}
-                              onHeightChange={persistDescriptionHeight}
+                              minHeight={120}
+                              autoGrow
                             />
                           </div>
                         ) : null}
@@ -584,6 +571,7 @@ export function TaskModal({
                           <TaskChildSubtasksPanel
                             parentTaskId={taskDetails.task.id}
                             childTasks={localChildTasks}
+                            columns={columns}
                             onOpenTask={onOpenLinkedTask}
                             onChange={refreshDetails}
                           />

@@ -1,26 +1,37 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { ExternalLink, Plus } from "lucide-react";
+import { ExternalLink, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { createChildTask } from "@/server/actions/tasks";
+import { createChildTask, deleteTask, updateTask } from "@/server/actions/tasks";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { TaskChild } from "./types";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { TaskChild, TaskColumn } from "./types";
 
 export function TaskChildSubtasksPanel({
   parentTaskId,
   childTasks,
+  columns,
   onOpenTask,
   onChange,
 }: {
   parentTaskId: string;
   childTasks: TaskChild[];
+  columns: TaskColumn[];
   onOpenTask: (taskKey: string) => void;
   onChange: () => Promise<void> | void;
 }) {
   const [draft, setDraft] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
   const [isPending, startTransition] = useTransition();
 
   function addChildTask() {
@@ -43,6 +54,46 @@ export function TaskChildSubtasksPanel({
     });
   }
 
+  function updateChildStatus(childId: string, columnId: string) {
+    startTransition(async () => {
+      try {
+        await updateTask({ id: childId, columnId });
+        await onChange();
+        toast.success("Subtask status updated");
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Unable to update subtask");
+      }
+    });
+  }
+
+  function saveChildTitle(childId: string) {
+    const title = editTitle.trim();
+    if (!title) return;
+    startTransition(async () => {
+      try {
+        await updateTask({ id: childId, title });
+        setEditingId(null);
+        await onChange();
+        toast.success("Subtask updated");
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Unable to update subtask");
+      }
+    });
+  }
+
+  function removeChild(child: TaskChild) {
+    if (!window.confirm(`Delete subtask ${child.key}?`)) return;
+    startTransition(async () => {
+      try {
+        await deleteTask(child.id);
+        await onChange();
+        toast.success("Subtask deleted");
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Unable to delete subtask");
+      }
+    });
+  }
+
   return (
     <div className="space-y-3 border-t pt-4">
       <div className="flex items-center justify-between gap-2">
@@ -56,21 +107,96 @@ export function TaskChildSubtasksPanel({
           <p className="text-xs text-muted-foreground">No linked subtasks yet.</p>
         ) : (
           childTasks.map((child) => (
-            <button
+            <div
               key={child.id}
-              type="button"
-              onClick={() => onOpenTask(child.key)}
-              className="flex w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-left transition hover:bg-accent"
+              className="flex flex-wrap items-center gap-2 rounded-md border px-2 py-2"
             >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">{child.title}</p>
-                <p className="text-xs text-muted-foreground">
-                  {child.key} · {child.type}
-                  {child.assigneeName ? ` · ${child.assigneeName}` : ""}
-                </p>
+              <button
+                type="button"
+                onClick={() => onOpenTask(child.key)}
+                className="min-w-0 flex-1 text-left"
+              >
+                <p className="truncate text-sm font-medium">{child.key}</p>
+                {editingId === child.id ? (
+                  <Input
+                    value={editTitle}
+                    onChange={(event) => setEditTitle(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") saveChildTitle(child.id);
+                      if (event.key === "Escape") setEditingId(null);
+                    }}
+                    className="mt-1 h-8"
+                    autoFocus
+                  />
+                ) : (
+                  <p className="truncate text-xs text-muted-foreground">{child.title}</p>
+                )}
+              </button>
+              <Select
+                value={child.columnId}
+                onValueChange={(value) => updateChildStatus(child.id, value)}
+                disabled={isPending}
+              >
+                <SelectTrigger className="h-8 w-[130px] text-xs">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {columns.map((column) => (
+                    <SelectItem key={column.id} value={column.id}>
+                      {column.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Badge variant="outline" className="text-[10px] capitalize">
+                {child.type}
+              </Badge>
+              <div className="flex items-center gap-1">
+                {editingId === child.id ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={isPending}
+                    onClick={() => saveChildTitle(child.id)}
+                  >
+                    Save
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    disabled={isPending}
+                    onClick={() => {
+                      setEditingId(child.id);
+                      setEditTitle(child.title);
+                    }}
+                  >
+                    Edit
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8 text-destructive"
+                  disabled={isPending}
+                  onClick={() => removeChild(child)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8"
+                  onClick={() => onOpenTask(child.key)}
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </Button>
               </div>
-              <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-            </button>
+            </div>
           ))
         )}
       </div>

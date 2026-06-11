@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const TASK_TYPE_VALUES = ["epic", "feature", "story", "task", "bug"] as const;
+export const TASK_TYPE_VALUES = ["epic", "feature", "story", "task", "subtask", "bug"] as const;
 export type TaskType = (typeof TASK_TYPE_VALUES)[number];
 
 export const TASK_TYPES: TaskType[] = [...TASK_TYPE_VALUES];
@@ -10,6 +10,7 @@ export const TASK_TYPE_LABELS: Record<TaskType, string> = {
   feature: "Feature",
   story: "Story",
   task: "Task",
+  subtask: "Subtask",
   bug: "Bug",
 };
 

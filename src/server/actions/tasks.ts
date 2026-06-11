@@ -35,6 +35,8 @@ import {
   updateProjectHierarchySettingsSchema,
   updateProjectFieldSettingsSchema,
   updateProjectBoardSettingsSchema,
+  updateProjectRoadmapSettingsSchema,
+  updateLabelSchema,
   roadmapCommitSchema,
   bulkUpdateTasksSchema,
   bulkDeleteTasksSchema,
@@ -277,9 +279,10 @@ export async function getTaskByKey(taskKey: string) {
     .orderBy(desc(taskAttachments.createdAt));
 
   const childRows = await db
-    .select({ task: tasks, user: users })
+    .select({ task: tasks, user: users, column: taskColumns })
     .from(tasks)
     .leftJoin(users, eq(tasks.assigneeId, users.id))
+    .leftJoin(taskColumns, eq(tasks.columnId, taskColumns.id))
     .where(eq(tasks.parentId, task.id))
     .orderBy(asc(tasks.sortOrder), asc(tasks.number));
 
@@ -332,12 +335,13 @@ export async function getTaskByKey(taskKey: string) {
     attachments: attachmentRows.map(({ attachment, user }) =>
       mapAttachmentRow(attachment, user?.name ?? null)
     ),
-    childTasks: childRows.map(({ task: child, user }) => ({
+    childTasks: childRows.map(({ task: child, user, column }) => ({
       id: child.id,
       key: `${project.key}-${String(child.number).padStart(3, "0")}`,
       title: child.title,
       type: child.type,
       columnId: child.columnId,
+      columnName: column?.name ?? "Unknown",
       assigneeName: user?.name ?? null,
     })),
     links,
@@ -380,6 +384,8 @@ export async function createTask(input: unknown) {
       storyPoints: data.storyPoints ?? null,
       priority: data.priority,
       dueDate: data.dueDate ? new Date(data.dueDate) : null,
+      startDate: data.startDate ? new Date(data.startDate) : null,
+      endDate: data.endDate ? new Date(data.endDate) : null,
       assigneeId: data.assigneeId,
       type: data.type ?? "task",
       parentId: data.parentId ?? null,
@@ -454,6 +460,18 @@ export async function updateTask(input: unknown) {
           ? new Date(String(payload.dueDate))
           : undefined;
     if (payload.dueDate === undefined) delete payload.dueDate;
+  }
+
+  for (const dateField of ["startDate", "endDate"] as const) {
+    if (dateField in payload) {
+      payload[dateField] =
+        payload[dateField] === null
+          ? null
+          : payload[dateField]
+            ? new Date(String(payload[dateField]))
+            : undefined;
+      if (payload[dateField] === undefined) delete payload[dateField];
+    }
   }
 
   if ("storyPoints" in payload && payload.storyPoints === null) {
@@ -585,6 +603,32 @@ export async function createLabel(input: unknown) {
   const [label] = await db.insert(taskLabels).values(data).returning();
   revalidatePath("/tasks");
   return label;
+}
+
+export async function updateLabel(input: unknown) {
+  const session = await requireAuth();
+  requireSessionPermission(session, "tasks:edit");
+  const data = updateLabelSchema.parse(input);
+  const { id, ...updates } = data;
+  const payload = Object.fromEntries(
+    Object.entries(updates).filter(([, value]) => value !== undefined)
+  );
+  if (!Object.keys(payload).length) throw new Error("No changes provided");
+  const [label] = await db
+    .update(taskLabels)
+    .set(payload)
+    .where(eq(taskLabels.id, id))
+    .returning();
+  revalidatePath("/tasks");
+  return label;
+}
+
+export async function deleteLabel(labelId: string) {
+  const session = await requireAuth();
+  requireSessionPermission(session, "tasks:edit");
+  await db.delete(taskLabels).where(eq(taskLabels.id, labelId));
+  revalidatePath("/tasks");
+  return { success: true };
 }
 
 export async function setTaskLabels(taskId: string, labelIds: string[]) {
@@ -1124,6 +1168,33 @@ export async function updateProjectBoardSettings(input: unknown) {
   return updated;
 }
 
+export async function updateProjectRoadmapSettings(input: unknown) {
+  const session = await requireAuth();
+  requireSessionPermission(session, "tasks:edit");
+  const data = updateProjectRoadmapSettingsSchema.parse(input);
+
+  const [project] = await db
+    .select()
+    .from(projects)
+    .where(eq(projects.id, data.projectId))
+    .limit(1);
+  if (!project) throw new Error("Project not found");
+
+  const nextSettings = {
+    ...(project.settings ?? {}),
+    roadmapSettings: data.roadmapSettings,
+  };
+
+  const [updated] = await db
+    .update(projects)
+    .set({ settings: nextSettings })
+    .where(eq(projects.id, data.projectId))
+    .returning();
+
+  revalidatePath("/tasks");
+  return updated;
+}
+
 export async function commitRoadmapChanges(input: unknown) {
   const session = await requireAuth();
   requireSessionPermission(session, "tasks:edit");
@@ -1163,6 +1234,8 @@ export async function commitRoadmapChanges(input: unknown) {
       assigneeId: item.assigneeId,
       parentId,
       dueDate: item.dueDate ?? undefined,
+      startDate: item.startDate ?? undefined,
+      endDate: item.endDate ?? undefined,
       storyPoints: item.storyPoints ?? undefined,
       sortOrder: item.sortOrder,
     });

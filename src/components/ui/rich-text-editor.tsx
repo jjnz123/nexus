@@ -127,6 +127,7 @@ export function RichTextEditor({
   minHeight = 180,
   className,
   onHeightChange,
+  autoGrow = false,
 }: {
   value: string;
   onChange: (html: string) => void;
@@ -134,8 +135,10 @@ export function RichTextEditor({
   minHeight?: number;
   className?: string;
   onHeightChange?: (height: number) => void;
+  autoGrow?: boolean;
 }) {
   const [, setRevision] = useState(0);
+  const [contentHeight, setContentHeight] = useState(minHeight);
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -159,6 +162,10 @@ export function RichTextEditor({
     onUpdate: ({ editor: current }) => {
       const html = current.getHTML();
       onChange(html === "<p></p>" ? "" : html);
+      if (autoGrow) {
+        const element = current.view.dom as HTMLElement;
+        setContentHeight(Math.max(minHeight, element.scrollHeight + 16));
+      }
     },
     onSelectionUpdate: () => setRevision((current) => current + 1),
     onTransaction: () => setRevision((current) => current + 1),
@@ -174,6 +181,12 @@ export function RichTextEditor({
       editor.commands.setContent(normalized || "", { emitUpdate: false });
     }
   }, [editor, value]);
+
+  useEffect(() => {
+    if (!editor || !autoGrow) return;
+    const element = editor.view.dom as HTMLElement;
+    setContentHeight(Math.max(minHeight, element.scrollHeight + 16));
+  }, [editor, value, autoGrow, minHeight]);
 
   if (!editor) {
     return (
@@ -300,10 +313,13 @@ export function RichTextEditor({
         </Select>
       </div>
       <div
-        className="relative resize-y overflow-auto"
-        style={{ minHeight, height: minHeight }}
+        className={cn("relative overflow-auto", !autoGrow && "resize-y")}
+        style={{
+          minHeight,
+          height: autoGrow ? contentHeight : minHeight,
+        }}
         onMouseUp={(event) => {
-          onHeightChange?.(event.currentTarget.offsetHeight);
+          if (!autoGrow) onHeightChange?.(event.currentTarget.offsetHeight);
         }}
       >
         <EditorContent editor={editor} />

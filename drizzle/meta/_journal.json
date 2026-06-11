@@ -169,6 +169,13 @@
       "when": 1781009600000,
       "tag": "0025_user_access_and_project_members",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1781010400000,
+      "tag": "0026_subtask_type_and_task_dates",
+      "breakpoints": true
     }
   ]
 }

@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v4.6.4
+**Current release:** v4.7.0
 
 ## 1. Overview
 
@@ -443,7 +443,7 @@ Requires `tasks:view`. Edit operations require `tasks:edit`.
 
 - **Collapsible Tasks sidebar** — Board, Issues, Roadmap, Project settings (icon-only + hover expand)
 - **View switcher** in the page header — quick toggle between Board, Issues, and Roadmap (alongside sidebar navigation)
-- **Kanban board** — non-backlog columns only, single horizontal scroll row (no wrapping); cross-column drag-and-drop from anywhere on the card with optimistic UI, server persistence via `reorderTasks`, and rollback on failure; drops onto **empty columns** persist correctly; **WIP limits block drops** when a column is at capacity (toast warning); drop target falls back to highlighted column when pointer collision is ambiguous
+- **Kanban board** — non-backlog columns only, single horizontal scroll row (no wrapping); cross-column drag-and-drop from anywhere on the card (no separate drag handle) with optimistic UI, server persistence via `reorderTasks`, and rollback on failure; drops onto **empty columns** persist correctly; **WIP limits block drops** when a column is at capacity (toast warning); drop target falls back to highlighted column when pointer collision is ambiguous; **child tickets hidden from top-level columns** — expand subtask list on parent card via clickable subtask badge; click child to open ticket modal
 - **Board type filter** — two layers:
   - **Project default types** — configurable in Project Settings → Board (`projects.settings.boardSettings.visibleTypes`); defaults to Story + Task only on the kanban board
   - **Bug visibility mode** — Project Settings → Board (`projects.settings.boardSettings.bugBoardMode`): `show_bugs` (default filter All), `hide_bugs` (default filter Other tickets), or `all_types` (always show all types regardless of user filter)
@@ -454,14 +454,14 @@ Requires `tasks:view`. Edit operations require `tasks:edit`.
 
 ### 6.3 Task Hierarchy & Ticket Fields
 
-- Ticket types: **Epic**, **Feature**, **Story**, **Task**, **Bug**
-- Optional **parent** link for hierarchy (Epic → Feature → Story/Task/Bug); **configurable hierarchy rules** per project in settings; Bug may be a child of Epic, Feature, Story, or Task (or stand alone); parent dropdown filtered by allowed types; server-side validation prevents cycles and invalid parents
+- Ticket types: **Epic**, **Feature**, **Story**, **Task**, **Subtask**, **Bug**
+- Optional **parent** link for hierarchy (Epic → Feature → Story/Task/Bug; **Subtask** nests under Story or Task); **configurable hierarchy rules** per project in settings; Bug may be a child of Epic, Feature, Story, or Task (or stand alone); parent dropdown filtered by allowed types; server-side validation prevents cycles and invalid parents
 - Extended ticket fields stored on `tasks`:
   - Title, description, **details**, **acceptance criteria**, **definition of done**, **story points**
-  - Priority, due date, assignee, column/status, type, parent, labels
+  - Priority, due date, **start date**, **end date** (roadmap/Gantt), assignee, column/status, type, parent, labels
 - **Linked issues** — `task_links` table (relates to, blocks, duplicates); search-and-link UI in ticket modal
 - **Attachments & links** — drag-and-drop file upload; **version history** when re-uploading the same filename; external **URL links** (SharePoint, Drive, etc.); separate **Emails** section for dragged `.eml` files with subject/sender/date; upload via `/api/uploads`, stored in `task_attachments` with kind (`file` | `url` | `email`)
-- **Child subtasks** — quick-create linked child tickets (`tasks.parent_id`) from the ticket modal sidebar
+- **Child subtasks** — quick-create linked child tickets (`tasks.parent_id`) from the ticket modal Overview tab; manage from parent modal: change status/column, edit title, delete, open child ticket
 - **Checklist subtasks** — lightweight checklist rows in `task_subtasks` (toggle complete)
 - **Comments** — threaded replies via `parent_id` on `task_comments`
 
@@ -480,10 +480,13 @@ Requires `tasks:view`. Edit operations require `tasks:edit`.
 ### 6.6 Roadmap View
 
 - **Draft/commit workflow** — inline edits stay local until **Commit changes**; **Discard** resets draft
-- **Add item** dropdown — create Epic, Feature, Story, or Task directly on the roadmap
+- **Add item** dropdown — create Epic, Feature, Story, Task, Subtask, or Bug directly on the roadmap
 - **Insert between rows** — hover **Insert below** control between rows to add a sibling in context (Jira Advanced Roadmaps-style)
 - **Tree ordering** — children appear directly under their parent (depth-first by `sortOrder` / ticket number), not grouped by type
-- Editable table: key, title, type, parent, assignee, priority, due date, story points, status/column
+- Editable table: key, title, type, parent, assignee, priority, due date, **start date**, **end date**, story points, status/column
+- **Column visibility** — show/hide columns via toolbar menu; persisted in `projects.settings.roadmapSettings`
+- **Saved views** — save and restore column configurations per project
+- **Gantt timeline column** — horizontal bars for tickets with start/end dates; drag bar to move schedule; resize handles to extend/compress; optional (no bar when dates unset)
 - **Parent picker** — shows `KEY – Title` (e.g. `VC-003 – Implement Authentication`); options filtered by project **hierarchy rules**; allowed parent types shown per row
 - Hierarchy visible via indent + collapse/expand on parent rows
 - Bulk create, update, and delete committed via `commitRoadmapChanges` server action
@@ -492,13 +495,14 @@ Requires `tasks:view`. Edit operations require `tasks:edit`.
 
 Requires `tasks:edit`.
 
-**Tabbed layout:** General · Board · Roadmap · Hierarchy · Fields & Display · Workflow (future)
+**Tabbed layout:** General · Board · Roadmap · Hierarchy · Fields & Display · **Access** · Workflow (future)
 
-- **General:** project summary, labels (create with name and color)
+- **General:** project summary, **labels** (create, edit, delete with name and colour)
 - **Board:** drag-to-reorder columns, create/edit/delete (name, color, WIP limit); backlog column managed here but hidden from kanban; **board settings** — default visible ticket types on kanban; **bug visibility mode** (`show_bugs`, `hide_bugs`, `all_types`); card field toggles (parent, due date, stale indicator, child subtasks) and stale threshold days (`projects.settings.boardSettings`)
-- **Roadmap:** explanatory copy linking hierarchy rules to roadmap behaviour
+- **Roadmap:** column visibility and saved views stored in `projects.settings.roadmapSettings`
 - **Hierarchy:** allowed parent types per child type with clearer matrix, default tree diagram, and impact notes for Board/Roadmap/modal; stored in `projects.settings.hierarchyRules`
-- **Fields & Display:** per Epic/Feature/Story/Task — drag-to-reorder fields, show/hide toggles; stored in `projects.settings.ticketFields`; controls ticket modal and backlog create form visibility
+- **Fields & Display:** per Epic/Feature/Story/Task/**Subtask**/Bug — drag-to-reorder fields, show/hide toggles; stored in `projects.settings.ticketFields`; controls ticket modal and backlog create form visibility
+- **Access:** manage `project_members` for this project — grant view/edit per user (mirrors Admin → Users project access, project-centric view)
 
 ### 6.8 Create Ticket
 
@@ -512,20 +516,20 @@ Requires `tasks:edit`.
 ### 6.9 Task Cards
 
 - Display task key, title, type, priority badge, assignee, labels
-- Optional fields per project board settings: parent key, due date, stale badge, child subtask count
-- Draggable on kanban board (cross-column)
-- Click to open task detail modal
+- Optional fields per project board settings: parent key, due date, stale badge, **expandable child subtask list** (click badge to expand; click child to open modal)
+- Draggable on kanban board from anywhere on the card (cross-column; no grip handle icon)
+- Click title/key area to open task detail modal
 
 ### 6.10 Ticket Detail Modal
 
 - Deep-linkable via `/tasks/[KEY]` (e.g. `/tasks/OPS-001`)
 - **Top-anchored dialog** — fixed height with internal scroll; **wider modal** (`max-w-7xl`); tab changes do not shift modal position
 - **Tabbed layout** — Overview, Specification, Links & files, Discussion
-- Header: ticket key badge, type/status badges, inline title edit
+- Header: ticket key badge, type/status badges, **parent ticket link** (`Parent: KEY – Title`) when applicable, inline title edit
 - Field visibility/order driven by project ticket field settings for the ticket type
 - Edit all ticket fields (see §6.3)
 - **Links & files tab** — drag-and-drop zone (files + `.eml` emails); external URL links; file attachments with version history, per-version download, **Preview** button, and **green indexed tick** when attachment is indexed in RAG (`rag_index_state.status = indexed`); linked issues panel
-- **Overview tab** — two-column issue-tracker layout: **Description** (TipTap rich text: bold, italic, underline, headings, lists, font size, colour; resizable editor height persisted in `user_preferences.tasks_workspace`), child subtasks, and Discussion on the left; **right sidebar** for type, status, assignee, priority, due date, story points, parent (filtered by hierarchy rules), labels, and checklist
+- **Overview tab** — two-column issue-tracker layout: **Description** (TipTap rich text: bold, italic, underline, headings, lists, font size, colour; **auto-growing height** — no manual resize), **child subtask management** (add, status, edit, delete, open), and Discussion on the left; **right sidebar** for type, status, assignee, priority, due date, story points, parent (filtered by hierarchy rules), labels, and checklist
 - **Specification tab** — details, acceptance criteria, definition of done
 - **Discussion tab** — full-height threaded comments (same panel as Overview)
 - Copy shareable ticket URL

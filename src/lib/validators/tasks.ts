@@ -29,6 +29,8 @@ export const taskSchema = z.object({
   storyPoints: z.number().int().min(0).max(999).nullable().optional(),
   priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
   dueDate: z.string().datetime().nullable().optional(),
+  startDate: z.string().datetime().nullable().optional(),
+  endDate: z.string().datetime().nullable().optional(),
   assigneeId: z.string().uuid().nullable().optional(),
   type: taskTypeSchema.optional(),
   parentId: z.string().uuid().nullable().optional(),
@@ -55,6 +57,12 @@ export const commentSchema = z.object({
 export const labelSchema = z.object({
   projectId: z.string().uuid(),
   name: z.string().min(1).max(50),
+  color: z.string().optional(),
+});
+
+export const updateLabelSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1).max(50).optional(),
   color: z.string().optional(),
 });
 
@@ -151,6 +159,8 @@ export const roadmapCommitSchema = z.object({
       assigneeId: z.string().uuid().nullable().optional(),
       priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
       dueDate: z.string().datetime().nullable().optional(),
+      startDate: z.string().datetime().nullable().optional(),
+      endDate: z.string().datetime().nullable().optional(),
       storyPoints: z.number().int().min(0).max(999).nullable().optional(),
       columnId: z.string().uuid(),
       description: z.string().max(10000).nullable().optional(),
@@ -159,6 +169,21 @@ export const roadmapCommitSchema = z.object({
   ),
   updates: z.array(updateTaskSchema),
   deletes: z.array(z.string().uuid()),
+});
+
+export const updateProjectRoadmapSettingsSchema = z.object({
+  projectId: z.string().uuid(),
+  roadmapSettings: z.object({
+    visibleColumns: z.array(z.string()).min(1),
+    savedViews: z.array(
+      z.object({
+        id: z.string(),
+        name: z.string().min(1).max(80),
+        visibleColumns: z.array(z.string()).min(1),
+      })
+    ),
+    activeViewId: z.string().nullable().optional(),
+  }),
 });
 
 export type TaskInput = z.infer<typeof taskSchema>;

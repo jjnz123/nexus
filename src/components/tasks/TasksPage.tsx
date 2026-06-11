@@ -47,7 +47,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { TaskCard, TaskCardPreview } from "./TaskCard";
+import { TaskCard, TaskCardPreview, type BoardCardChild } from "./TaskCard";
 import { TaskModal } from "./TaskModal";
 import { CreateTaskDialog } from "./CreateTaskDialog";
 import { TasksSidebar, type TasksSidebarView } from "./TasksSidebar";
@@ -283,6 +283,7 @@ export function TasksPage({
   const boardFilterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null);
+  const [expandedCardIds, setExpandedCardIds] = useState<Set<string>>(new Set());
 
   const [projectDialogOpen, setProjectDialogOpen] = useState(false);
   const [newProjectKey, setNewProjectKey] = useState("");
@@ -381,6 +382,32 @@ export function TasksPage({
     return counts;
   }, [board?.tasks]);
 
+  const childrenByParentId = useMemo(() => {
+    const map = new Map<string, BoardCardChild[]>();
+    if (!board) return map;
+    for (const task of board.tasks) {
+      if (!task.parentId) continue;
+      const list = map.get(task.parentId) ?? [];
+      list.push({
+        id: task.id,
+        key: makeTaskKey(board.project.key, task.number),
+        title: task.title,
+        type: task.type,
+        sortOrder: task.sortOrder,
+      } as BoardCardChild & { sortOrder: number });
+      map.set(task.parentId, list);
+    }
+    for (const [parentId, list] of map) {
+      map.set(
+        parentId,
+        (list as Array<BoardCardChild & { sortOrder: number }>)
+          .sort((a, b) => a.sortOrder - b.sortOrder)
+          .map(({ id, key, title, type }) => ({ id, key, title, type }))
+      );
+    }
+    return map;
+  }, [board]);
+
   const parentKeyById = useMemo(() => {
     const map = new Map<string, string>();
     if (!board) return map;
@@ -449,16 +476,30 @@ export function TasksPage({
     boardTypeFilter,
   ]);
 
+  const boardRootTasks = useMemo(
+    () => boardDisplayTasks.filter((task) => !task.parentId),
+    [boardDisplayTasks]
+  );
+
   const groupedFiltered = useMemo(
     () =>
-      boardDisplayTasks.reduce<Record<string, BoardTask[]>>((acc, task) => {
+      boardRootTasks.reduce<Record<string, BoardTask[]>>((acc, task) => {
         if (!acc[task.columnId]) acc[task.columnId] = [];
         acc[task.columnId].push(task);
         acc[task.columnId].sort((a, b) => a.sortOrder - b.sortOrder);
         return acc;
       }, {}),
-    [boardDisplayTasks]
+    [boardRootTasks]
   );
+
+  const toggleCardSubtasks = (taskId: string) => {
+    setExpandedCardIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(taskId)) next.delete(taskId);
+      else next.add(taskId);
+      return next;
+    });
+  };
 
   const refreshProjects = async () => {
     const next = await getProjects();
@@ -894,7 +935,17 @@ export function TasksPage({
                                     labelsById={labelsById}
                                     cardFields={boardSettings.cardFields}
                                     staleDays={boardSettings.staleDays}
+                                    childTasks={childrenByParentId.get(task.id) ?? []}
                                     childTaskCount={childCountByParentId.get(task.id) ?? 0}
+                                    subtasksExpanded={expandedCardIds.has(task.id)}
+                                    onToggleSubtasks={() => toggleCardSubtasks(task.id)}
+                                    onOpenChild={(key) => {
+                                      const match = board.tasks.find(
+                                        (entry) =>
+                                          makeTaskKey(board.project.key, entry.number) === key
+                                      );
+                                      if (match) openTaskModal(match);
+                                    }}
                                     parentKey={
                                       task.parentId ? parentKeyById.get(task.parentId) ?? null : null
                                     }
@@ -918,7 +969,9 @@ export function TasksPage({
                       labelsById={labelsById}
                       cardFields={boardSettings.cardFields}
                       staleDays={boardSettings.staleDays}
+                      childTasks={childrenByParentId.get(activeDragTask.id) ?? []}
                       childTaskCount={childCountByParentId.get(activeDragTask.id) ?? 0}
+                      subtasksExpanded={expandedCardIds.has(activeDragTask.id)}
                       parentKey={
                         activeDragTask.parentId
                           ? parentKeyById.get(activeDragTask.parentId) ?? null
@@ -1065,7 +1118,6 @@ export function TasksPage({
           if (pathname !== "/tasks") router.replace("/tasks");
           void refreshBoard();
         }}
-        tasksWorkspace={tasksWorkspace}
       />
     </div>
   );

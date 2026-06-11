@@ -2,7 +2,7 @@
 
 import { CSS } from "@dnd-kit/utilities";
 import { useSortable } from "@dnd-kit/sortable";
-import { Calendar, Clock, Flag, GitBranch, GripVertical, ListTree } from "lucide-react";
+import { Calendar, ChevronDown, ChevronRight, Clock, Flag, GitBranch, ListTree } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
@@ -11,7 +11,7 @@ import {
   isTaskStale,
   type BoardCardFields,
 } from "@/lib/tasks/project-settings";
-import type { BoardTask, TaskLabel } from "./types";
+import type { BoardTask, TaskLabel, TaskType } from "./types";
 
 const priorityTone: Record<BoardTask["priority"], string> = {
   low: "text-emerald-400 border-emerald-500/50",
@@ -27,13 +27,24 @@ function formatDueDate(value: string | Date | null) {
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
+export type BoardCardChild = {
+  id: string;
+  key: string;
+  title: string;
+  type: TaskType;
+};
+
 type TaskCardPreviewProps = {
   task: BoardTask;
   taskKey: string;
   labelsById: Map<string, TaskLabel>;
   cardFields?: BoardCardFields;
   staleDays?: number;
+  childTasks?: BoardCardChild[];
   childTaskCount?: number;
+  subtasksExpanded?: boolean;
+  onToggleSubtasks?: () => void;
+  onOpenChild?: (taskKey: string) => void;
   parentKey?: string | null;
   onClick?: () => void;
   className?: string;
@@ -46,7 +57,11 @@ export function TaskCardPreview({
   labelsById,
   cardFields = DEFAULT_BOARD_CARD_FIELDS,
   staleDays = DEFAULT_STALE_DAYS,
+  childTasks = [],
   childTaskCount = 0,
+  subtasksExpanded = false,
+  onToggleSubtasks,
+  onOpenChild,
   parentKey,
   onClick,
   className,
@@ -56,6 +71,7 @@ export function TaskCardPreview({
   const dueLabel = showDueDate ? formatDueDate(task.dueDate) : null;
   const labels = task.labelIds.map((id) => labelsById.get(id)).filter(Boolean) as TaskLabel[];
   const stale = cardFields.stale && isTaskStale(task.updatedAt, staleDays);
+  const subtaskCount = childTaskCount || childTasks.length;
 
   return (
     <article
@@ -83,12 +99,6 @@ export function TaskCardPreview({
             <h4 className="line-clamp-2 text-sm font-medium">{task.title}</h4>
           </div>
         )}
-        <span
-          className="rounded p-1 text-muted-foreground opacity-40 group-hover:opacity-100"
-          aria-hidden
-        >
-          <GripVertical className="h-4 w-4" />
-        </span>
       </div>
 
       {cardFields.parent && parentKey ? (
@@ -123,11 +133,29 @@ export function TaskCardPreview({
             Stale
           </Badge>
         ) : null}
-        {cardFields.subtasks && childTaskCount > 0 ? (
-          <Badge variant="outline" className="text-[10px]">
-            <ListTree className="mr-1 h-3 w-3" />
-            {childTaskCount} subtasks
-          </Badge>
+        {cardFields.subtasks && subtaskCount > 0 ? (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggleSubtasks?.();
+            }}
+            onPointerDown={(event) => event.stopPropagation()}
+            className="inline-flex"
+          >
+            <Badge
+              variant="outline"
+              className="cursor-pointer text-[10px] hover:border-primary/60 hover:bg-primary/5"
+            >
+              {subtasksExpanded ? (
+                <ChevronDown className="mr-1 h-3 w-3" />
+              ) : (
+                <ChevronRight className="mr-1 h-3 w-3" />
+              )}
+              <ListTree className="mr-1 h-3 w-3" />
+              {subtaskCount} subtasks
+            </Badge>
+          </button>
         ) : null}
       </div>
 
@@ -145,6 +173,30 @@ export function TaskCardPreview({
           ))}
         </div>
       ) : null}
+
+      {cardFields.subtasks && subtasksExpanded && childTasks.length > 0 ? (
+        <ul className="mt-3 space-y-1 border-t pt-2">
+          {childTasks.map((child) => (
+            <li key={child.id}>
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onOpenChild?.(child.key);
+                }}
+                onPointerDown={(event) => event.stopPropagation()}
+                className="flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-left text-xs hover:bg-accent"
+              >
+                <span className="shrink-0 text-muted-foreground">{child.key}</span>
+                <span className="min-w-0 truncate">{child.title}</span>
+                <Badge variant="outline" className="ml-auto shrink-0 text-[9px] capitalize">
+                  {child.type}
+                </Badge>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </article>
   );
 }
@@ -155,7 +207,11 @@ export function TaskCard({
   labelsById,
   cardFields = DEFAULT_BOARD_CARD_FIELDS,
   staleDays = DEFAULT_STALE_DAYS,
+  childTasks = [],
   childTaskCount = 0,
+  subtasksExpanded = false,
+  onToggleSubtasks,
+  onOpenChild,
   parentKey,
   onClick,
 }: {
@@ -164,7 +220,11 @@ export function TaskCard({
   labelsById: Map<string, TaskLabel>;
   cardFields?: BoardCardFields;
   staleDays?: number;
+  childTasks?: BoardCardChild[];
   childTaskCount?: number;
+  subtasksExpanded?: boolean;
+  onToggleSubtasks?: () => void;
+  onOpenChild?: (taskKey: string) => void;
   parentKey?: string | null;
   onClick: () => void;
 }) {
@@ -190,7 +250,11 @@ export function TaskCard({
         labelsById={labelsById}
         cardFields={cardFields}
         staleDays={staleDays}
+        childTasks={childTasks}
         childTaskCount={childTaskCount}
+        subtasksExpanded={subtasksExpanded}
+        onToggleSubtasks={onToggleSubtasks}
+        onOpenChild={onOpenChild}
         parentKey={parentKey}
         onClick={onClick}
         className="cursor-grab touch-none active:cursor-grabbing"

@@ -49,7 +49,14 @@ export const taskPriorityEnum = pgEnum("task_priority", [
   "urgent",
 ]);
 
-export const taskTypeEnum = pgEnum("task_type", ["epic", "feature", "story", "task", "bug"]);
+export const taskTypeEnum = pgEnum("task_type", [
+  "epic",
+  "feature",
+  "story",
+  "task",
+  "subtask",
+  "bug",
+]);
 export const taskLinkTypeEnum = pgEnum("task_link_type", ["relates_to", "blocks", "duplicates"]);
 
 export const bookmarkVisibilityEnum = pgEnum("bookmark_visibility", ["everyone", "restricted"]);
@@ -699,6 +706,8 @@ export const tasks = pgTable(
     storyPoints: integer("story_points"),
     priority: taskPriorityEnum("priority").notNull().default("medium"),
     dueDate: timestamp("due_date"),
+    startDate: timestamp("start_date"),
+    endDate: timestamp("end_date"),
     assigneeId: uuid("assignee_id").references(() => users.id),
     type: taskTypeEnum("type").notNull().default("task"),
     parentId: uuid("parent_id").references((): AnyPgColumn => tasks.id, {

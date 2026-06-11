@@ -49,13 +49,13 @@ Editors can create and manage the library; viewers can browse and launch.
 A **Jira-inspired** task board with tickets, hierarchy, roadmap planning, and configurable fields:
 
 - Multiple **projects**, each with ticket keys (e.g. `OPS-001`); **last selected project persists** across reloads
-- **Kanban board** (horizontal columns) with **cross-column drag-and-drop**, **WIP limit enforcement**, configurable **default ticket types** (Story + Task by default), and a **board type filter** (All / Other tickets / Bugs only) persisted per user and project. Ticket types include **Epic, Feature, Story, Task, and Bug**.
+- **Kanban board** (horizontal columns) with **cross-column drag-and-drop**, **WIP limit enforcement**, configurable **default ticket types** (Story + Task by default), and a **board type filter** (All / Other tickets / Bugs only) persisted per user and project. Ticket types include **Epic, Feature, Story, Task, Subtask, and Bug**. Child tickets nest under parents on the board — click the subtask badge to expand/collapse; click a subtask to open its ticket modal.
 - **Backlog modal** — full-screen table (key, title, type, parent, assignee, priority, due date, points, status); search/filter; rank via drag handle; drag rows onto board columns or use **Move to board** dropdown.
 - **Issues view** — sortable columns, column visibility, quick filters, row selection, and bulk actions (assign, move, priority, delete).
 - **View switcher** — jump between Board, Issues, and Roadmap from the page header.
-- **Roadmap** — tree-ordered hierarchy (children directly under parents); inline bulk editing with draft/commit workflow; **insert rows between lines**; parent picker shows full ticket names and respects hierarchy rules.
-- **Tickets** — tabbed detail modal (wider layout) with rich text description (lists/headings), **RAG indexed** green tick on attachments, attachment preview, and more.
-- **Project settings** — tabbed layout (General, Board, Roadmap, Hierarchy, Fields & Display); columns, labels, **board card fields** (parent, due date, stale indicator, child subtasks), **visible board types**, **bug visibility default** (show bugs / hide bugs / always show all types), and clearer **hierarchy rules** UI.
+- **Roadmap** — tree-ordered hierarchy (children directly under parents); inline bulk editing with draft/commit workflow; **insert rows between lines**; parent picker shows full ticket names and respects hierarchy rules; **configurable column visibility**, **saved views**, and **Gantt-style timeline bars** (start/end dates, drag to move, resize handles).
+- **Tickets** — tabbed detail modal (wider layout) with **auto-growing** rich text description (lists/headings), **parent ticket link in header**, **subtask management** (add, edit title, change status, delete) from the parent modal, **RAG indexed** green tick on attachments, attachment preview, and more.
+- **Project settings** — tabbed layout (General, Board, Roadmap, Hierarchy, Fields & Display, **Access**); columns, **labels** (create, edit, delete, colour), **project member access** (view/edit per user), **board card fields** (parent, due date, stale indicator, child subtasks), **visible board types**, **bug visibility default** (show bugs / hide bugs / always show all types), and clearer **hierarchy rules** UI.
 
 ### Monitoring
 

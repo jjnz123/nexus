@@ -49,6 +49,8 @@ export type BoardTask = {
   storyPoints: number | null;
   priority: TaskPriority;
   dueDate: string | Date | null;
+  startDate: string | Date | null;
+  endDate: string | Date | null;
   assigneeId: string | null;
   type: TaskType;
   parentId: string | null;
@@ -98,6 +100,7 @@ export type TaskChild = {
   title: string;
   type: TaskType;
   columnId: string;
+  columnName: string;
   assigneeName: string | null;
 };
 
@@ -136,6 +139,8 @@ export type RoadmapDraftCreate = {
   assigneeId: string | null;
   priority: TaskPriority;
   dueDate: string | null;
+  startDate: string | null;
+  endDate: string | null;
   storyPoints: number | null;
   columnId: string;
   sortOrder: number;
@@ -150,6 +155,8 @@ export type RoadmapDraftUpdate = {
   assigneeId?: string | null;
   priority?: TaskPriority;
   dueDate?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
   storyPoints?: number | null;
   columnId?: string;
   sortOrder?: number;

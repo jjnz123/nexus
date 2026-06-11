@@ -80,6 +80,7 @@ export const DEFAULT_TICKET_FIELD_SETTINGS: ProjectTicketFieldSettings = {
   feature: buildDefaults(["definitionOfDone"]),
   story: buildDefaults([]),
   task: buildDefaults(["details", "acceptanceCriteria", "definitionOfDone"]),
+  subtask: buildDefaults(["details", "acceptanceCriteria", "definitionOfDone", "storyPoints"]),
   bug: buildDefaults(["details", "acceptanceCriteria", "definitionOfDone", "storyPoints"]),
 };
 
