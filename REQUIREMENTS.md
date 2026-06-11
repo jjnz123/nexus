@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v4.7.1
+**Current release:** v4.7.2
 
 ## 1. Overview
 
@@ -672,6 +672,7 @@ Requires `monitoring:configure` to enable; `monitoring:view` to display status.
 | `/api/ai/chat` | POST | Streaming Grok chat | Authenticated + `ai:use` |
 | `/api/ai/audit-analyze` | POST | Grok audit log analysis | Authenticated + `ai:use` |
 | `/api/uploads` | POST | File upload (icons, avatars) | Authenticated |
+| `/api/uploads/chunk` | POST | Chunked file upload (meeting audio) | Authenticated |
 | `/uploads/[...path]` | GET | Serve uploaded files | Authenticated (via app) |
 
 ## 13. Data & Persistence
@@ -758,7 +759,7 @@ Requires `ai:use`. Transcription requires `OPENAI_API_KEY`; summarization requir
 - Create meeting with **title**, **date/time** (defaults to now), and optional **project** link
 - **Create a new Tasks project** inline from the meeting form when the user has `tasks:edit`
 - **Select audio input device** before recording (choice persisted in localStorage; **System default** uses macOS input setting e.g. Loopback Audio). `getUserMedia` is called **only** when the user clicks Start recording — never on app load or section navigation
-- **Record** in browser (MediaRecorder via global `RecordingProvider` at app-shell level; survives SPA navigation). Active recordings continue when visiting Notes, AI Chat, Tasks, etc. Header recording indicator remains visible with live dB meters
+- **Record** in browser (MediaRecorder via global `RecordingProvider` at app-shell level; survives SPA navigation). Active recordings continue when visiting Notes, AI Chat, Tasks, etc. Header recording indicator remains visible with live dB meters. MediaRecorder emits 10s timeslices for long sessions; audio uploads use **chunked POST** to `/api/uploads/chunk` (2MB chunks with retry) to avoid proxy timeouts on long recordings
 - **Header recording indicator** — always visible next to notifications (grey when idle with link to last meeting; red with live meters when recording)
 - States: `recording` → `processing` → `ready` (or `failed`)
 - Background processing: Whisper transcription → Grok summary + action item extraction

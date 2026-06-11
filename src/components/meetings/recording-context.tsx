@@ -148,7 +148,8 @@ export function RecordingProvider({
           }
         };
 
-        recorder.start();
+        // Emit data every 10s so long recordings stay reliable and memory-stable.
+        recorder.start(10_000);
         mediaRecorderRef.current = recorder;
         setActiveRecording({
           meetingId: input.meetingId,

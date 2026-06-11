@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WHISPER_MAX_BYTES } from "@/lib/uploads";
+import { uploadFileChunked } from "@/lib/uploads/chunked-upload";
 import type { RecordingSettings } from "@/lib/recording";
 
 type MeetingDetailProps = {
@@ -77,6 +78,12 @@ export function MeetingDetailView({
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [pendingRecording, setPendingRecording] = useState<{
+    blob: Blob;
+    filename: string;
+    mimeType: string;
+  } | null>(null);
 
   const isRecordingThisMeeting =
     recordingContext.isRecording &&
@@ -123,30 +130,60 @@ export function MeetingDetailView({
     };
   }, [meeting.id, meeting.status]);
 
-  async function uploadBlob(blob: Blob, filename: string) {
+  async function uploadBlob(blob: Blob, filename: string, mimeType = blob.type || "audio/webm") {
+    if (blob.size > WHISPER_MAX_BYTES) {
+      toast.warning(
+        `This recording is ${Math.round(blob.size / 1024 / 1024)}MB. Whisper accepts at most 25MB — transcription may fail unless you compress it.`
+      );
+    }
+
     setIsUploading(true);
+    setUploadProgress(0);
+    setPendingRecording(null);
+
     try {
-      const form = new FormData();
-      form.append("file", blob, filename);
-      const res = await fetch("/api/uploads", { method: "POST", body: form });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(body?.error ?? `Upload failed (${res.status})`);
-      }
-      const { path } = (await res.json()) as { path: string };
+      const { path } = await uploadFileChunked(blob, filename, {
+        onProgress: (percent) => setUploadProgress(percent),
+      });
       await attachMeetingAudio({
         meetingId: meeting.id,
         audioPath: path,
         audioFilename: filename,
-        audioMimeType: blob.type || "audio/webm",
+        audioMimeType: mimeType,
         audioSize: blob.size,
       });
       setMeeting((m) => ({ ...m, status: "processing" }));
+      setPendingRecording(null);
       toast.success("Audio uploaded — processing started");
       router.refresh();
+    } catch (error) {
+      setPendingRecording({ blob, filename, mimeType });
+      throw error;
     } finally {
       setIsUploading(false);
+      setUploadProgress(null);
     }
+  }
+
+  function downloadPendingRecording() {
+    if (!pendingRecording) return;
+    const url = URL.createObjectURL(pendingRecording.blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = pendingRecording.filename;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function retryPendingUpload() {
+    if (!pendingRecording) return;
+    void uploadBlob(
+      pendingRecording.blob,
+      pendingRecording.filename,
+      pendingRecording.mimeType
+    ).catch((error) => {
+      toast.error(error instanceof Error ? error.message : "Upload failed");
+    });
   }
 
   function startRecording() {
@@ -156,8 +193,12 @@ export function MeetingDetailView({
       projectName,
       projectKey,
       onStop: async (blob, mimeType) => {
+        if (!blob.size) {
+          toast.error("Recording was empty — try again or upload a file manually.");
+          return;
+        }
         const ext = getRecordingExtension(mimeType);
-        await uploadBlob(blob, `meeting-${Date.now()}.${ext}`);
+        await uploadBlob(blob, `meeting-${Date.now()}.${ext}`, mimeType);
       },
     });
   }
@@ -389,9 +430,44 @@ export function MeetingDetailView({
             <AudioInputSelect id="meeting-audio-input" />
             <div className="flex flex-wrap gap-2">
             {isUploading ? (
-              <div className="flex w-full items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Uploading audio…
+              <div className="flex w-full flex-col gap-1 text-sm text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Uploading audio…
+                  {uploadProgress !== null ? (
+                    <span>{Math.round(uploadProgress)}%</span>
+                  ) : null}
+                </div>
+                {uploadProgress !== null ? (
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full bg-primary transition-[width]"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+            {pendingRecording ? (
+              <div className="w-full rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
+                <p className="font-medium text-foreground">Upload failed</p>
+                <p className="mt-1 text-muted-foreground">
+                  Your {Math.round(pendingRecording.blob.size / 1024 / 1024)}MB recording is still
+                  in the browser. Retry the upload or download it to upload manually.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button size="sm" onClick={retryPendingUpload} disabled={isUploading}>
+                    Retry upload
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={downloadPendingRecording}
+                    disabled={isUploading}
+                  >
+                    Download recording
+                  </Button>
+                </div>
               </div>
             ) : null}
             {!isRecordingThisMeeting ? (
