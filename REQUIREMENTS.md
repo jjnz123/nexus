@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v4.7.3
+**Current release:** v4.7.4
 
 ## 1. Overview
 
@@ -13,7 +13,7 @@ Internal operations portal for bookmarks, kanban tasks, network monitoring, and 
 | AI provider | xAI Grok (optional; `XAI_API_KEY`); OpenAI Whisper + RAG embeddings (optional; `OPENAI_API_KEY`) |
 | Vector search | pgvector (PostgreSQL extension; `pgvector/pgvector:pg16` image) |
 | Email | SMTP2go REST API (optional; `SMTP2GO_*`) |
-| Background services | `monitor-worker` for scheduled network health checks |
+| Background services | `monitor-worker` for scheduled network health checks; `transcription-worker` for meeting transcription jobs |
 
 ## 2. Authentication & Authorization
 
@@ -715,7 +715,7 @@ Requires `monitoring:configure` to enable; `monitoring:view` to display status.
 
 ### 14.1 Deployment
 
-- Docker Compose: app, PostgreSQL, monitor-worker
+- Docker Compose: app, PostgreSQL, monitor-worker, transcription-worker
 - Default host port: 8374 (internal/LAN access only)
 - Environment: `DATABASE_URL`, `AUTH_SECRET`, `AUTH_URL`, `NEXT_PUBLIC_APP_URL`, `AUTH_TRUST_HOST`, `XAI_API_KEY`, `OPENAI_API_KEY`, `SMTP2GO_*` (all optional except core auth/DB), seed admin vars
 
@@ -760,9 +760,9 @@ Requires `ai:use`. Transcription requires `OPENAI_API_KEY`; summarization requir
 - **Create a new Tasks project** inline from the meeting form when the user has `tasks:edit`
 - **Select audio input device** before recording (choice persisted in localStorage; **System default** uses macOS input setting e.g. Loopback Audio). `getUserMedia` is called **only** when the user clicks Start recording — never on app load or section navigation
 - **Record** in browser (MediaRecorder via global `RecordingProvider` at app-shell level; survives SPA navigation). Active recordings continue when visiting Notes, AI Chat, Tasks, etc. Header recording indicator remains visible with live dB meters. MediaRecorder emits 10s timeslices for long sessions; audio uploads use **chunked POST** to `/api/uploads/chunk` (2MB chunks with retry) to avoid proxy timeouts on long recordings
-- **Header recording indicator** — always visible next to notifications (grey when idle with link to last meeting; red with live meters when recording)
+- **Header recording indicator** — always visible next to notifications (grey when idle with link to last meeting; when recording: red state + **inline 5-segment level ladder** driven by peak dBFS across channels). Dropdown shows **per-channel sample-peak dBFS meters** with peak hold, colour zones (green / yellow / red), and -60…0 dBFS scale
 - States: `recording` → `processing` → `ready` (or `failed`)
-- Background processing: **chunked OpenAI Whisper transcription** (ffmpeg splits audio into &lt;24MB segments when needed; merged transcript) → Grok summary + action item extraction. Requires `ffmpeg` in the app container.
+- Background processing via **`transcription-worker`** service: polls `meetings` where `status = processing`, claims jobs with `transcription_started_at` (stale reclaim after 45 min). **Chunked OpenAI Whisper transcription** (ffmpeg splits audio into &lt;24MB segments when needed; merged transcript) → Grok summary + action item extraction. Shared `uploads` volume; requires `ffmpeg`, `OPENAI_API_KEY`, `XAI_API_KEY`
 - Processing view shows spinner and **auto-refreshes** when transcription completes; long recordings may take several minutes
 
 ### 15.2 Meeting detail

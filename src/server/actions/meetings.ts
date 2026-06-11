@@ -13,8 +13,7 @@ import {
 } from "@/lib/db/schema";
 import { requireActiveMember } from "@/lib/auth";
 import { requireSessionPermission } from "@/lib/permissions";
-import { analyzeMeetingTranscript, answerMeetingQuestion } from "@/lib/ai/meeting-analysis";
-import { transcribeAudioFile } from "@/lib/ai/whisper";
+import { answerMeetingQuestion } from "@/lib/ai/meeting-analysis";
 import { deleteMeetingIndex, indexMeetingContent } from "@/lib/rag/indexer";
 import { retrieveMeetingKnowledge } from "@/lib/rag/retriever";
 import {
@@ -178,6 +177,7 @@ export async function attachMeetingAudio(input: unknown) {
       audioMimeType: data.audioMimeType,
       audioSize: data.audioSize,
       status: "processing",
+      transcriptionStartedAt: null,
       updatedAt: new Date(),
     })
     .where(and(eq(meetings.id, data.meetingId), eq(meetings.userId, session.user.id)))
@@ -185,68 +185,8 @@ export async function attachMeetingAudio(input: unknown) {
 
   if (!meeting) throw new Error("Meeting not found");
 
-  void processMeetingRecording(meeting.id);
   revalidatePath(`/meetings/${meeting.id}`);
   return meeting;
-}
-
-async function processMeetingRecording(meetingId: string) {
-  try {
-    const [meeting] = await db.select().from(meetings).where(eq(meetings.id, meetingId)).limit(1);
-    if (!meeting?.audioPath) throw new Error("No audio attached");
-
-    const transcript = await transcribeAudioFile(meeting.audioPath);
-    const analysis = await analyzeMeetingTranscript(transcript);
-
-    await db
-      .update(meetings)
-      .set({
-        transcript,
-        summary: analysis.summary,
-        status: "ready",
-        updatedAt: new Date(),
-        errorMessage: null,
-      })
-      .where(eq(meetings.id, meetingId));
-
-    await db.delete(meetingActionItems).where(eq(meetingActionItems.meetingId, meetingId));
-
-    if (analysis.actionItems.length) {
-      await db.insert(meetingActionItems).values(
-        analysis.actionItems.map((item, index) => ({
-          meetingId,
-          title: item.title,
-          description: item.description ?? null,
-          assigneeHint: item.assigneeHint ?? null,
-          priority: item.priority ?? "medium",
-          sortOrder: index,
-        }))
-      );
-    }
-
-    const [updatedMeeting] = await db
-      .select()
-      .from(meetings)
-      .where(eq(meetings.id, meetingId))
-      .limit(1);
-    const actionItems = await db
-      .select()
-      .from(meetingActionItems)
-      .where(eq(meetingActionItems.meetingId, meetingId));
-
-    if (updatedMeeting) {
-      void indexMeetingContent(updatedMeeting, actionItems).catch(() => undefined);
-    }
-  } catch (error) {
-    await db
-      .update(meetings)
-      .set({
-        status: "failed",
-        errorMessage: error instanceof Error ? error.message : "Processing failed",
-        updatedAt: new Date(),
-      })
-      .where(eq(meetings.id, meetingId));
-  }
 }
 
 export async function reprocessMeeting(meetingId: string) {
@@ -255,12 +195,16 @@ export async function reprocessMeeting(meetingId: string) {
 
   const [meeting] = await db
     .update(meetings)
-    .set({ status: "processing", errorMessage: null, updatedAt: new Date() })
+    .set({
+      status: "processing",
+      errorMessage: null,
+      transcriptionStartedAt: null,
+      updatedAt: new Date(),
+    })
     .where(and(eq(meetings.id, meetingId), eq(meetings.userId, session.user.id)))
     .returning();
 
   if (!meeting) throw new Error("Meeting not found");
-  void processMeetingRecording(meetingId);
   revalidatePath(`/meetings/${meetingId}`);
   return { ok: true };
 }

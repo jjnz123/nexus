@@ -15,21 +15,47 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useRecordingOptional } from "@/components/meetings/recording-context";
+import { RecordingLevelLadder } from "@/components/meetings/RecordingLevelLadder";
 import { getLatestMeeting } from "@/server/actions/meetings";
+import {
+  channelLabel,
+  formatDbfs,
+  meterBarColor,
+} from "@/lib/recording/meters";
+import { maxPeakDbfs } from "@/lib/recording/use-audio-levels";
 import { cn } from "@/lib/utils";
 
-function LevelMeter({ label, percent, db }: { label: string; percent: number; db: number }) {
+function DbfsMeter({
+  label,
+  peakDbfs,
+  peakHoldDbfs,
+  percent,
+}: {
+  label: string;
+  peakDbfs: number;
+  peakHoldDbfs: number;
+  percent: number;
+}) {
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between text-[10px] text-muted-foreground">
         <span>{label}</span>
-        <span>{Math.round(db)} dB</span>
+        <span className="tabular-nums">
+          {formatDbfs(peakDbfs)}
+          {peakHoldDbfs > peakDbfs + 0.5 ? (
+            <span className="ml-1 text-muted-foreground/80">H {formatDbfs(peakHoldDbfs)}</span>
+          ) : null}
+        </span>
       </div>
-      <div className="h-2 overflow-hidden rounded-full bg-muted">
+      <div className="relative h-2 overflow-hidden rounded-full bg-muted">
         <div
-          className="h-full rounded-full bg-green-500 transition-[width] duration-75"
+          className={cn("h-full rounded-full transition-[width] duration-75", meterBarColor(peakDbfs))}
           style={{ width: `${percent}%` }}
         />
+      </div>
+      <div className="flex justify-between text-[9px] text-muted-foreground/70">
+        <span>-60</span>
+        <span>0 dBFS</span>
       </div>
     </div>
   );
@@ -54,18 +80,20 @@ export function RecordingHeaderControl() {
     const projectLabel =
       activeRecording.projectName ??
       (activeRecording.projectKey ? activeRecording.projectKey : "No project");
+    const headerPeakDbfs = maxPeakDbfs(levels);
 
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
             variant="ghost"
-            size="icon"
-            className="relative text-red-500 hover:text-red-600"
+            size="sm"
+            className="relative h-9 gap-1.5 px-2 text-red-500 hover:text-red-600"
             aria-label="Recording in progress"
           >
-            <Mic className="h-5 w-5" />
-            <span className="absolute right-1 top-1 h-2 w-2 animate-pulse rounded-full bg-red-500" />
+            <Mic className="h-5 w-5 shrink-0" />
+            <RecordingLevelLadder peakDbfs={headerPeakDbfs} />
+            <span className="absolute right-0.5 top-0.5 h-2 w-2 animate-pulse rounded-full bg-red-500" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-80">
@@ -89,12 +117,13 @@ export function RecordingHeaderControl() {
               </Badge>
             </div>
             <div className="space-y-2">
-              {levels.levelsPercent.map((percent, index) => (
-                <LevelMeter
+              {levels.peakDbfs.map((peakDbfs, index) => (
+                <DbfsMeter
                   key={index}
-                  label={levels.channels > 1 ? `Ch ${index + 1}` : "Level"}
-                  percent={percent}
-                  db={levels.levelsDb[index] ?? -60}
+                  label={channelLabel(index, levels.channels)}
+                  peakDbfs={peakDbfs}
+                  peakHoldDbfs={levels.peakHoldDbfs[index] ?? -60}
+                  percent={levels.levelsPercent[index] ?? 0}
                 />
               ))}
             </div>

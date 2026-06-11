@@ -865,6 +865,7 @@ export const meetings = pgTable(
     transcript: text("transcript"),
     summary: text("summary"),
     errorMessage: text("error_message"),
+    transcriptionStartedAt: timestamp("transcription_started_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -874,6 +875,7 @@ export const meetings = pgTable(
     index("meetings_created_at_idx").on(table.createdAt),
     index("meetings_meeting_at_idx").on(table.meetingAt),
     index("meetings_archived_at_idx").on(table.archivedAt),
+    index("meetings_transcription_queue_idx").on(table.status, table.transcriptionStartedAt),
   ]
 );
 

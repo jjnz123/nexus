@@ -1,6 +1,6 @@
 {
   "name": "nexus",
-  "version": "4.7.3",
+  "version": "4.7.4",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
@@ -11,7 +11,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:seed": "tsx scripts/seed-admin.ts",
-    "worker:monitor": "tsx scripts/monitor-worker.ts"
+    "worker:monitor": "tsx scripts/monitor-worker.ts",
+    "worker:transcription": "tsx scripts/transcription-worker.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
