@@ -6,6 +6,7 @@ import { Mail } from "lucide-react";
 import { toast } from "sonner";
 import type { SystemSettings } from "@/lib/db/schema";
 import { sendTestEmail, updateSystemSettings } from "@/server/actions/settings";
+import { BackupRestorePanel } from "@/components/admin/BackupRestorePanel";
 import {
   DEFAULT_RECORDING_BITRATE_KBPS,
   DEFAULT_RECORDING_MIME_TYPE,
@@ -282,6 +283,8 @@ export function SystemSettingsPanel({
         )}
       </CardContent>
     </Card>
+
+    <BackupRestorePanel emailConfigured={emailConfigured} defaultEmail={defaultTestEmail} />
     </div>
   );
 }

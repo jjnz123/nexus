@@ -1,5 +1,5 @@
 FROM node:20-alpine AS base
-RUN apk add --no-cache libc6-compat iputils-ping wget ffmpeg
+RUN apk add --no-cache libc6-compat iputils-ping wget ffmpeg postgresql-client
 WORKDIR /app
 
 FROM base AS deps

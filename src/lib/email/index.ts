@@ -3,6 +3,11 @@ type SendEmailInput = {
   subject: string;
   text: string;
   html?: string;
+  attachments?: {
+    filename: string;
+    contentBase64: string;
+    mimeType: string;
+  }[];
 };
 
 export function isEmailConfigured(): boolean {
@@ -33,6 +38,11 @@ export async function sendEmail(input: SendEmailInput): Promise<{ ok: boolean; s
       subject: input.subject,
       text_body: input.text,
       html_body: input.html ?? input.text.replace(/\n/g, "<br>"),
+      attachments: input.attachments?.map((attachment) => ({
+        filename: attachment.filename,
+        fileblob: attachment.contentBase64,
+        mimetype: attachment.mimeType,
+      })),
     }),
   });
 

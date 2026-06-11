@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v4.7.4
+**Current release:** v4.7.5
 
 ## 1. Overview
 
@@ -620,6 +620,11 @@ Requires `admin:access`. Tab selection via query param: `?tab=users|settings|kno
 - **Show version number in header** — append `vX.Y.Z` next to the subtitle (from `NEXT_PUBLIC_NEXUS_VERSION` / `package.json` at build time); stored in `system_settings.show_version_in_header`
 - **Meeting audio recording** — browser recording format (default WebM Opus) and bitrate (default 96 kbps)
 - **Email test** — send a test message via SMTP2go to verify configuration (shows configured/not configured status)
+- **Backup & restore** — full Nexus backup as `.tar.gz` (PostgreSQL dump + uploads volume + manifest):
+  - **Download backup** — admin-only; may take several minutes on large instances
+  - **Email backup** — attaches archive via SMTP2go when size ≤ 10 MB; larger backups must be downloaded
+  - **Restore from backup** — destructive replace of database and uploads; confirmation dialog requires restore passcode (`1234`) validated server-side; actions logged to audit trail (`backup.download`, `backup.email`, `backup.restore`)
+  - Requires `postgresql-client` in the app container (`pg_dump` / `psql`)
 
 ### 10.3 Knowledge Base (RAG)
 

@@ -1,20 +1,34 @@
 # Backup & Restore
 
-## Database backup
+## Admin UI (recommended)
+
+**Admin → Settings → Backup & Restore**
+
+| Action | Detail |
+|--------|--------|
+| Download backup | Full `.tar.gz`: `database.sql` (pg_dump), `uploads/`, `manifest.json` |
+| Email backup | SMTP2go attachment when archive ≤ 10 MB |
+| Restore | Select `.tar.gz`, confirm warning, enter passcode; replaces DB + uploads |
+
+Requires admin access. Events are logged to the audit trail.
+
+---
+
+## Manual CLI — database only
 
 ```bash
 docker compose exec postgres pg_dump -U nexus nexus > backup-$(date +%Y%m%d).sql
 ```
 
-## Database restore
+Restore:
 
 ```bash
 cat backup-20260609.sql | docker compose exec -T postgres psql -U nexus nexus
 ```
 
-## Uploads volume
+## Manual CLI — uploads volume only
 
-Avatars and task attachments are stored in the Docker `uploads` volume.
+Avatars, task attachments, and meeting audio live in the Docker `uploads` volume.
 
 ```bash
 docker run --rm -v internalportal_uploads:/data -v $(pwd):/backup alpine \

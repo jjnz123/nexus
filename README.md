@@ -186,15 +186,15 @@ npm run dev
 
 ### Backup & restore
 
-```bash
-# Backup
-docker compose exec postgres pg_dump -U nexus nexus > backup.sql
+**Admin → Settings → Backup & Restore** (recommended):
 
-# Restore
-cat backup.sql | docker compose exec -T postgres psql -U nexus nexus
-```
+- **Download backup** — `.tar.gz` with PostgreSQL dump, uploads folder, and manifest
+- **Email backup** — sends the archive when it is ≤ 10 MB (requires SMTP2go)
+- **Restore from backup** — replaces all data; requires confirmation passcode in the dialog
 
-Uploads (avatars, attachments) live in the `uploads` Docker volume.
+All backup actions require admin access and are written to the audit log.
+
+Manual CLI alternatives (database only or uploads only) are documented in [scripts/backup-restore.md](./scripts/backup-restore.md).
 
 ### HTTPS (future)
 
