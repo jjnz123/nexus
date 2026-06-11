@@ -29,6 +29,8 @@ export default async function AppLayout({
       }}
       portalSubtitle={settings.portalSubtitle ?? "Internal Operations Portal"}
       portalSubtitleEnabled={settings.portalSubtitleEnabled}
+      showVersionInHeader={settings.showVersionInHeader}
+      nexusVersion={process.env.NEXT_PUBLIC_NEXUS_VERSION ?? ""}
       initialAppSidebarCollapsed={prefs.appSidebarCollapsed ?? false}
       recordingSettings={recordingSettings}
     >

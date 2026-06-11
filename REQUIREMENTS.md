@@ -2,7 +2,7 @@
 
 Internal operations portal for bookmarks, kanban tasks, network monitoring, and AI assistance.
 
-**Current release:** v4.7.0
+**Current release:** v4.7.1
 
 ## 1. Overview
 
@@ -461,7 +461,7 @@ Requires `tasks:view`. Edit operations require `tasks:edit`.
   - Priority, due date, **start date**, **end date** (roadmap/Gantt), assignee, column/status, type, parent, labels
 - **Linked issues** — `task_links` table (relates to, blocks, duplicates); search-and-link UI in ticket modal
 - **Attachments & links** — drag-and-drop file upload; **version history** when re-uploading the same filename; external **URL links** (SharePoint, Drive, etc.); separate **Emails** section for dragged `.eml` files with subject/sender/date; upload via `/api/uploads`, stored in `task_attachments` with kind (`file` | `url` | `email`)
-- **Child subtasks** — quick-create linked child tickets (`tasks.parent_id`) from the ticket modal Overview tab; manage from parent modal: change status/column, edit title, delete, open child ticket
+- **Child subtasks** — quick-create linked child tickets (`tasks.parent_id`) from the ticket modal Overview tab; manage from parent modal: change status/column, edit title, delete, open child ticket. **Subtask tickets cannot have child tickets** (UI hidden + server rejection in `createChildTask`).
 - **Checklist subtasks** — lightweight checklist rows in `task_subtasks` (toggle complete)
 - **Comments** — threaded replies via `parent_id` on `task_comments`
 
@@ -481,9 +481,10 @@ Requires `tasks:view`. Edit operations require `tasks:edit`.
 
 - **Draft/commit workflow** — inline edits stay local until **Commit changes**; **Discard** resets draft
 - **Add item** dropdown — create Epic, Feature, Story, Task, Subtask, or Bug directly on the roadmap
-- **Insert between rows** — hover **Insert below** control between rows to add a sibling in context (Jira Advanced Roadmaps-style)
+- **Insert between rows** — hover **Insert below** control between rows to add a sibling in context (left-aligned with the Key column; Jira Advanced Roadmaps-style)
 - **Tree ordering** — children appear directly under their parent (depth-first by `sortOrder` / ticket number), not grouped by type
 - Editable table: key, title, type, parent, assignee, priority, due date, **start date**, **end date**, story points, status/column
+- **Column widths** — drag column header edges to resize; widths persisted per user and project in `user_preferences.tasks_workspace.roadmapColumnWidths[projectId]`
 - **Column visibility** — show/hide columns via toolbar menu; persisted in `projects.settings.roadmapSettings`
 - **Saved views** — save and restore column configurations per project
 - **Gantt timeline column** — horizontal bars for tickets with start/end dates; drag bar to move schedule; resize handles to extend/compress; optional (no bar when dates unset)
@@ -529,7 +530,7 @@ Requires `tasks:edit`.
 - Field visibility/order driven by project ticket field settings for the ticket type
 - Edit all ticket fields (see §6.3)
 - **Links & files tab** — drag-and-drop zone (files + `.eml` emails); external URL links; file attachments with version history, per-version download, **Preview** button, and **green indexed tick** when attachment is indexed in RAG (`rag_index_state.status = indexed`); linked issues panel
-- **Overview tab** — two-column issue-tracker layout: **Description** (TipTap rich text: bold, italic, underline, headings, lists, font size, colour; **auto-growing height** — no manual resize), **child subtask management** (add, status, edit, delete, open), and Discussion on the left; **right sidebar** for type, status, assignee, priority, due date, story points, parent (filtered by hierarchy rules), labels, and checklist
+- **Overview tab** — two-column issue-tracker layout: **Description** (TipTap rich text: bold, italic, underline, headings, lists, font size, colour; **auto-growing height** — no manual resize), **child subtask management** on non-Subtask tickets (add, status, edit, delete, open; hidden with explanatory message for Subtask type), and Discussion on the left; **right sidebar** for type, status, assignee, priority, due date, story points, parent (filtered by hierarchy rules), labels, and checklist
 - **Specification tab** — details, acceptance criteria, definition of done
 - **Discussion tab** — full-height threaded comments (same panel as Overview)
 - Copy shareable ticket URL
@@ -616,10 +617,9 @@ Requires `admin:access`. Tab selection via query param: `?tab=users|settings|kno
 
 - **AI model** — select preset Grok model or enter custom model ID
 - **Portal header subtitle** — text and enable/disable toggle
+- **Show version number in header** — append `vX.Y.Z` next to the subtitle (from `NEXT_PUBLIC_NEXUS_VERSION` / `package.json` at build time); stored in `system_settings.show_version_in_header`
 - **Meeting audio recording** — browser recording format (default WebM Opus) and bitrate (default 96 kbps)
 - **Email test** — send a test message via SMTP2go to verify configuration (shows configured/not configured status)
-
-- **Meeting audio recording** — browser recording format (default WebM Opus) and bitrate (default 96 kbps)
 
 ### 10.3 Knowledge Base (RAG)
 

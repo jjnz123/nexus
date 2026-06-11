@@ -1005,6 +1005,9 @@ export async function createChildTask(input: unknown) {
 
   const [parent] = await db.select().from(tasks).where(eq(tasks.id, data.parentTaskId)).limit(1);
   if (!parent) throw new Error("Parent task not found");
+  if (parent.type === "subtask") {
+    throw new Error("Subtasks cannot have child tickets");
+  }
 
   const rules = await loadProjectHierarchyRules(parent.projectId);
   const childType = resolveChildTypeForParent(parent.type, rules);

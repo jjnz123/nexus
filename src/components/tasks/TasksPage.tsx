@@ -71,6 +71,7 @@ import {
   DEFAULT_TASKS_WORKSPACE,
   type TasksWorkspacePrefs,
 } from "@/lib/preferences/workspace";
+import type { RoadmapColumnId } from "@/lib/tasks/roadmap-settings";
 import { cn } from "@/lib/utils";
 
 function makeTaskKey(projectKey: string, taskNumber: number) {
@@ -350,11 +351,39 @@ export function TasksPage({
               ...tasksWorkspace.boardFilters,
               [board.project.id]: filter,
             },
+            roadmapColumnWidths: tasksWorkspace.roadmapColumnWidths,
           },
         });
       }, 300);
     },
-    [board, tasksWorkspace.boardFilters, tasksWorkspace.descriptionHeight]
+    [
+      board,
+      tasksWorkspace.boardFilters,
+      tasksWorkspace.descriptionHeight,
+      tasksWorkspace.roadmapColumnWidths,
+    ]
+  );
+
+  const persistRoadmapColumnWidths = useCallback(
+    (widths: Partial<Record<RoadmapColumnId, number>>) => {
+      if (!board) return;
+      void updateBookmarkPreferences({
+        tasksWorkspace: {
+          descriptionHeight: tasksWorkspace.descriptionHeight,
+          boardFilters: tasksWorkspace.boardFilters,
+          roadmapColumnWidths: {
+            ...tasksWorkspace.roadmapColumnWidths,
+            [board.project.id]: widths,
+          },
+        },
+      });
+    },
+    [
+      board,
+      tasksWorkspace.boardFilters,
+      tasksWorkspace.descriptionHeight,
+      tasksWorkspace.roadmapColumnWidths,
+    ]
   );
 
   const handleBoardTypeFilterChange = (filter: BoardTypeFilter) => {
@@ -1007,6 +1036,8 @@ export function TasksPage({
               hierarchyRules={hierarchyRules}
               onOpenTask={openTaskModal}
               onRefresh={refreshBoard}
+              initialColumnWidths={tasksWorkspace.roadmapColumnWidths?.[board.project.id]}
+              onColumnWidthsChange={persistRoadmapColumnWidths}
             />
           ) : null}
 

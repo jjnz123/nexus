@@ -39,6 +39,9 @@ const bookmarkPrefsSchema = z.object({
       boardFilters: z
         .record(z.string(), z.enum(["all", "bugs", "others"]))
         .optional(),
+      roadmapColumnWidths: z
+        .record(z.string(), z.record(z.string(), z.number().min(60).max(800)))
+        .optional(),
     })
     .optional(),
   homeDashboard: z

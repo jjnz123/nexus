@@ -19,6 +19,7 @@ export async function getSystemSettings() {
       aiModel: DEFAULT_MODEL,
       portalSubtitle: "Internal Operations Portal",
       portalSubtitleEnabled: true,
+      showVersionInHeader: true,
       recordingAudioMimeType: DEFAULT_RECORDING_MIME_TYPE,
       recordingAudioBitrateKbps: DEFAULT_RECORDING_BITRATE_KBPS,
     })

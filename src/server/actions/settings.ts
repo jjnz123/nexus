@@ -20,6 +20,7 @@ const updateSettingsSchema = z.object({
   aiModel: z.string().min(1).max(100),
   portalSubtitle: z.string().max(120).optional(),
   portalSubtitleEnabled: z.boolean(),
+  showVersionInHeader: z.boolean(),
   recordingAudioMimeType: z.enum(
     RECORDING_FORMAT_PRESETS.map((preset) => preset.mimeType) as [string, ...string[]]
   ),
@@ -48,6 +49,7 @@ export async function updateSystemSettings(input: unknown) {
       aiModel: data.aiModel,
       portalSubtitle: data.portalSubtitle ?? current.portalSubtitle,
       portalSubtitleEnabled: data.portalSubtitleEnabled,
+      showVersionInHeader: data.showVersionInHeader,
       recordingAudioMimeType: data.recordingAudioMimeType,
       recordingAudioBitrateKbps: data.recordingAudioBitrateKbps,
       updatedAt: new Date(),
@@ -66,6 +68,7 @@ export async function updateSystemSettings(input: unknown) {
     details: {
       aiModel: settings.aiModel,
       portalSubtitleEnabled: settings.portalSubtitleEnabled,
+      showVersionInHeader: settings.showVersionInHeader,
       recordingAudioMimeType: settings.recordingAudioMimeType,
       recordingAudioBitrateKbps: settings.recordingAudioBitrateKbps,
     },

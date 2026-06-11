@@ -568,13 +568,19 @@ export function TaskModal({
                           </div>
                         ) : null}
                         {taskDetails ? (
-                          <TaskChildSubtasksPanel
-                            parentTaskId={taskDetails.task.id}
-                            childTasks={localChildTasks}
-                            columns={columns}
-                            onOpenTask={onOpenLinkedTask}
-                            onChange={refreshDetails}
-                          />
+                          taskType === "subtask" ? (
+                            <div className="rounded-lg border border-dashed px-4 py-3 text-sm text-muted-foreground">
+                              Subtasks cannot have child tickets.
+                            </div>
+                          ) : (
+                            <TaskChildSubtasksPanel
+                              parentTaskId={taskDetails.task.id}
+                              childTasks={localChildTasks}
+                              columns={columns}
+                              onOpenTask={onOpenLinkedTask}
+                              onChange={refreshDetails}
+                            />
+                          )
                         ) : null}
                         {discussionPanel}
                       </div>

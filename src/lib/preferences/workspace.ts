@@ -1,8 +1,10 @@
 import type { BoardTypeFilter } from "@/lib/tasks/task-types";
+import type { RoadmapColumnId } from "@/lib/tasks/roadmap-settings";
 
 export type TasksWorkspacePrefs = {
   descriptionHeight?: number;
   boardFilters?: Record<string, BoardTypeFilter>;
+  roadmapColumnWidths?: Record<string, Partial<Record<RoadmapColumnId, number>>>;
 };
 
 export const DEFAULT_TASKS_WORKSPACE: TasksWorkspacePrefs = {
@@ -60,10 +62,23 @@ export function parseTasksWorkspace(
         )
       : undefined;
 
+  const roadmapColumnWidths =
+    value.roadmapColumnWidths && typeof value.roadmapColumnWidths === "object"
+      ? Object.fromEntries(
+          Object.entries(value.roadmapColumnWidths).filter(
+            (entry): entry is [string, Partial<Record<RoadmapColumnId, number>>] =>
+              typeof entry[0] === "string" &&
+              entry[1] !== null &&
+              typeof entry[1] === "object"
+          )
+        )
+      : undefined;
+
   return {
     descriptionHeight:
       typeof height === "number" && height >= 120 && height <= 800 ? height : 180,
     boardFilters,
+    roadmapColumnWidths,
   };
 }
 

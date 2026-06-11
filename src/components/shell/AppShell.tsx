@@ -42,6 +42,8 @@ export function AppShell({
   user,
   portalSubtitle,
   portalSubtitleEnabled,
+  showVersionInHeader,
+  nexusVersion,
   initialAppSidebarCollapsed,
   recordingSettings,
 }: {
@@ -55,6 +57,8 @@ export function AppShell({
   };
   portalSubtitle: string;
   portalSubtitleEnabled: boolean;
+  showVersionInHeader: boolean;
+  nexusVersion: string;
   initialAppSidebarCollapsed: boolean;
   recordingSettings?: Partial<RecordingSettings>;
 }) {
@@ -109,7 +113,15 @@ export function AppShell({
           {portalSubtitleEnabled && portalSubtitle ? (
             <div className="hidden text-sm text-muted-foreground md:block">
               {portalSubtitle}
+              {showVersionInHeader && nexusVersion ? (
+                <>
+                  {"  •  "}
+                  <span>v{nexusVersion}</span>
+                </>
+              ) : null}
             </div>
+          ) : showVersionInHeader && nexusVersion ? (
+            <div className="hidden text-sm text-muted-foreground md:block">v{nexusVersion}</div>
           ) : (
             <div className="hidden md:block" />
           )}

@@ -54,6 +54,9 @@ export function SystemSettingsPanel({
   const [portalSubtitleEnabled, setPortalSubtitleEnabled] = useState(
     settings.portalSubtitleEnabled
   );
+  const [showVersionInHeader, setShowVersionInHeader] = useState(
+    settings.showVersionInHeader
+  );
   const [recordingAudioMimeType, setRecordingAudioMimeType] = useState(
     settings.recordingAudioMimeType ?? DEFAULT_RECORDING_MIME_TYPE
   );
@@ -79,6 +82,7 @@ export function SystemSettingsPanel({
           aiModel: model,
           portalSubtitle,
           portalSubtitleEnabled,
+          showVersionInHeader,
           recordingAudioMimeType,
           recordingAudioBitrateKbps,
         });
@@ -166,6 +170,18 @@ export function SystemSettingsPanel({
             <Switch
               checked={portalSubtitleEnabled}
               onCheckedChange={setPortalSubtitleEnabled}
+            />
+          </div>
+          <div className="flex items-center justify-between rounded-md border px-3 py-2">
+            <div>
+              <p className="text-sm font-medium">Show version number in header</p>
+              <p className="text-xs text-muted-foreground">
+                Appends the Nexus release version next to the header subtitle (e.g. v4.7.1).
+              </p>
+            </div>
+            <Switch
+              checked={showVersionInHeader}
+              onCheckedChange={setShowVersionInHeader}
             />
           </div>
         </div>

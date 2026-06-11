@@ -53,8 +53,8 @@ A **Jira-inspired** task board with tickets, hierarchy, roadmap planning, and co
 - **Backlog modal** — full-screen table (key, title, type, parent, assignee, priority, due date, points, status); search/filter; rank via drag handle; drag rows onto board columns or use **Move to board** dropdown.
 - **Issues view** — sortable columns, column visibility, quick filters, row selection, and bulk actions (assign, move, priority, delete).
 - **View switcher** — jump between Board, Issues, and Roadmap from the page header.
-- **Roadmap** — tree-ordered hierarchy (children directly under parents); inline bulk editing with draft/commit workflow; **insert rows between lines**; parent picker shows full ticket names and respects hierarchy rules; **configurable column visibility**, **saved views**, and **Gantt-style timeline bars** (start/end dates, drag to move, resize handles).
-- **Tickets** — tabbed detail modal (wider layout) with **auto-growing** rich text description (lists/headings), **parent ticket link in header**, **subtask management** (add, edit title, change status, delete) from the parent modal, **RAG indexed** green tick on attachments, attachment preview, and more.
+- **Roadmap** — tree-ordered hierarchy (children directly under parents); inline bulk editing with draft/commit workflow; **insert rows between lines** (left-aligned with Key column); parent picker shows full ticket names and respects hierarchy rules; **resizable column widths** (persisted per user and project); **configurable column visibility**, **saved views**, and **Gantt-style timeline bars** (start/end dates, drag to move, resize handles).
+- **Tickets** — tabbed detail modal (wider layout) with **auto-growing** rich text description (lists/headings), **parent ticket link in header**, **subtask management** from parent tickets (Subtask type cannot have children), **RAG indexed** green tick on attachments, attachment preview, and more.
 - **Project settings** — tabbed layout (General, Board, Roadmap, Hierarchy, Fields & Display, **Access**); columns, **labels** (create, edit, delete, colour), **project member access** (view/edit per user), **board card fields** (parent, due date, stale indicator, child subtasks), **visible board types**, **bug visibility default** (show bugs / hide bugs / always show all types), and clearer **hierarchy rules** UI.
 
 ### Monitoring
@@ -107,7 +107,7 @@ At `/meetings` (requires `meetings:view`):
 Admins manage the portal itself:
 
 - **Users** — create pending accounts, assign roles, elevate status, send welcome emails, disable users, set **per-module view/edit permissions**, and **share projects** (view/edit per project).
-- **System settings** — AI model choice, header subtitle, meeting recording format/bitrate, and **send test email** to verify SMTP2go.
+- **System settings** — AI model choice, header subtitle, **optional Nexus version in header** (toggle), meeting recording format/bitrate, and **send test email** to verify SMTP2go.
 - **Knowledge base** — RAG chunk browser, index health, 7/30-day retrieval analytics, pipeline debug test search (vector/keyword/fused scores), reindex, and staged backfill progress (`?tab=knowledge`).
 - **Audit logs** — review who did what, filter, export, or ask AI to summarise activity.
 

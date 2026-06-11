@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createId } from "@/lib/create-id";
 import {
   Bookmark,
@@ -51,6 +51,7 @@ import { hierarchyDepth, sortRoadmapRows } from "@/lib/tasks/roadmap-order";
 import {
   DEFAULT_ROADMAP_VISIBLE_COLUMNS,
   ROADMAP_COLUMN_LABELS,
+  resolveRoadmapColumnWidths,
   type RoadmapColumnId,
   type RoadmapSavedView,
   parseProjectRoadmapSettings,
@@ -128,12 +129,16 @@ export function TasksRoadmapView({
   hierarchyRules,
   onOpenTask,
   onRefresh,
+  initialColumnWidths,
+  onColumnWidthsChange,
 }: {
   board: ProjectBoard;
   projectUsers: { id: string; name: string }[];
   hierarchyRules: HierarchyRules;
   onOpenTask: (task: BoardTask) => void;
   onRefresh: () => Promise<void> | void;
+  initialColumnWidths?: Partial<Record<RoadmapColumnId, number>>;
+  onColumnWidthsChange?: (widths: Partial<Record<RoadmapColumnId, number>>) => void;
 }) {
   const [isPending, startTransition] = useTransition();
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -149,6 +154,21 @@ export function TasksRoadmapView({
   );
   const [savedViews, setSavedViews] = useState<RoadmapSavedView[]>(roadmapSettings.savedViews);
   const [viewNameDraft, setViewNameDraft] = useState("");
+  const [columnWidths, setColumnWidths] = useState(() =>
+    resolveRoadmapColumnWidths(initialColumnWidths)
+  );
+  const columnWidthsRef = useRef(columnWidths);
+  const resizeStateRef = useRef<{ column: RoadmapColumnId; startX: number; startWidth: number } | null>(
+    null
+  );
+
+  useEffect(() => {
+    columnWidthsRef.current = columnWidths;
+  }, [columnWidths]);
+
+  useEffect(() => {
+    setColumnWidths(resolveRoadmapColumnWidths(initialColumnWidths));
+  }, [board.project.id, initialColumnWidths]);
 
   useEffect(() => {
     setVisibleColumns(roadmapSettings.visibleColumns);
@@ -157,6 +177,56 @@ export function TasksRoadmapView({
 
   const showColumn = (column: RoadmapColumnId) => visibleColumns.includes(column);
   const columnCount = visibleColumns.length;
+
+  const startColumnResize = useCallback(
+    (column: RoadmapColumnId, event: React.MouseEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      event.stopPropagation();
+      resizeStateRef.current = {
+        column,
+        startX: event.clientX,
+        startWidth: columnWidthsRef.current[column],
+      };
+
+      const onMouseMove = (moveEvent: MouseEvent) => {
+        const state = resizeStateRef.current;
+        if (!state) return;
+        const nextWidth = Math.min(
+          800,
+          Math.max(60, state.startWidth + moveEvent.clientX - state.startX)
+        );
+        setColumnWidths((prev) => ({ ...prev, [state.column]: nextWidth }));
+      };
+
+      const onMouseUp = () => {
+        document.removeEventListener("mousemove", onMouseMove);
+        document.removeEventListener("mouseup", onMouseUp);
+        resizeStateRef.current = null;
+        onColumnWidthsChange?.(columnWidthsRef.current);
+      };
+
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("mouseup", onMouseUp);
+    },
+    [onColumnWidthsChange]
+  );
+
+  const renderColumnHeader = (column: RoadmapColumnId, label: React.ReactNode) => (
+    <th
+      key={column}
+      className="relative px-3 py-2"
+      style={{ width: columnWidths[column], minWidth: columnWidths[column] }}
+    >
+      {label}
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label={`Resize ${ROADMAP_COLUMN_LABELS[column] || column} column`}
+        className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-primary/30"
+        onMouseDown={(event) => startColumnResize(column, event)}
+      />
+    </th>
+  );
 
   const defaultColumnId =
     board.columns.find((column) => column.isBacklog)?.id ??
@@ -571,29 +641,35 @@ export function TasksRoadmapView({
       </div>
 
       <div className="overflow-x-auto rounded-xl border">
-        <table className="min-w-[980px] w-full text-sm">
+        <table className="min-w-[980px] w-full table-fixed text-sm">
+          <colgroup>
+            {visibleColumns.map((column) => (
+              <col key={column} style={{ width: columnWidths[column] }} />
+            ))}
+          </colgroup>
           <thead className="border-b bg-muted/30 text-left text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
-              {showColumn("key") ? <th className="px-3 py-2">Key</th> : null}
-              {showColumn("title") ? <th className="min-w-[220px] px-3 py-2">Title</th> : null}
-              {showColumn("type") ? <th className="px-3 py-2">Type</th> : null}
-              {showColumn("parent") ? <th className="px-3 py-2">Parent</th> : null}
-              {showColumn("assignee") ? <th className="px-3 py-2">Assignee</th> : null}
-              {showColumn("priority") ? <th className="px-3 py-2">Priority</th> : null}
-              {showColumn("dueDate") ? <th className="px-3 py-2">Due</th> : null}
-              {showColumn("startDate") ? <th className="px-3 py-2">Start</th> : null}
-              {showColumn("endDate") ? <th className="px-3 py-2">End</th> : null}
-              {showColumn("storyPoints") ? <th className="px-3 py-2">Points</th> : null}
-              {showColumn("status") ? <th className="px-3 py-2">Status</th> : null}
+              {showColumn("key") ? renderColumnHeader("key", "Key") : null}
+              {showColumn("title") ? renderColumnHeader("title", "Title") : null}
+              {showColumn("type") ? renderColumnHeader("type", "Type") : null}
+              {showColumn("parent") ? renderColumnHeader("parent", "Parent") : null}
+              {showColumn("assignee") ? renderColumnHeader("assignee", "Assignee") : null}
+              {showColumn("priority") ? renderColumnHeader("priority", "Priority") : null}
+              {showColumn("dueDate") ? renderColumnHeader("dueDate", "Due") : null}
+              {showColumn("startDate") ? renderColumnHeader("startDate", "Start") : null}
+              {showColumn("endDate") ? renderColumnHeader("endDate", "End") : null}
+              {showColumn("storyPoints") ? renderColumnHeader("storyPoints", "Points") : null}
+              {showColumn("status") ? renderColumnHeader("status", "Status") : null}
               {showColumn("timeline") ? (
-                <th className="min-w-[320px] px-3 py-2">
+                renderColumnHeader(
+                  "timeline",
                   <RoadmapTimelineHeader
                     rangeStart={timelineRange.start}
                     rangeEnd={timelineRange.end}
                   />
-                </th>
+                )
               ) : null}
-              {showColumn("delete") ? <th className="px-3 py-2" /> : null}
+              {showColumn("delete") ? renderColumnHeader("delete", null) : null}
             </tr>
           </thead>
           <tbody>
@@ -614,35 +690,50 @@ export function TasksRoadmapView({
 
                 if (hiddenByParent) return [];
 
+                const insertAlignColumn: RoadmapColumnId = showColumn("key")
+                  ? "key"
+                  : visibleColumns[0] ?? "key";
+                const insertPaddingLeft =
+                  insertAlignColumn === "key" ? 12 + depth * 12 : 12;
+
                 const insertRow = (
                   <tr key={`insert-after-${row.id}`} className="group/insert border-0">
-                    <td colSpan={columnCount} className="relative h-0 p-0">
-                      <div className="absolute inset-x-0 -top-2 z-10 flex justify-center opacity-0 transition group-hover/insert:opacity-100">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              className="h-6 gap-1 rounded-full px-2 text-[10px] shadow-sm"
-                            >
-                              <Plus className="h-3 w-3" />
-                              Insert below
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="center">
-                            {TASK_TYPES.map((type) => (
-                              <DropdownMenuItem
-                                key={type}
-                                onClick={() => addRow(type, row.id)}
-                              >
-                                {TASK_TYPE_LABELS[type]}
-                              </DropdownMenuItem>
-                            ))}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </td>
+                    {visibleColumns.map((column) =>
+                      column === insertAlignColumn ? (
+                        <td key={column} className="relative h-0 p-0 align-top">
+                          <div
+                            className="absolute -top-2 z-10 flex justify-start opacity-0 transition group-hover/insert:opacity-100"
+                            style={{ paddingLeft: insertPaddingLeft }}
+                          >
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-6 gap-1 rounded-full px-2 text-[10px] shadow-sm"
+                                >
+                                  <Plus className="h-3 w-3" />
+                                  Insert below
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="start">
+                                {TASK_TYPES.map((type) => (
+                                  <DropdownMenuItem
+                                    key={type}
+                                    onClick={() => addRow(type, row.id)}
+                                  >
+                                    {TASK_TYPE_LABELS[type]}
+                                  </DropdownMenuItem>
+                                ))}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </td>
+                      ) : (
+                        <td key={column} className="relative h-0 p-0" />
+                      )
+                    )}
                   </tr>
                 );
 

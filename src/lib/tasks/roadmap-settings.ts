@@ -32,6 +32,41 @@ export const ROADMAP_COLUMN_LABELS: Record<RoadmapColumnId, string> = {
   delete: "",
 };
 
+export const DEFAULT_ROADMAP_COLUMN_WIDTHS: Record<RoadmapColumnId, number> = {
+  key: 120,
+  title: 240,
+  type: 120,
+  parent: 180,
+  assignee: 140,
+  priority: 100,
+  dueDate: 120,
+  startDate: 120,
+  endDate: 120,
+  storyPoints: 80,
+  status: 120,
+  timeline: 320,
+  delete: 48,
+};
+
+const MIN_ROADMAP_COLUMN_WIDTH = 60;
+const MAX_ROADMAP_COLUMN_WIDTH = 800;
+
+export function resolveRoadmapColumnWidths(
+  saved: Partial<Record<RoadmapColumnId, number>> | undefined
+): Record<RoadmapColumnId, number> {
+  const result = { ...DEFAULT_ROADMAP_COLUMN_WIDTHS };
+  if (!saved) return result;
+
+  for (const column of ROADMAP_COLUMN_IDS) {
+    const value = saved[column];
+    if (typeof value === "number" && value >= MIN_ROADMAP_COLUMN_WIDTH && value <= MAX_ROADMAP_COLUMN_WIDTH) {
+      result[column] = value;
+    }
+  }
+
+  return result;
+}
+
 export const DEFAULT_ROADMAP_VISIBLE_COLUMNS: RoadmapColumnId[] = [
   "key",
   "title",
